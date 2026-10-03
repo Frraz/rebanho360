@@ -1,8 +1,8 @@
 """Exportação de dados — o pedido, o andamento e o arquivo pronto.
 
 O pedido grava **tudo o que é preciso para repetir a exportação**: quais
-conjuntos, quais formatos, quais filtros. O arquivo expira (decisão de
-retenção, pendência #45); o registro do pedido nunca sai do banco, como
+conjuntos, quais formatos, quais filtros. O arquivo expira (30 dias,
+decisão de Warley em 2026-10-03); o registro do pedido nunca sai do banco, como
 qualquer outro registro do sistema (regra 5).
 
 O andamento é para o usuário ler: a tela pergunta de tempos em tempos

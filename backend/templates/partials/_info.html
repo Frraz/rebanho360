@@ -10,7 +10,7 @@
     <div data-info-dialog x-show="aberto" x-cloak class="fixed inset-0 z-[55] flex items-end justify-center sm:items-center sm:p-6"
          role="dialog" aria-modal="true" aria-labelledby="info-{{ slug }}-titulo">
       <div class="absolute inset-0 bg-brand-950/60" @click="aberto = false; $refs.abrir.focus()" x-show="aberto" x-transition.opacity.duration.150ms></div>
-      <div class="relative flex max-h-[88vh] w-full flex-col rounded-t-xl bg-white shadow-float sm:max-w-xl sm:rounded-xl"
+      <div class="sheet relative flex max-h-[88vh] w-full flex-col rounded-t-xl bg-surface shadow-float sm:max-w-xl sm:rounded-xl"
            x-show="aberto" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-6 opacity-0"
            x-transition:enter-end="translate-y-0 opacity-100" x-transition:leave="transition ease-in duration-150"
            x-transition:leave-start="translate-y-0 opacity-100" x-transition:leave-end="translate-y-6 opacity-0">

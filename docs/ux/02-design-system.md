@@ -16,13 +16,13 @@ O Rebanho360 é um instrumento de trabalho, não um site. A interface transmite 
 - **Cor nunca sozinha.** Todo status tem texto e um marcador de forma.
 - **Celular é o caso difícil.** Alvo mínimo 44 px, tabela vira cartão, ação principal no rodapé.
 
-Evitar: gradiente decorativo, sombra pesada, glassmorphism, emoji, ícone sem função, cartão dentro de cartão, pílulas em excesso, ilustração.
+Evitar: gradiente decorativo, sombra pesada, glassmorphism (exceção: o tema escuro usa vidro **só em quem flutua**, seção 14), emoji, ícone sem função, cartão dentro de cartão, pílulas em excesso, ilustração.
 
 ---
 
 ## 2. Tokens
 
-Definidos em [`backend/tailwind.config.js`](../../backend/tailwind.config.js). Os nomes `gray`, `red`, `amber`, `green`, `blue` foram **redefinidos** para a paleta do sistema; use-os normalmente.
+Definidos em [`backend/tailwind.config.js`](../../backend/tailwind.config.js), com os **valores** em variáveis CSS no topo de `input.css` (um conjunto por tema, [seção 14](#14-tema-escuro)). Os nomes `gray`, `red`, `amber`, `green`, `blue` foram **redefinidos** para a paleta do sistema; use-os normalmente. A tabela abaixo traz os valores do tema claro.
 
 ### Cor
 
@@ -199,6 +199,39 @@ Decisão de 03/10/2026: a análise ganhou tela própria (**Dashboard**, abaixo d
 
 **Checklist de gráfico novo:** forma certa para o trabalho do dado (ou nem é gráfico: cartão de número) · um eixo · cor pelo papel · tabela equivalente · estado vazio · 360 px sem rolagem horizontal · rodou o validador se a paleta mudou.
 
-## 14. Pendente neste design
+## 14. Tema escuro
 
-Páginas 403/404/500 próprias (com código de referência para erro inesperado) · máscara de dinheiro · modo escuro. Ver [`docs/ux/01-navegacao-e-ui.md`](01-navegacao-e-ui.md#implementação-do-redesign-01102026).
+Decisão de 03/10/2026. Cada usuário escolhe **Claro** ou **Escuro** em **Conta › Aparência** e a escolha fica gravada no cadastro (`User.theme`), valendo em qualquer aparelho. **Não existe alternador no cabeçalho nem em outra tela**: tema é decisão de uma vez, não ação do trabalho do dia. O claro continua exatamente como era (padrão de todo usuário).
+
+**Como funciona.** O servidor grava `data-theme="light|dark"` no `<html>` (context processor `tema_da_interface`, sem piscar no carregamento). As cores são **variáveis CSS** (canais `R G B`) em `input.css`, camada `base`; o `tailwind.config.js` só aponta para elas (`rgb(var(--gray-500) / <alpha-value>)`). Claro em `:root`, escuro em `:root[data-theme="dark"]`. Por isso os templates não mudaram: `text-gray-500`, `bg-brand-50` e companhia trocam de valor, não de nome. Tela de entrar (sem usuário) usa o último tema deste navegador (cookie `r360_tema`, mantido pelo `TemaCookieMiddleware`).
+
+**Não é inversão de cores.** Escala própria, pensada para a superfície escura:
+
+| Papel | Claro | Escuro | Regra |
+|---|---|---|---|
+| Fundo da página (`gray-50`) | `#f6f8f9` | `#0b1318` | Petróleo-tinta, não preto puro nem cinza-azulado genérico |
+| Superfície (`surface`) | `#ffffff` | `#111b22` | **Elevação sobe clareando**: fundo < cartão < menu flutuante |
+| Campo (`field`) | branco | `#0c1519` | Rebaixado em relação ao cartão |
+| Texto principal / secundário | `gray-900` / `gray-500` | `#eef3f6` / `#93a4af` | 15,6:1 e 6,8:1 sobre a superfície; apoio mínimo (`gray-400`) 4,8:1 |
+| Marca (`brand-500…700`) | petróleo escuro | petróleo claro (`#5ab8d6…#8fd2e6`) | Link e foco acendem; **botão sólido usa token próprio** (`action`, `#1f6f8a`, texto branco 5,7:1) |
+| Sálvia / âmbar / vermelho | tons escuros | tons claros dessaturados; fundos de selo viram tinta escura | Texto de selo ≥ 9:1 sobre o fundo do selo |
+
+Tokens novos fora das escalas: `surface`, `field`, `action` (`DEFAULT/hover/active/edge`), `danger` (idem), `accent`, `--shadow-float`. **Use `bg-surface`, nunca `bg-white`** em superfície (exceções: ladrilho do logotipo e QR code, que precisam ser brancos nos dois temas). `.on-dark` (menu lateral, painel de login) **repõe a paleta clara**: já é escuro nos dois temas e seus textos (`text-brand-100/70`) dependem dela.
+
+**O que o escuro acrescenta** (tudo em `@media screen`, no fim de `input.css`; impressão sai sempre no claro):
+
+- **Fundo ambiente:** duas manchas de luz muito baixas (petróleo no alto à direita, sálvia embaixo à esquerda), fixas.
+- **Cartão:** fio de luz no topo e véu de claridade que some em 6 rem. Sem sombra pesada.
+- **Vidro só em quem flutua:** cabeçalho, menu do avatar, lista do seletor, aviso e painéis (`.sheet`) são translúcidos com desfoque (`blur-purpose`: o conteúdo atrás continua sugerido). O vidro do cabeçalho mora em `::before`, porque `backdrop-filter` no próprio elemento viraria bloco de contenção de filho `fixed`.
+- **Neon discreto, sempre com função:** brilho no botão primário, no foco do campo, na barra do item ativo do menu, na borda dos KPIs e no ponto do selo (`confirmada`, `editada`, `erro`). Nunca em texto corrido, nunca animado.
+- **Selo:** fundo tingido + fio da própria cor (`color-mix`); cor continua nunca sozinha.
+- **Botão secundário:** vidro fosco que clareia ao passar o mouse (no claro, escurece); idem hover de linha de tabela e `hover:bg-gray-50`.
+- **Campo:** foco com anel e brilho da marca; preenchimento automático do Chrome neutralizado; seta do `<select>` clara; `color-scheme: dark` deixa nativos (calendário, barra de rolagem) escuros.
+
+**Gráficos do dashboard.** `dashboard.js` escolhe a paleta por `data-theme`. Categórica escura: `#3a9bc4 #d95926 #199e70 #c98500 #d55181 #008300 #9085e9 #e66767`, **validada** com o validador da skill `dataviz` em `--mode dark --surface #101a21` (faixa de luminosidade, croma, CVD adjacente 8,4, visão normal 19,3, contraste ≥ 3:1: todos passam). Magnitude no escuro inverte a âncora (pouco some no fundo, muito acende). Polaridade segue azul ↔ vermelho. Regra de ouro do `dataviz`: **dark é selecionado, não derivado** — mude uma cor e rode o validador nos dois modos.
+
+**Checklist de tela nova (vale para os dois temas):** use só tokens e componentes (nada de hex em template; `style="color:…"` proibido) · `bg-surface` e não `bg-white` · cor de gráfico por `TEMA` em `dashboard.js` · ver a tela nos dois temas, a 360 px e a 1366 px antes de dar por pronta · contraste do texto ≥ 4,5:1 nos dois.
+
+## 15. Pendente neste design
+
+Páginas 403/404/500 próprias (com código de referência para erro inesperado) · máscara de dinheiro. Ver [`docs/ux/01-navegacao-e-ui.md`](01-navegacao-e-ui.md#implementação-do-redesign-01102026).

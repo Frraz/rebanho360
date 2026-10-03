@@ -23,6 +23,11 @@ urlpatterns = [
         name="2fa_configurar",
     ),
     path(
+        "2fa/desativar/",
+        views.DesativarSegundoFatorView.as_view(),
+        name="2fa_desativar",
+    ),
+    path(
         "2fa/verificar/",
         views.VerificarSegundoFatorView.as_view(),
         name="2fa_verificar",
@@ -39,6 +44,7 @@ urlpatterns = [
         name="dispositivos_revogar_todos",
     ),
     path("conta/", views.ContaView.as_view(), name="conta"),
+    path("conta/tema/", views.TemaView.as_view(), name="tema"),
     path("senha/trocar/", views.PasswordChangeView.as_view(), name="password_change"),
     path("senha/redefinir/", views.PasswordResetView.as_view(), name="password_reset"),
     path(

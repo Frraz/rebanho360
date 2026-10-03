@@ -29,7 +29,7 @@ Pode esperar: até aqui os pagamentos continuam sendo controlados fora do sistem
 - Corrigir/excluir/restaurar a operação mexe nos títulos como efeitos dela; valor ou favorecido diferentes anulam a aprovação.
 - `Purchase.bloqueios()` olha também os pagamentos da **venda do lote** que a compra criou — o caso do documento.
 
-**Pendências abertas pela fase:** [#16](../regras-negocio/99-pendencias-resolvidas.md) (prazo/parcelas), [#17](../regras-negocio/99-pendencias-resolvidas.md) (a quem vão frete/comissão/impostos; quem aprova e paga), [#18](../regras-negocio/99-pendencias-resolvidas.md) (o histórico), [#19](../regras-negocio/99-pendencias.md) (troca de celular no 2FA). Tudo com padrão reversível.
+**Pendências abertas pela fase:** [#16](../regras-negocio/99-pendencias-resolvidas.md) (prazo/parcelas), [#17](../regras-negocio/99-pendencias-resolvidas.md) (a quem vão frete/comissão/impostos; quem aprova e paga), [#18](../regras-negocio/99-pendencias-resolvidas.md) (o histórico), [#19](../regras-negocio/99-pendencias-resolvidas.md) (2FA opcional; troca de celular). Todas respondidas ou com padrão reversível.
 
 **O que não foi feito, e por quê**
 

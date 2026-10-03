@@ -62,6 +62,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     # Depois das mensagens (usa `messages`) e do segundo fator (que vem primeiro).
     "apps.accounts.middleware.PasswordChangeRequiredMiddleware",
+    "apps.accounts.middleware.TemaCookieMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
 ]
@@ -80,6 +81,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.contexto_fixo",
+                "apps.core.context_processors.tema_da_interface",
             ],
         },
     },
@@ -184,9 +186,9 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # --- Exportação de dados (docs/regras-negocio/10-exportacao-de-dados.md) ---
-# O arquivo gerado fica disponível por este prazo; depois é apagado (o pedido
-# e a auditoria ficam). Pendência #45.
-EXPORT_RETENTION_DAYS = config("EXPORT_RETENTION_DAYS", default=7, cast=int)
+# O arquivo gerado fica disponível por este prazo (30 dias, decisão de Warley em
+# 2026-10-03); depois é apagado sem volta (o pedido e a auditoria ficam).
+EXPORT_RETENTION_DAYS = config("EXPORT_RETENTION_DAYS", default=30, cast=int)
 # Quantas exportações um usuário pode ter ao mesmo tempo (na fila ou rodando).
 EXPORT_MAX_ACTIVE_PER_USER = config("EXPORT_MAX_ACTIVE_PER_USER", default=2, cast=int)
 
@@ -200,10 +202,10 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB (anexo)
 # perfis sensíveis: com o segundo fator ativo, a sessão deles morre ao fechar
 # o navegador.
 TWO_FACTOR_ROLES = ("ADMIN", "FINANCEIRO")
-# Pendência #19: o cliente ainda avalia se o segundo fator é sustentável na
-# operação. Se adotar, será obrigatório para **todos** os usuários (não só
-# `ADMIN` e `FINANCEIRO`): basta ligar esta variável — quem ainda não ativou é
-# levado direto à configuração no próximo acesso.
+# Decisão de Warley (2026-10-03): o segundo fator fica opcional para todos. Se a
+# regra mudar, será obrigatório para **todos** (não só `ADMIN` e `FINANCEIRO`):
+# basta ligar esta variável — quem ainda não ativou é levado direto à
+# configuração no próximo acesso.
 TWO_FACTOR_OBRIGATORIO = config("TWO_FACTOR_OBRIGATORIO", default=False, cast=bool)
 TWO_FACTOR_ISSUER = "Rebanho360"
 # Passos de 30 s aceitos antes e depois do atual — tolera relógio de celular
@@ -217,10 +219,13 @@ TWO_FACTOR_WINDOW = 1
 # Nesse navegador a sessão persiste `TRUSTED_SESSION_DAYS` dias, com logout
 # depois de `TRUSTED_IDLE_HOURS` horas sem uso. Mudar de IP não revoga: só audita.
 TRUSTED_DEVICE_COOKIE = "r360_dispositivo"
+# Último tema escolhido neste navegador. Só serve às telas sem login (entrar,
+# redefinir senha), que não sabem quem é o usuário; logado, vale o do cadastro.
+THEME_COOKIE = "r360_tema"
 TRUSTED_DEVICE_DAYS = 30
 TRUSTED_DEVICE_MAX_DAYS = 90
 TRUSTED_SESSION_DAYS = 14
-TRUSTED_IDLE_HOURS = 8
+TRUSTED_IDLE_HOURS = 24  # decisão de Warley, 2026-10-03 (antes 8)
 
 # --- Console de auditoria (docs/regras-negocio/06) ---
 AUDIT_CONSOLE_INCLUDE_GESTOR = config(

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.forms import PasswordChangeForm
@@ -11,7 +12,8 @@ from apps.accounts import services as account_services
 from apps.accounts import trusted_devices, two_factor
 from apps.accounts import user_management as usuarios
 from apps.accounts.forms import ContaForm
-from apps.accounts.models import TrustedDevice
+from apps.accounts.middleware import gravar_cookie_do_tema
+from apps.accounts.models import Tema, TrustedDevice
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
 from apps.core.exceptions import BusinessError
@@ -88,6 +90,13 @@ class LogoutView(auth_views.LogoutView):
 # --------------------------------------------------------------------------
 
 
+#: (valor, rótulo, ícone) na ordem em que a página Conta os oferece.
+TEMAS_DA_CONTA = (
+    (Tema.CLARO.value, Tema.CLARO.label, "sun"),
+    (Tema.ESCURO.value, Tema.ESCURO.label, "moon"),
+)
+
+
 def contexto_da_conta(request, *, form=None, senha_form=None) -> dict:
     """Tudo o que a página Conta mostra. Compartilhado com a troca de senha, que
     reabre a página com os erros quando a senha nova é recusada."""
@@ -99,11 +108,13 @@ def contexto_da_conta(request, *, form=None, senha_form=None) -> dict:
             for a in usuario.farm_access.select_related("farm").order_by("farm__name")
         ]
     return {
+        "temas": TEMAS_DA_CONTA,
         "form": form or ContaForm(usuario=usuario),
         "senha_form": senha_form or PasswordChangeForm(usuario),
         "cpf_formatado": formatar_cpf(usuario.cpf),
         "fazendas_do_usuario": acessos,
         "segundo_fator_ativo": two_factor.dispositivo_confirmado(usuario) is not None,
+        "segundo_fator_obrigatorio": settings.TWO_FACTOR_OBRIGATORIO,
         "codigos_restantes": two_factor.codigos_de_recuperacao_restantes(usuario),
         "dispositivos_confiaveis": _dispositivos_para_a_conta(request),
     }
@@ -153,6 +164,33 @@ class ContaView(LoginRequiredMixin, View):
         return render(
             request, self.template_name, contexto_da_conta(request, form=form)
         )
+
+
+class TemaView(LoginRequiredMixin, View):
+    """O usuário escolhe o tema claro ou escuro da própria interface. Só POST: a
+    escolha mora na página Conta, que mostra e salva."""
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        tema = request.POST.get("tema", "")
+        destino = reverse("accounts:conta") + "#aparencia"
+        try:
+            mudou = usuarios.definir_tema(request.user, tema)
+        except BusinessError as exc:
+            messages.error(request, f"✗ {exc}")
+            return redirect(destino)
+        nome = Tema(request.user.theme).label.lower()
+        if mudou:
+            messages.success(
+                request,
+                f"✓ Tema {nome} ativado. Ele vale para a sua conta em qualquer aparelho.",
+            )
+        else:
+            messages.info(request, f"Nada mudou: o tema já era o {nome}.")
+        resposta = redirect(destino)
+        gravar_cookie_do_tema(resposta, request.user.theme)
+        return resposta
 
 
 class PasswordChangeView(auth_views.PasswordChangeView):
@@ -461,6 +499,34 @@ class StatusSegundoFatorView(LoginRequiredMixin, View):
             "registration/2fa_codigos.html",
             {"codigos": codigos, "recem_ativado": False},
         )
+
+
+class DesativarSegundoFatorView(LoginRequiredMixin, View):
+    """O usuário desliga o próprio segundo fator, com a senha e um código."""
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        try:
+            revogados = two_factor.desativar_segundo_fator(
+                request.user,
+                senha=request.POST.get("senha", ""),
+                codigo=request.POST.get("codigo", ""),
+            )
+        except two_factor.DesativacaoNegada as exc:
+            messages.error(request, str(exc))
+            return redirect(reverse("accounts:conta") + "#seguranca")
+        # Os dispositivos acabaram de ser revogados; a sessão de quem pediu não
+        # deve cair por isso (SessaoLongaMiddleware derrubaria).
+        request.session.pop(trusted_devices.SESSION_DISPOSITIVO, None)
+        request.session.pop(trusted_devices.SESSION_ATIVIDADE, None)
+        mensagem = "✓ Segundo fator desativado. Você volta a entrar só com a senha."
+        if revogados:
+            mensagem += f" {revogados} dispositivo(s) confiável(is) revogado(s)."
+        messages.success(request, mensagem)
+        resposta = redirect(reverse("accounts:conta") + "#seguranca")
+        resposta.delete_cookie(settings.TRUSTED_DEVICE_COOKIE)
+        return resposta
 
 
 # --------------------------------------------------------------------------

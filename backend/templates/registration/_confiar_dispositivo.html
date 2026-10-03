@@ -1,0 +1,19 @@
+{# Caixa "Confiar neste dispositivo": vem DESMARCADA (decisão de 2026-10-03). A explicação fica recolhida para não poluir a tela. #}
+<div>
+  <label class="flex min-h-touch items-start gap-3 text-sm">
+    <input type="checkbox" name="confiar" value="1" class="mt-1" aria-describedby="ajuda-confiar">
+    <span>
+      <span class="font-medium text-gray-900">Confiar neste dispositivo por 30 dias</span>
+      <span class="block text-gray-500" id="ajuda-confiar">Opcional. Não marque em computador compartilhado.</span>
+    </span>
+  </label>
+  <details class="mt-1 pl-7 text-xs text-gray-500">
+    <summary class="cursor-pointer">Como funciona o segundo fator?</summary>
+    <div class="mt-2 space-y-2">
+      <p>Além da senha, o sistema pede um código de 6 dígitos que muda a cada 30 segundos e aparece no aplicativo do seu celular. Quem descobrir sua senha não entra sem o celular.</p>
+      <p><strong class="font-medium text-gray-700">Marcada:</strong> neste navegador o código não é pedido de novo por 30 dias (o prazo renova a cada uso e vale, no máximo, 90 dias). A senha continua sendo pedida, e você é desconectado depois de 24 horas sem usar o sistema.</p>
+      <p><strong class="font-medium text-gray-700">Desmarcada:</strong> o código é pedido em toda entrada.</p>
+      <p>Você pode retirar a confiança a qualquer momento em Conta.</p>
+    </div>
+  </details>
+</div>

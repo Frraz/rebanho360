@@ -323,6 +323,15 @@ class TestManutencao:
             entity_id=str(job.job_id), action="DELETE", reason__contains="prazo"
         ).exists()
 
+    def test_o_prazo_padrao_e_de_30_dias(self, na_fila, gestor, operacao, settings):
+        del settings.EXPORT_RETENTION_DAYS  # o que vale sem o .env
+        job = services.executar_exportacao(na_fila(gestor).pk)
+        assert (
+            datetime.timedelta(days=29, hours=23)
+            < job.expires_at - job.finished_at
+            <= datetime.timedelta(days=30)
+        )
+
     def test_o_prazo_vem_da_configuracao(self, na_fila, gestor, operacao, settings):
         settings.EXPORT_RETENTION_DAYS = 2
         job = services.executar_exportacao(na_fila(gestor).pk)

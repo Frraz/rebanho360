@@ -85,7 +85,7 @@ class ExportacaoCancelada(Exception):
 
 
 def _retencao() -> timedelta:
-    return timedelta(days=getattr(settings, "EXPORT_RETENTION_DAYS", 7))
+    return timedelta(days=getattr(settings, "EXPORT_RETENTION_DAYS", 30))
 
 
 def _limite_de_ativas() -> int:

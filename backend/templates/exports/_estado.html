@@ -42,7 +42,7 @@
         <button type="submit" class="btn-danger-outline w-full sm:w-auto">{% icon "trash-2" %} Apagar o arquivo</button>
       </form>
     </div>
-    <p class="mt-3 text-xs text-gray-500">Disponível até {{ job.expires_at|date:"d/m/Y H:i" }}. Depois disso o arquivo é apagado do servidor por segurança; o pedido continua na lista.</p>
+    <p class="mt-3 text-xs text-gray-500">Disponível até {{ job.expires_at|date:"d/m/Y H:i" }}. Baixe e guarde onde preferir: depois dessa data o arquivo é apagado do servidor e não há como recuperá-lo. O pedido continua na lista.</p>
 
     {% elif job.status == "ERRO" %}
     <div class="alert-danger" role="alert">{% icon "circle-x" %}<div><p class="font-medium">A exportação não foi concluída.</p><p>{{ job.error }}</p></div></div>

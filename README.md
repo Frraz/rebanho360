@@ -105,7 +105,7 @@ O que ainda falta contra o documento funcional está na [matriz de alinhamento](
 
 ### Perguntas de negócio em aberto
 
-O maior risco do projeto não é técnico, é modelar o negócio errado. Restam **19 pendências** em [99-pendencias](docs/regras-negocio/99-pendencias.md), cada uma com o padrão **mais reversível** já implementado e o código isolado para ajuste; as já respondidas ou dispensadas ficam em [99-pendencias-resolvidas](docs/regras-negocio/99-pendencias-resolvidas.md). As respostas recentes são **provisórias**: serão validadas com os usuários da operação, com o sistema na tela ([roteiro](docs/regras-negocio/14-roteiro-de-validacao-com-os-usuarios.md)). Duas coisas pesam antes de usar com dado real:
+O maior risco do projeto não é técnico, é modelar o negócio errado. Restam **15 pendências** em [99-pendencias](docs/regras-negocio/99-pendencias.md), cada uma com o padrão **mais reversível** já implementado e o código isolado para ajuste; as já respondidas ou dispensadas ficam em [99-pendencias-resolvidas](docs/regras-negocio/99-pendencias-resolvidas.md). As respostas recentes são **provisórias**: serão validadas com os usuários da operação, com o sistema na tela ([roteiro](docs/regras-negocio/14-roteiro-de-validacao-com-os-usuarios.md)). Duas coisas pesam antes de usar com dado real:
 
 - **Tributos:** nada tributário é calculado; Funrural, Fundepec, GTA, ICMS e demais são **valores digitados** (com alíquota, base e favorecido só como registro) até um contador definir as regras ([#21](docs/regras-negocio/99-pendencias.md#21--efeito-padrão-de-cada-natureza-de-tributo-contador-fase-5)).
 - **Mais de uma empresa:** a barra do topo ainda não troca de empresa ([#47](docs/regras-negocio/99-pendencias.md#47--mais-de-uma-empresa-troca-de-empresa-no-topo-e-escopo-fase-0)); hoje só a primeira é operável.
@@ -143,6 +143,8 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py seed_demo
 docker compose exec web sh bin/build_css.sh   # gera backend/static/css/output.css
 ```
+
+Para ver o sistema cheio (12 fazendas, 3 safras, ciclo de compra, financeiro) sem digitar nada, só em desenvolvimento: `docker compose exec web python manage.py seed_operacao_grande`. Para desfazer só o que ele criou: `... desfazer_seed_operacao_grande`. Não mexem em usuários — ver [docs/operacao/01-seed-operacao-grande.md](docs/operacao/01-seed-operacao-grande.md).
 
 `output.css` é **gerado e não é versionado**: sem compilá-lo, a tela abre sem estilo. Recompile depois de mexer em `input.css`, em `tailwind.config.js` ou ao usar classes novas nos templates.
 
@@ -216,7 +218,7 @@ Produção usa `docker-compose.prod.yml` (imagem fixa, sem bind mount; só o `we
 Pontos de atenção do primeiro deploy:
 
 - **Reconstruir a imagem**: `pydyf` está fixada em `0.10.0` (versões mais novas quebram o PDF do WeasyPrint) e a Fase 4 trouxe a `segno`, do QR do 2FA.
-- **2FA é opcional** por padrão (`TWO_FACTOR_OBRIGATORIO=True` o torna obrigatório para todos). Rode `manage.py conferir_segundo_fator` para conferir o relógio do servidor (os códigos dependem dele) e ver quem já usa.
+- **2FA é opcional e recomendado** a todos, por decisão do cliente (`TWO_FACTOR_OBRIGATORIO=True` o torna obrigatório para todos, se a regra mudar). A caixa "Confiar neste dispositivo" vem **desmarcada**. Rode `manage.py conferir_segundo_fator` para conferir o relógio do servidor (os códigos dependem dele) e ver quem já usa.
 - **Configurar o SMTP**, usado nos convites e nos avisos de pedido de acesso (variáveis `EMAIL_*` no `.env.example`): como o e-mail é obrigatório, sem ele ninguém recebe o link de senha.
 - **`.env` com `chmod 600`**, `DJANGO_DEBUG=False` e `DJANGO_HSTS_SECONDS=0` até confirmar que o HTTPS funciona.
 - Nunca usar os usuários de demonstração: o `seed_demo` é só para desenvolvimento.

@@ -108,6 +108,25 @@ class TestDarConfianca:
         assert not TrustedDevice.objects.exists()
         assert client.session.get_expire_at_browser_close()  # como antes
 
+    def test_a_caixa_vem_desmarcada_e_a_explicacao_esta_na_tela(
+        self, client, financeiro
+    ):
+        """Decisão de 2026-10-03: confiar no dispositivo é escolha ativa de quem
+        entra, nunca o padrão."""
+        entrar(client, financeiro)
+        configurar = client.get(reverse("accounts:2fa_configurar")).content.decode()
+        client.post(
+            reverse("accounts:2fa_configurar"), {"codigo": codigo_de(financeiro)}
+        )
+        outro = Client()
+        entrar(outro, financeiro)
+        verificar = outro.get(reverse("accounts:2fa_verificar")).content.decode()
+
+        for html in (configurar, verificar):
+            caixa = html[html.index('name="confiar"') :].split(">", 1)[0]
+            assert "checked" not in caixa
+            assert "Como funciona o segundo fator?" in html
+
     def test_marcar_ao_verificar_tambem_vale(self, client, financeiro):
         ativar(client, financeiro, confiar=False)
         outro = Client()
@@ -360,7 +379,8 @@ class TestRevogar:
 
 
 class TestInatividade:
-    def test_oito_horas_sem_uso_encerram_a_sessao(self, confiado, financeiro):
+    def test_o_limite_de_inatividade_encerra_a_sessao(self, confiado, financeiro):
+        assert settings.TRUSTED_IDLE_HOURS == 24
         sessao = confiado.session
         sessao[trusted_devices.SESSION_ATIVIDADE] = int(time.time()) - (
             settings.TRUSTED_IDLE_HOURS * 3600 + 60

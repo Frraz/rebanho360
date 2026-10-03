@@ -1065,7 +1065,7 @@ AJUDA: dict[str, dict] = {
         "perguntas": [
             (
                 "Quanto tempo o arquivo fica disponível?",
-                "Por alguns dias (7, por padrão). Depois o arquivo é apagado do servidor por segurança; o pedido continua na lista e dá para pedir de novo.",
+                "30 dias, a contar de quando a exportação termina. Nesse prazo você pode baixar o arquivo e guardá-lo onde quiser. Depois, ele é apagado do servidor automaticamente e não há como recuperá-lo; o pedido continua na lista e dá para pedir de novo.",
             ),
             (
                 "Por que a exportação de tudo demora?",
@@ -1166,7 +1166,7 @@ AJUDA: dict[str, dict] = {
     "conta": {
         "titulo": "Conta",
         "resumo": [
-            "É a sua página pessoal: seus dados, a sua senha e a proteção da sua entrada. O que você muda aqui vale só para você.",
+            "É a sua página pessoal: seus dados, a aparência do sistema, a sua senha e a proteção da sua entrada. O que você muda aqui vale só para você.",
         ],
         "relacoes": [
             (
@@ -1174,12 +1174,16 @@ AJUDA: dict[str, dict] = {
                 "Usuário (para entrar), nome, sobrenome, telefone, data de nascimento e CPF. Você entra com o usuário ou com o e-mail. E-mail, papel e fazendas são definidos pelo administrador.",
             ),
             (
+                "Aparência",
+                "Tema claro ou escuro. Ao escolher, a tela já mostra como fica; ele só fica gravado depois de Salvar aparência. A escolha é da sua conta e vale em qualquer aparelho em que você entrar; não muda nada para os outros usuários.",
+            ),
+            (
                 "Senha",
                 "Informe a senha atual e escolha uma nova. As outras sessões abertas em outros aparelhos são encerradas. A troca fica registrada na auditoria, sem a senha.",
             ),
             (
                 "Segundo fator",
-                "O código do aplicativo autenticador, pedido a cada entrada. É obrigatório para Administrador e Financeiro.",
+                "O código do aplicativo autenticador, pedido a cada entrada. É opcional, mas recomendado a todos. Você ativa, gera novos códigos de recuperação, revoga dispositivos confiáveis e, se quiser, desativa por aqui (com a senha e um código).",
             ),
         ],
         "perguntas": [
@@ -1194,6 +1198,14 @@ AJUDA: dict[str, dict] = {
             (
                 "Perdi o celular do segundo fator. E agora?",
                 "Entre com um código de recuperação, se ainda tiver. Sem eles, peça ao administrador para redefinir o seu segundo fator e configure de novo.",
+            ),
+            (
+                "Por que o tema só aparece aqui, e não no topo da tela?",
+                "Porque é uma escolha que você faz uma vez, não uma ação do trabalho do dia. Escolhida, ela acompanha a sua conta: vale no celular, no computador do escritório e em qualquer lugar em que você entrar.",
+            ),
+            (
+                "Posso desativar o segundo fator?",
+                "Pode. Em Segundo fator, use Desativar e confirme com a senha e um código do aplicativo (ou de recuperação). O aplicativo e os códigos são apagados, os dispositivos confiáveis são revogados e a ação fica na auditoria. Dá para ativar de novo quando quiser.",
             ),
         ],
     },

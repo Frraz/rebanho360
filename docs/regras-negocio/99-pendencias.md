@@ -8,7 +8,7 @@ Dúvidas que **continuam sem resposta**. Cada uma tem: a pergunta, por que impor
 
 Os números das pendências **não foram reordenados** (o código e os documentos citam "pendência #N"): faltam números porque esses itens estão no arquivo de resolvidas.
 
-**Abertas (19):** #3 · #7 · #13 · #14 · #19 · #21 · #26 · #29 · #35 · #37 · #38 · #39 · #40 · #42 · #44 · #45 · #47 · #48 · #49
+**Abertas (15):** #3 · #7 · #13 · #14 · #21 · #26 · #29 · #35 · #37 · #38 · #39 · #40 · #44 · #47 · #48
 
 ---
 
@@ -67,16 +67,6 @@ Os números das pendências **não foram reordenados** (o código e os documento
 **Custo de mudar:** baixo — é a função `resultado_do_lote`, isolada em `apps/sales/result.py`.
 
 **🔎 Auditoria de 2026-10-02:** a planilha `REPORTAGEM IVAN` (aba `ANÁLISE PECUÁRIA`) divide o custo pela **@ produzida**, não pela vendida. Quem comparar o painel com o relatório do consultor verá números diferentes sem erro de nenhum dos lados. Ver também [#37](#37--o-que-é-custo-total-e-custo-por-cabeça-no-painel-fase-5).
-
----
-
-## #19 — 🟡 Segundo fator: adotar ou não *(Fase 4)*
-
-**A dúvida:** o cliente ainda avalia se o segundo fator (código no celular) é sustentável na operação. Se adotado, será **obrigatório para todos** os usuários, não só para `ADMIN` e `FINANCEIRO`. E: quantas pessoas vão usá-lo, e quem refaz o acesso de quem perde o celular **e** os códigos de recuperação?
-
-**Implementado:** opcional e recomendado a todos (decisão de Warley, 2026-10-03). Pronto para ligar: `TWO_FACTOR_OBRIGATORIO=True` no `.env` leva quem ainda não ativou direto à configuração. Códigos de recuperação (10, uso único). Perdeu tudo: um `ADMIN` redefine pela tela de usuários (nunca o próprio) ou o servidor roda `manage.py resetar_segundo_fator` — ambos auditados, e as sessões do usuário são encerradas.
-
-**Custo de mudar:** baixo. É uma variável de ambiente; a regra mora em `two_factor.precisa_de_segundo_fator`.
 
 ---
 
@@ -186,43 +176,17 @@ Os números das pendências **não foram reordenados** (o código e os documento
 
 ---
 
-## #42 — 🟢 O que o pedido de acesso deve conter e como confirmar quem pede *(Fase 0)*
-
-**A dúvida:** basta nome, e-mail, telefone e uma frase de justificativa? Falta algo (fazenda, função, quem indicou)? Convém limitar a domínio de e-mail da empresa, ou o administrador decide caso a caso?
-
-**Por que importa:** o pedido é aberto ao público. Pedir pouco deixa o administrador decidindo no escuro; pedir muito afasta quem tem sinal ruim no campo.
-
-**Implementado:** nome completo, e-mail, telefone opcional e texto livre (10 a 1.000 caracteres). O e-mail **não é confirmado antes**: o link para definir a senha só vai ao endereço informado, então só o dono dele entra — e o aviso ao administrador diz isso. Limites: 5 pedidos/hora por IP, 20 avisos por e-mail/hora, um pedido pendente por e-mail, campo-isca contra robô. Nada de CAPTCHA.
-
-**Custo de mudar:** baixo. Campos novos: `AccessRequest` + `SolicitacaoAcessoForm`. Restrição de domínio: um `clean_email`. CAPTCHA só se o abuso aparecer.
-
----
-
 ## #44 — 🟡 Exportação de dados além do PDF *(Fase 6)*
 
 **Onde:** tela *Exportações* ([regra 10](10-exportacao-de-dados.md)).
 
-**A dúvida:** o cliente definiu que **todos os perfis exportam relatórios em PDF**, no escopo de fazendas de cada um. Ficam em aberto as regras de **Excel**, de **auditoria** e de **retenção de arquivos**: quem leva dado em massa para fora? O `GESTOR` deve ver a trilha de auditoria exportada? Algum papel de campo precisa exportar o próprio escopo?
+**A dúvida:** o cliente definiu que **todos os perfis exportam relatórios em PDF**, no escopo de fazendas de cada um. Ficam em aberto as regras de **Excel** e de **auditoria** (a retenção de arquivos já foi decidida: 30 dias, [#45](99-pendencias-resolvidas.md#45--por-quanto-tempo-o-arquivo-fica-e-o-que-a-exportação-não-é-fase-6)): quem leva dado em massa para fora? O `GESTOR` deve ver a trilha de auditoria exportada? Algum papel de campo precisa exportar o próprio escopo?
 
 **Por que importa:** exportar é o jeito mais fácil de vazar a base inteira — compra, custo, parceiros com CPF/CNPJ, contas bancárias.
 
 **Implementado:** a tela de exportação de **dados** abre para `ADMIN`, `GESTOR`, `ESCRITORIO` e `FINANCEIRO` (`CAMPO` e `CONSULTA` não); cada conjunto segue a regra da tela correspondente; contas bancárias só para quem já vê dado bancário; usuários e auditoria só para o `ADMIN`; só quem pediu baixa o arquivo; cada pedido e download vão para a auditoria. Relatórios (PDF, CSV, Excel) abrem para todos, no escopo.
 
 **Custo de mudar:** baixo. Papéis da tela: `PAPEIS_QUE_EXPORTAM` em `apps/exports/permissions.py`; de um conjunto: o campo `permitido` em `apps/exports/catalog.py`.
-
----
-
-## #45 — 🟢 Por quanto tempo o arquivo fica e o que a exportação não é *(Fase 6)*
-
-**Onde:** tela *Exportações* e `manutencao` (Celery beat).
-
-**A dúvida:** (a) o arquivo exportado fica disponível por **7 dias** e depois é apagado do servidor — é o prazo certo? (b) A exportação **não** é um instantâneo atômico do banco: os conjuntos são lidos um depois do outro. Para quem sai do sistema, isso basta, ou é preciso uma exportação "congelada" num instante só? (c) O PDF mostra só as colunas principais e vai até 20.000 linhas por conjunto: aceitável?
-
-**Por que importa:** (a) o arquivo é dado do negócio parado em disco, sem a proteção de papel e escopo do sistema; quanto mais fica, maior a janela de vazamento. (b) Quem exporta "tudo" para guardar de vez espera consistência: um lançamento feito durante a leitura poderia aparecer num conjunto e faltar em outro. (c) PDF de tabela larga é ilegível; o dado completo está nos outros formatos.
-
-**Implementado:** (a) 7 dias (`EXPORT_RETENTION_DAYS`); o dono pode apagar antes; o **pedido** e a auditoria nunca saem. (b) Sem snapshot; o `LEIA-ME` do pacote e a ajuda da tela dizem isso, e apontam o `deploy/backup.sh` para a cópia exata. (c) Como descrito.
-
-**Custo de mudar:** (a) uma variável de ambiente. (b) médio: ler tudo numa transação `REPEATABLE READ` por uma conexão separada, com o custo de segurar o snapshot por minutos. (c) baixo: lista de colunas por conjunto (`Conjunto.pdf`) e `PdfEscritor.LIMITE_DE_LINHAS`.
 
 ---
 
@@ -262,20 +226,10 @@ Os números das pendências **não foram reordenados** (o código e os documento
 
 ---
 
-## #49 — 🟢 Dispositivo confiável: caixa marcada por padrão e IP forjável *(Fase 0)*
-
-**A dúvida:** (1) a caixa "Confiar neste dispositivo por 30 dias" deve vir **marcada** (menos cansaço) ou **desmarcada** (mais cautela em computador compartilhado)? (2) Os prazos (30 dias deslizantes, teto de 90, sessão de 14 dias, logout após 8 h sem uso) servem à operação?
-
-**Implementado:** marcada por padrão, com o aviso "Não marque em computador compartilhado"; prazos como acima, em `TRUSTED_*` (`config/settings/base.py`). Também: `client_ip` (`apps/core/request_context.py`) confia no primeiro item de `X-Forwarded-For`, que o cliente pode forjar — o IP da auditoria pode ser falso. Como o IP aqui só é auditado, não bloqueia; corrigir é configurar o número de proxies confiáveis.
-
-**Custo de mudar:** baixo. O padrão da caixa é um atributo `checked` em `2fa_verificar.html` e `2fa_configurar.html`; os prazos são constantes.
-
----
-
 ## Como usar este documento
 
 1. **Antes de usar o acerto de verdade:** confirmar #21 com o contador.
 2. **Antes de apresentar:** o que entra na reunião com os usuários está em [14](14-roteiro-de-validacao-com-os-usuarios.md); a de **#47** (mais de uma empresa) precisa ser decidida antes de cadastrar dado real na segunda empresa.
-3. **Decididas na reunião:** #19 (segundo fator), #29 (status), #35 (tabela de preço), #38 (lotação), #39 (consumo e arroba viva), #44 (exportações).
-4. **Podem esperar:** #3, #26, #37, #40, #42, #45, #48 — funcionam com os padrões reversíveis e não bloqueiam nada.
+3. **Decididas na reunião:** #29 (status), #35 (tabela de preço), #38 (lotação), #39 (consumo e arroba viva), #44 (exportações).
+4. **Podem esperar:** #3, #26, #37, #40, #48 — funcionam com os padrões reversíveis e não bloqueiam nada.
 5. Resolvida uma pendência: registrar a resposta **no próprio item**, com data e quem respondeu, **mover o item para** [99-pendencias-resolvidas](99-pendencias-resolvidas.md) e só então mexer no código. A pergunta e a resposta ficam no arquivo de resolvidas — apagar a pergunta é perder o motivo da regra.

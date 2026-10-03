@@ -82,7 +82,7 @@ As [45 pendências](../regras-negocio/99-pendencias.md) não são nota de rodap�
 | Importador da Fase 2 | **#2** 🟡 os −140 da aba `GERAL` — adiada em 2026-10-01 com padrão reversível (transferência sempre interna) |
 | Fase 2 | **#3** o que é "PARCERIA" · **#6** quem é "ONODA" · **#10** compra de 126 cabeças fora da aba · **#11** 30 custos com ano errado |
 | Fase 3 | **#7** rendimento de carcaça: informado ou calculado? *(construída como calculado; segue aberta)* · **#12** pesos de saída divergem entre as abas · **#13** abate sem carcaça confirma? · **#14** margem por @ e lote parcial · **#15** rendimento de entrada e mortalidade normal |
-| Fase 4 | **#16** prazo e parcelamento · **#17** a quem vão frete/comissão/impostos, e quem aprova e paga · **#18** o histórico gera título? · **#19** troca de celular no 2FA *(todas construídas com padrão reversível; responder antes de usar o financeiro de verdade)* |
+| Fase 4 | **#16** prazo e parcelamento · **#17** a quem vão frete/comissão/impostos, e quem aprova e paga · **#18** o histórico gera título? · **#19** 2FA: adotar ou não, troca de celular *(#19 respondida: opcional para todos; as demais construídas com padrão reversível)* |
 | Fase 5 | **#4** base da comissão · **#8** faixas de preço *(a fase foi construída sem as respostas, com padrão reversível)* · **#20** faixa por linha · **#21** 🔴 tributos, com o contador, **antes de usar o acerto** · **#22** rateio · **#23** quebra · **#24** quando o gado entra no saldo · **#25** quem aprova · **#26** base do preço |
 | Antes de gerar contrato de verdade | **#27** dados bancários no contrato: o documento funcional pede, o sistema omite |
 | Qualquer momento | **#9** quem pode excluir registro confirmado *(só permissão)* |

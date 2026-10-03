@@ -294,4 +294,4 @@ Feito antes da Fase 4, só no frontend. Regra de negócio, rotas, modelos e cont
 | Modal | Nenhuma tela usa; a página resolve (análise de impacto é uma página) |
 | Excluído riscado na lista, com "Mostrar excluídos" desligado por padrão | Compras, vendas e custos têm filtro por Situação (inclui Excluídas); "Restaurar" fica no detalhe do registro e na auditoria |
 | Páginas de erro 403/404/500 próprias, com código de referência | Ainda são as padrão do Django — **pendente** |
-| Dark mode | Fora de escopo |
+| ~~Dark mode~~ | **Feito em 03/10/2026**: tema por usuário, escolhido só em Conta › Aparência. Ver [design system, seção 14](02-design-system.md#14-tema-escuro) |

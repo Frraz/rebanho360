@@ -73,7 +73,7 @@ Categorias vindas da aba `TABELA DE ÁREAS` da REPORTAGEM IVAN.
 ## Pessoas e acesso
 
 ### `User`
-Estende `AbstractUser`. Acrescenta `role`, `phone`, `birth_date` (opcional), `cpf` (opcional, 11 dígitos, único entre contas não excluídas), `is_active`, `last_login_ip`, `must_change_password` e `deleted_at` (exclusão lógica).
+Estende `AbstractUser`. Acrescenta `role`, `phone`, `birth_date` (opcional), `cpf` (opcional, 11 dígitos, único entre contas não excluídas), `is_active`, `last_login_ip`, `must_change_password`, `theme` (`light`/`dark`, preferência de aparência; não auditada) e `deleted_at` (exclusão lógica).
 
 Papéis: `ADMIN`, `GESTOR`, `ESCRITORIO`, `CAMPO`, `FINANCEIRO`, `CONSULTA`.
 

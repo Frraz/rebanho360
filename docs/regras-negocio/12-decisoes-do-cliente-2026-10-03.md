@@ -18,7 +18,7 @@ Cada decisão está registrada na pendência correspondente em [99-pendencias-re
 | 2 | Comprador = comissionado; **vários compradores**, cada um com a sua comissão | `Commission` passou a uma linha **por comprador**; botão *+ Adicionar comprador* no compromisso; título e vencimento por comprador — #30, #33 |
 | 31 | E-mail obrigatório; só o Admin altera o e-mail de outro | E-mail obrigatório ao criar e editar; entra-se por usuário **ou** e-mail — #43, #46 |
 | 30 | Admin e Gestor aprovam novos acessos | `pode_aprovar_acessos`; o Gestor não concede o papel de Administrador — #41 |
-| 32 | 2FA em aberto; se adotado, obrigatório para todos | `TWO_FACTOR_OBRIGATORIO` (desligado) — #19 |
+| 32 | 2FA em aberto; se adotado, obrigatório para todos | `TWO_FACTOR_OBRIGATORIO` (desligado). **Fechada por Warley em 2026-10-03: opcional e recomendado para todos** — #19 |
 
 ## Numeração e fluxo
 

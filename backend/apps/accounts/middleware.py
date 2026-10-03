@@ -9,6 +9,7 @@ view lembrou de checar". Ver docs/seguranca/01#autenticação.
 
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.http import HttpResponse
@@ -164,3 +165,35 @@ class PasswordChangeRequiredMiddleware:
             )
             return redirect(destino)
         return self.get_response(request)
+
+
+class TemaCookieMiddleware:
+    """Mantém o cookie do tema igual ao do usuário logado. O cookie existe para
+    a tela de entrar combinar com a última escolha feita neste navegador; sem
+    isto, quem usa o tema escuro receberia uma tela de login branca. Só grava
+    quando muda (login, troca de tema, outro usuário no mesmo navegador)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        usuario = getattr(request, "user", None)
+        if (
+            usuario is not None
+            and usuario.is_authenticated
+            and request.COOKIES.get(settings.THEME_COOKIE) != usuario.theme
+        ):
+            gravar_cookie_do_tema(response, usuario.theme)
+        return response
+
+
+def gravar_cookie_do_tema(response, tema: str) -> None:
+    response.set_cookie(
+        settings.THEME_COOKIE,
+        tema,
+        max_age=60 * 60 * 24 * 365,
+        secure=settings.SESSION_COOKIE_SECURE,
+        httponly=True,
+        samesite="Lax",
+    )

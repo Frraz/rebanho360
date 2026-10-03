@@ -484,6 +484,62 @@ Qualquer um exige um ADR e mexe em `Receiving.aplicar_efeitos` e em `closing.py`
 
 ---
 
+## #19 — ✅ Segundo fator: adotar ou não, e o que fazer ao trocar de celular *(Fase 4)*
+
+**A dúvida:** o cliente avaliava se o segundo fator (código no celular) é sustentável na operação — e, se adotado, seria **obrigatório para todos**. E: quantas pessoas vão usá-lo, e quem refaz o acesso de quem perde o celular **e** os códigos de recuperação?
+
+**Por que importa:** segurança que cansa vira pressão para desligá-la; obrigar todos custa suporte (troca de celular, códigos perdidos).
+
+**Implementado:** opcional e recomendado a todos (antes era obrigatório para `ADMIN` e `FINANCEIRO`). Códigos de recuperação (10, uso único). Perdeu tudo: um `ADMIN` redefine pela tela de usuários (nunca o próprio) ou o servidor roda `manage.py resetar_segundo_fator` — ambos auditados, e as sessões do usuário são encerradas.
+
+**Custo de mudar:** baixo. Tornar obrigatório é uma variável de ambiente: `TWO_FACTOR_OBRIGATORIO=True` leva quem ainda não ativou direto à configuração; a regra mora em `two_factor.precisa_de_segundo_fator`.
+
+**✅ Respondida em 2026-10-03** por Warley (dono do produto, em áudio): **fica totalmente opcional e recomendado, como já é hoje, para todos os usuários.** Se mudar no futuro, altera-se o código (a variável acima já está pronta). Deixou de ser pendência.
+
+---
+
+## #42 — ✅ O que o pedido de acesso deve conter e como confirmar quem pede *(Fase 0)*
+
+**A dúvida:** basta nome, e-mail, telefone e uma frase de justificativa? Falta algo (fazenda, função, quem indicou)? Convém limitar a domínio de e-mail da empresa, ou o administrador decide caso a caso?
+
+**Por que importa:** o pedido é aberto ao público. Pedir pouco deixa o administrador decidindo no escuro; pedir muito afasta quem tem sinal ruim no campo.
+
+**Implementado:** nome completo, e-mail, telefone opcional e texto livre (10 a 1.000 caracteres). O e-mail **não é confirmado antes**: o link para definir a senha só vai ao endereço informado, então só o dono dele entra — e o aviso ao administrador diz isso. Limites: 5 pedidos/hora por IP, 20 avisos por e-mail/hora, um pedido pendente por e-mail, campo-isca contra robô. Nada de CAPTCHA.
+
+**Custo de mudar:** baixo. Campos novos: `AccessRequest` + `SolicitacaoAcessoForm`. Restrição de domínio: um `clean_email`. CAPTCHA só se o abuso aparecer.
+
+**✅ Respondida em 2026-10-03** por Warley (dono do produto, em áudio): **fica como está.** A confirmação de quem pede é pelo e-mail e pelo nome, com os campos de hoje. O sistema é **privado**: não está indexado em nenhum buscador, só os usuários autorizados sabem que ele existe e só eles pedirão acesso — por isso não há restrição de domínio nem CAPTCHA.
+
+---
+
+## #45 — ✅ Por quanto tempo o arquivo fica e o que a exportação não é *(Fase 6)*
+
+**Onde:** tela *Exportações* e `manutencao` (Celery beat).
+
+**A dúvida:** (a) por quanto tempo o arquivo exportado fica no servidor? (b) A exportação **não** é um instantâneo atômico do banco: os conjuntos são lidos um depois do outro. Para quem sai do sistema, isso basta, ou é preciso uma exportação "congelada" num instante só? (c) O PDF mostra só as colunas principais e vai até 20.000 linhas por conjunto: aceitável?
+
+**Por que importa:** (a) o arquivo é dado do negócio parado em disco, sem a proteção de papel e escopo do sistema; quanto mais fica, maior a janela de vazamento. (b) Quem exporta "tudo" para guardar de vez espera consistência. (c) PDF de tabela larga é ilegível; o dado completo está nos outros formatos.
+
+**Implementado:** (a) `EXPORT_RETENTION_DAYS`; o dono pode apagar antes; o **pedido** e a auditoria nunca saem. (b) Sem snapshot; o `LEIA-ME` do pacote e a ajuda da tela dizem isso, e apontam o `deploy/backup.sh` para a cópia exata. (c) Como descrito.
+
+**Custo de mudar:** (a) uma variável de ambiente. (b) médio: ler tudo numa transação `REPEATABLE READ` por uma conexão separada, com o custo de segurar o snapshot por minutos. (c) baixo: lista de colunas por conjunto (`Conjunto.pdf`) e `PdfEscritor.LIMITE_DE_LINHAS`.
+
+**✅ Respondida em 2026-10-03** por Warley (dono do produto, em áudio e em conversa): **(a) o arquivo fica 30 dias**, a contar de quando a exportação termina (`EXPORT_RETENTION_DAYS=30`, antes 7). Nesse prazo a pessoa baixa e guarda onde preferir; depois, o arquivo é **apagado automaticamente e não há como recuperá-lo**. **Quem não quer deixar o arquivo no servidor apaga a qualquer momento**: gera, baixa e clica em *Apagar o arquivo* (já existia; o pedido e a auditoria continuam). **(b) sem snapshot** e **(c) PDF com as colunas principais** ficam como implementados — decisão pela simplicidade: o `LEIA-ME` do pacote e a ajuda dizem que a exportação não é um instantâneo atômico e apontam o `deploy/backup.sh` para a cópia exata; o PDF é para ler, o dado completo está em CSV/Excel/JSON. Só se um usuário reclamar de inconsistência entra o snapshot (custo médio, acima).
+
+---
+
+## #49 — ✅ Dispositivo confiável: caixa marcada por padrão, prazos e IP *(Fase 0)*
+
+**A dúvida:** (1) a caixa "Confiar neste dispositivo por 30 dias" deve vir **marcada** (menos cansaço) ou **desmarcada** (mais cautela em computador compartilhado)? (2) Os prazos (30 dias deslizantes, teto de 90, sessão de 14 dias, logout após 8 h sem uso) servem à operação? E o IP gravado pode ser forjado?
+
+**Implementado:** marcada por padrão, com o aviso "Não marque em computador compartilhado"; prazos em `TRUSTED_*` (`config/settings/base.py`).
+
+**Custo de mudar:** baixo. O padrão da caixa é um atributo `checked` em um partial; os prazos são constantes.
+
+**✅ Respondida em 2026-10-03** por Warley (dono do produto, em áudio e em conversa): **(1) a caixa vem desmarcada**; quem quer confiar no dispositivo marca. A tela explica sem poluir: uma linha curta ("Opcional. Não marque em computador compartilhado.") e, recolhido, *Como funciona o segundo fator?*, que diz o que é o código, o que acontece **marcada** (o código não é pedido de novo por 30 dias neste navegador, renovando a cada uso até 90; a senha continua; desconecta após 24 h sem uso) e **desmarcada** (o código é pedido em toda entrada). Fica em `templates/registration/_confiar_dispositivo.html`, usado na ativação e na verificação. **(2) Prazos:** 30 dias deslizantes, teto de 90 e sessão de 14 dias ficam; a **inatividade passou de 8 h para 24 h** (`TRUSTED_IDLE_HOURS=24`): passadas 24 h sem usar o sistema, o logout é automático. **IP forjável — corrigido:** `client_ip` deixou de confiar em `X-Forwarded-For` (o primeiro item vem do cliente) e passou a usar o `X-Real-IP`, que o Nginx do projeto **sobrescreve** com `$remote_addr` ([nginx.conf.example](../../deploy/nginx.conf.example)); sem proxy (desenvolvimento, testes) vale o `REMOTE_ADDR`. Sem variável nova e sem lista de proxies para manter.
+
+---
+
 # Respostas parciais (o resto aberto está em [99-pendencias](99-pendencias.md))
 
 Texto **original** dos itens abaixo, com o que já foi respondido. O que sobrou como pendência foi reescrito em [99-pendencias](99-pendencias.md).
@@ -503,18 +559,6 @@ Texto **original** dos itens abaixo, com o que já foi respondido. O que sobrou 
 **🔎 Fase 3 (2026-10-01):** implementado como a decisão acima: rendimento **sempre calculado** (`CarcassService`), alerta fora de 40%–65%, `SOMA RENDIMENTO` não importada. O importador de vendas recalcula os seis indicadores e **compara com a planilha**; o `RENDIMENTO %` bate nas 3 vendas (51,33% · 56,45% · 56,79%). A pergunta (a) segue aberta — e agora tem consequência prática: o rendimento depende do **peso vivo**, e o peso vivo diverge entre abas ([#12](#12--pesos-de-saída-divergem-entre-as-abas-fase-3)).
 
 **✅ Respondida em 2026-10-03** (cliente, Facholi — [decisões](12-decisoes-do-cliente-2026-10-03.md)): (a) prevalece o **rendimento informado pelo frigorífico**: `Sale.reported_yield_percent`, que vence o calculado (carcaça ÷ peso vivo), mantido ao lado para conferência. **(b) segue aberta:** o cliente confirmou que **não** se cria regra, cálculo ou indicador para `SOMA RENDIMENTO` até o significado ser esclarecido.
-
----
-
-## #19 — 🟡 Segundo fator: o que fazer ao trocar de celular *(Fase 4)*
-
-**A dúvida:** quantas pessoas vão usar o aplicativo, e quem faz a redefinição quando alguém perde celular **e** códigos de recuperação?
-
-**Implementado:** O segundo fator é opcional e recomendado a todos (decisão de Warley, 03/10/2026; antes era obrigatório para `ADMIN` e `FINANCEIRO`). Códigos de recuperação (10, uso único). Perdeu tudo: um `ADMIN` redefine pela tela de usuários (nunca o próprio) ou o servidor roda `manage.py resetar_segundo_fator` — ambos auditados, e as sessões do usuário são encerradas.
-
-**Custo de mudar:** baixo. Voltar a exigir é recolocar a checagem em `two_factor.precisa_de_segundo_fator` e `precisa_configurar`.
-
-**Cliente (2026-10-03): em aberto.** Se for adotado, será **obrigatório para todos** os usuários. Está pronto para ligar: `TWO_FACTOR_OBRIGATORIO=True` no `.env` leva quem ainda não ativou direto à configuração. Desligado por padrão.
 
 ---
 
@@ -612,5 +656,5 @@ Texto **original** dos itens abaixo, com o que já foi respondido. O que sobrou 
 
 **Custo de mudar:** baixo. Papéis da tela: `PAPEIS_QUE_EXPORTAM` em `apps/exports/permissions.py`. Papéis de um conjunto: o campo `permitido` dele em `apps/exports/catalog.py`.
 
-**✅ Respondida em 2026-10-03** (cliente, Facholi — [decisões](12-decisoes-do-cliente-2026-10-03.md)): **todos os perfis exportam em PDF** os relatórios que o nível de acesso permite, no mesmo escopo de fazendas (já era assim). Em aberto: regras específicas de Excel, auditoria ou retenção de arquivos (etapa posterior).
+**✅ Respondida em 2026-10-03** (cliente, Facholi — [decisões](12-decisoes-do-cliente-2026-10-03.md)): **todos os perfis exportam em PDF** os relatórios que o nível de acesso permite, no mesmo escopo de fazendas (já era assim). A **retenção** foi decidida depois, em [#45](#45--por-quanto-tempo-o-arquivo-fica-e-o-que-a-exportação-não-é-fase-6) (30 dias). Em aberto: regras específicas de Excel e de auditoria (etapa posterior).
 

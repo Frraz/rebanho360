@@ -91,7 +91,7 @@ Exportar em massa é o jeito mais fácil de vazar dado. Por isso:
 5. **Tabela nova não passa batido.** Um teste obriga todo modelo do sistema a estar no catálogo **ou** em `NAO_EXPORTAVEIS`, com o motivo.
 6. **Injeção de fórmula.** Texto digitado por gente (parceiro, observação) que começa com `=`, `+`, `-`, `@` é neutralizado no CSV e no Excel, como já era nos relatórios.
 7. **Só o dono baixa.** Outro usuário — até o `ADMIN` — recebe **404**, não 403. O arquivo tem os dados do escopo de quem pediu; outro papel não herda isso. Download só por view autenticada, `attachment`, `Cache-Control: no-store`. O arquivo nunca é servido como estático.
-8. **O arquivo é temporário.** Fica **7 dias** (`EXPORT_RETENTION_DAYS`), e o dono pode apagá-lo antes. Depois, o arquivo sai do disco; **o pedido e a auditoria ficam** ([#45](99-pendencias.md#45--🟢-por-quanto-tempo-o-arquivo-fica-e-o-que-a-exportação-não-é-fase-6)).
+8. **O arquivo é temporário.** Fica **30 dias** a contar do fim da exportação (`EXPORT_RETENTION_DAYS`): nesse prazo quem pediu baixa e guarda o arquivo onde quiser, e pode apagá-lo antes. Passado o prazo, o arquivo é apagado automaticamente e **não há como recuperá-lo**; **o pedido e a auditoria ficam** ([#45](99-pendencias-resolvidas.md#45--por-quanto-tempo-o-arquivo-fica-e-o-que-a-exportação-não-é-fase-6)).
 9. **Auditoria** (`EXPORT`): o pedido (conjuntos, formatos, filtros), a conclusão (nome, tamanho, SHA-256) e **cada download**, com quem, quando e IP. **O conteúdo exportado nunca vai para a auditoria nem para o log.**
 
 ---
@@ -110,7 +110,7 @@ Exportar em massa é o jeito mais fácil de vazar dado. Por isso:
 |---|---|---|
 | Quem exporta: `ADMIN`, `GESTOR`, `ESCRITORIO`, `FINANCEIRO` | Exportar é levar dado para fora; `CAMPO` e `CONSULTA` ficam de fora até alguém dizer o contrário (#44) | Uma linha em `permissions.py` |
 | Falha de **dado** derruba tudo; falha de **relatório/anexo** vira aviso | Pacote incompleto sem aviso é o pior caso | Um `except` em `services._produzir` |
-| Arquivo expira em 7 dias | O arquivo tem dado do negócio parado no disco (#45) | `EXPORT_RETENTION_DAYS` |
+| Arquivo expira em 30 dias | O arquivo tem dado do negócio parado no disco (#45) | `EXPORT_RETENTION_DAYS` |
 | Sem snapshot atômico | Segurar uma transação de minutos tem custo no banco inteiro; para cópia exata há o backup | Conexão de leitura com `REPEATABLE READ` |
 | PDF só com colunas principais, até 20.000 linhas | PDF de tabela larga é ilegível; o CSV/Excel/JSON têm tudo | `Conjunto.pdf`, `PdfEscritor.LIMITE_DE_LINHAS` |
 

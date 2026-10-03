@@ -126,8 +126,9 @@ def precisa_de_segundo_fator(usuario: User) -> bool:
     """O segundo fator é **opcional**, mas recomendado a todos: quem o ativou
     sempre confirma a cada entrada; quem não ativou entra só com a senha.
 
-    Com `TWO_FACTOR_OBRIGATORIO` ligado (pendência #19), vale para todos:
-    quem ainda não ativou é levado à configuração antes de usar o sistema."""
+    Com `TWO_FACTOR_OBRIGATORIO` ligado (o cliente o manteve desligado), vale
+    para todos: quem ainda não ativou é levado à configuração antes de usar o
+    sistema."""
     return (
         bool(settings.TWO_FACTOR_OBRIGATORIO)
         or dispositivo_confirmado(usuario) is not None
@@ -347,6 +348,62 @@ def redefinir_segundo_fator(usuario: User, *, por=None, motivo: str = "") -> Non
         ),
         actor=por,
     )
+
+
+class DesativacaoNegada(Exception):
+    """Motivo (em português, para o usuário) de a desativação não ter ocorrido."""
+
+
+def pode_desativar(usuario: User) -> bool:
+    """Com `TWO_FACTOR_OBRIGATORIO` ligado, desativar levaria o usuário de volta
+    à tela de configuração na requisição seguinte: melhor nem oferecer."""
+    return not settings.TWO_FACTOR_OBRIGATORIO and (
+        dispositivo_confirmado(usuario) is not None
+    )
+
+
+@transaction.atomic
+def desativar_segundo_fator(usuario: User, *, senha: str, codigo: str) -> int:
+    """O próprio usuário desliga o segundo fator.
+
+    Exige a **senha** e um código do aplicativo (ou de recuperação): quem deixou
+    a sessão aberta num computador alheio não pode tirar a proteção da conta.
+    Apaga aplicativo e códigos e revoga os dispositivos confiáveis — sem segundo
+    fator, a confiança neles não significa nada. As sessões abertas continuam:
+    é a pessoa que acabou de provar quem é. Devolve quantos dispositivos foram
+    revogados. Nega com `DesativacaoNegada`; tentativa errada conta para o
+    limite, como em qualquer prova de segundo fator."""
+    if settings.TWO_FACTOR_OBRIGATORIO:
+        raise DesativacaoNegada(
+            "O segundo fator é obrigatório neste sistema e não pode ser desativado."
+        )
+    if dispositivo_confirmado(usuario) is None:
+        raise DesativacaoNegada("O segundo fator já está desativado.")
+    if bloqueado_por_tentativas(usuario):
+        raise DesativacaoNegada("Muitas tentativas. Tente novamente em alguns minutos.")
+    if not usuario.check_password(senha or ""):
+        registrar_falha(usuario)
+        raise DesativacaoNegada("Senha incorreta. O segundo fator continua ativo.")
+    if verificar(usuario, codigo) is None:
+        registrar_falha(usuario)
+        raise DesativacaoNegada(
+            "Código inválido. Digite o que o aplicativo mostra agora "
+            "(ou um código de recuperação). O segundo fator continua ativo."
+        )
+    limpar_falhas(usuario)
+    TOTPDevice.objects.filter(user=usuario).delete()
+    RecoveryCode.objects.filter(user=usuario).delete()
+    revogados = trusted_devices.revogar_todos(
+        usuario, motivo="Segundo fator desativado", ator=usuario
+    )
+    registrar_auditoria(
+        action=AuditAction.UPDATE,
+        entity_type="TOTPDevice",
+        entity_id=str(usuario.pk),
+        reason="Segundo fator desativado pelo próprio usuário",
+        actor=usuario,
+    )
+    return revogados
 
 
 def encerrar_sessoes(usuario: User) -> int:

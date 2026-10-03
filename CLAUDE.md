@@ -11,7 +11,7 @@ Sistema de gestão pecuária para **uma operação real de fazenda a pasto, com 
 ## Antes de codificar
 
 1. Ler [`docs/00-visao-geral.md`](docs/00-visao-geral.md)
-2. Ler [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md) — **19 pendências abertas** (as 30 respondidas ou dispensadas estão em [`99-pendencias-resolvidas.md`](docs/regras-negocio/99-pendencias-resolvidas.md); a maior parte das respostas é do cliente em **2026-10-03**, provisórias, ver [`docs/regras-negocio/12`](docs/regras-negocio/12-decisoes-do-cliente-2026-10-03.md)); as demais abertas, cada uma com padrão reversível implementado
+2. Ler [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md) — **15 pendências abertas** (as 34 respondidas ou dispensadas estão em [`99-pendencias-resolvidas.md`](docs/regras-negocio/99-pendencias-resolvidas.md); a maior parte das respostas é do cliente em **2026-10-03**, provisórias, ver [`docs/regras-negocio/12`](docs/regras-negocio/12-decisoes-do-cliente-2026-10-03.md)); as demais abertas, cada uma com padrão reversível implementado
 3. Consultar [`docs/roadmap/`](docs/roadmap/README.md) para saber em que fase e em que tarefa estamos
 4. Vai mexer em tela? Ler [`docs/ux/02-design-system.md`](docs/ux/02-design-system.md) — componentes, tokens e padrões já existem; não inventar outro
 
@@ -177,6 +177,8 @@ Feedback diz **o que aconteceu**: "✓ Compra confirmada. 126 cabeças deram ent
 Erro de negócio é específico: "Saldo insuficiente: há 12 cabeças de Machos 13 a 24 meses no Baixão, foram informadas 20."
 
 **Design system:** [`docs/ux/02-design-system.md`](docs/ux/02-design-system.md) é a fonte de verdade visual. Em resumo: usar as classes de componente (`.btn-*`, `.card`, `.table`, `.badge-*`, `.alert-*`, `.field-*`) e os partials (`_field`, `_form_page`, `_empty`, `_pagination`) em vez de copiar HTML; ícones só pelo sprite (`{% icon "nome" %}`); **sem emoji** e sem cor como único sinal; código de registro em mono (`.code`); número alinhado à direita. Mexeu em classe ou CSS? Recompile: `docker compose exec web sh bin/build_css.sh` (o `output.css` é gerado, não versionado).
+
+**Dois temas, claro e escuro**, escolhidos por cada usuário só em Conta › Aparência (nada no cabeçalho). Cores são variáveis; use os tokens e `bg-surface` (nunca `bg-white` ou hex em template) e confira a tela **nos dois temas**, a 360 px e a 1366 px. Regras e paleta escura: [`docs/ux/02-design-system.md` seção 14](docs/ux/02-design-system.md#14-tema-escuro).
 
 → [`docs/ux/01-navegacao-e-ui.md`](docs/ux/01-navegacao-e-ui.md)
 

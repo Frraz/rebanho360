@@ -21,7 +21,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts import emails, two_factor
-from apps.accounts.models import Role, User, UserFarmAccess
+from apps.accounts.models import Role, Tema, User, UserFarmAccess
 from apps.accounts.permissions import pode_aprovar_acessos, pode_gerenciar_usuarios
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
@@ -329,6 +329,19 @@ def editar_usuario(
     _auditar(
         usuario, ator, AuditAction.UPDATE, antes=antes, depois=depois, motivo=motivo
     )
+    return True
+
+
+def definir_tema(usuario: User, tema: str) -> bool:
+    """Grava o tema que o usuário escolheu para a própria interface. Devolve
+    `False` se já era esse. Sem auditoria: é preferência, não dado de negócio —
+    a auditoria guarda o que a operação precisa provar."""
+    if tema not in Tema.values:
+        raise BusinessError("Escolha o tema claro ou o escuro.")
+    if usuario.theme == tema:
+        return False
+    usuario.theme = tema
+    usuario.save(update_fields=["theme"])
     return True
 
 

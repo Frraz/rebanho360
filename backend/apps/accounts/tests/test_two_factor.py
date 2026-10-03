@@ -5,13 +5,14 @@ garantia de que quem o ativou não entra sem ele."""
 import base64
 
 import pytest
+from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts import two_factor
-from apps.accounts.models import RecoveryCode, Role, TOTPDevice, User
+from apps.accounts.models import RecoveryCode, Role, TOTPDevice, TrustedDevice, User
 from apps.audit.models import AuditEvent
 
 pytestmark = pytest.mark.django_db
@@ -227,7 +228,7 @@ class TestOpcional:
     def test_se_for_obrigatorio_vale_para_todos_e_leva_a_configurar(
         self, client, gestor, settings
     ):
-        """Pendência #19: o cliente ainda decide. Ligada a variável, todo usuário
+        """Opcional por decisão do cliente; ligada a variável, todo usuário
         sem o segundo fator é levado a configurá-lo antes de usar o sistema."""
         settings.TWO_FACTOR_OBRIGATORIO = True
         entrar(client, gestor)
@@ -523,6 +524,151 @@ class TestRecuperacao:
         saida = capsys.readouterr().out
         assert "não usa" in saida and "fin" in saida and "adm" in saida
         assert "Hora do servidor" in saida
+
+
+class TestDesativar:
+    """O próprio usuário desliga o segundo fator, com senha e código."""
+
+    URL = "accounts:2fa_desativar"
+
+    def _desativar(self, client, usuario, *, senha=SENHA, codigo=None):
+        return client.post(
+            reverse(self.URL),
+            {
+                "senha": senha,
+                "codigo": (
+                    codigo if codigo is not None else codigo_de(usuario, deslocamento=1)
+                ),
+            },
+        )
+
+    def test_apaga_tudo_audita_e_volta_a_entrar_so_com_a_senha(
+        self, client, financeiro
+    ):
+        ativar(client, financeiro)
+
+        resposta = self._desativar(client, financeiro)
+
+        assert resposta.status_code == 302
+        assert resposta["Location"] == reverse("accounts:conta") + "#seguranca"
+        assert two_factor.dispositivo_confirmado(financeiro) is None
+        assert not TOTPDevice.objects.filter(user=financeiro).exists()
+        assert not RecoveryCode.objects.filter(user=financeiro).exists()
+        evento = AuditEvent.objects.get(
+            reason="Segundo fator desativado pelo próprio usuário"
+        )
+        assert evento.actor == financeiro
+        # Quem desativou segue conectado; outro navegador entra só com a senha.
+        assert client.get("/financeiro/").status_code == 200
+        novo = Client()
+        entrar(novo, financeiro)
+        assert novo.get("/financeiro/").status_code == 200
+
+    def test_senha_errada_nao_desativa(self, client, financeiro):
+        ativar(client, financeiro)
+
+        resposta = self._desativar(client, financeiro, senha="errada", codigo=None)
+        mensagens = [m.message for m in get_messages(resposta.wsgi_request)]
+
+        assert any("Senha incorreta" in m for m in mensagens)
+        assert two_factor.dispositivo_confirmado(financeiro) is not None
+        assert two_factor.codigos_de_recuperacao_restantes(financeiro) == 10
+
+    def test_codigo_errado_nao_desativa(self, client, financeiro):
+        ativar(client, financeiro)
+
+        resposta = self._desativar(client, financeiro, codigo="000000")
+        mensagens = [m.message for m in get_messages(resposta.wsgi_request)]
+
+        assert any("Código inválido" in m for m in mensagens)
+        assert two_factor.dispositivo_confirmado(financeiro) is not None
+
+    def test_codigo_de_recuperacao_tambem_serve(self, client, financeiro):
+        codigos, _ = ativar(client, financeiro)
+
+        self._desativar(client, financeiro, codigo=codigos[0])
+
+        assert two_factor.dispositivo_confirmado(financeiro) is None
+
+    def test_tentativas_erradas_chegam_ao_limite(self, client, financeiro):
+        ativar(client, financeiro)
+        for _ in range(two_factor.LIMITE_DE_TENTATIVAS):
+            self._desativar(client, financeiro, codigo="000000")
+
+        resposta = self._desativar(client, financeiro)  # agora com tudo certo
+        mensagens = [m.message for m in get_messages(resposta.wsgi_request)]
+
+        assert any("Muitas tentativas" in m for m in mensagens)
+        assert two_factor.dispositivo_confirmado(financeiro) is not None
+
+    def test_sem_segundo_fator_nao_ha_o_que_desativar(self, client, financeiro):
+        entrar(client, financeiro)
+
+        resposta = self._desativar(client, financeiro, codigo="123456")
+        mensagens = [m.message for m in get_messages(resposta.wsgi_request)]
+
+        assert any("já está desativado" in m for m in mensagens)
+        assert not AuditEvent.objects.filter(
+            reason="Segundo fator desativado pelo próprio usuário"
+        ).exists()
+
+    def test_obrigatorio_nao_pode_ser_desativado(self, client, financeiro, settings):
+        ativar(client, financeiro)
+        settings.TWO_FACTOR_OBRIGATORIO = True
+
+        resposta = self._desativar(client, financeiro)
+        mensagens = [m.message for m in get_messages(resposta.wsgi_request)]
+
+        assert any("obrigatório" in m for m in mensagens)
+        assert two_factor.dispositivo_confirmado(financeiro) is not None
+        html = client.get(reverse("accounts:conta")).content.decode()
+        assert reverse(self.URL) not in html
+
+    def test_nao_aceita_get_e_pede_login(self, client, financeiro):
+        assert client.post(reverse(self.URL)).status_code == 302
+        entrar(client, financeiro)
+        assert client.get(reverse(self.URL)).status_code == 405
+
+    def test_post_sem_csrf_e_recusado(self, financeiro):
+        navegador = Client(enforce_csrf_checks=True)
+        navegador.force_login(financeiro)
+        assert navegador.post(reverse(self.URL), {"senha": SENHA}).status_code == 403
+
+    def test_conta_oferece_desativar_so_a_quem_tem_o_segundo_fator(
+        self, client, financeiro
+    ):
+        entrar(client, financeiro)
+        antes = client.get(reverse("accounts:conta")).content.decode()
+        assert reverse(self.URL) not in antes
+
+        ativar(client, financeiro)
+        depois = client.get(reverse("accounts:conta")).content.decode()
+        assert reverse(self.URL) in depois
+        assert "Desativar o segundo fator" in depois
+
+    def test_revoga_os_dispositivos_confiaveis_sem_derrubar_a_sessao_de_quem_pediu(
+        self, client, financeiro
+    ):
+        entrar(client, financeiro)
+        client.get(reverse("accounts:2fa_configurar"))
+        client.post(
+            reverse("accounts:2fa_configurar"),
+            {"codigo": codigo_de(financeiro), "confiar": "1"},
+        )
+        assert (
+            TrustedDevice.objects.filter(
+                user=financeiro, revoked_at__isnull=True
+            ).count()
+            == 1
+        )
+
+        self._desativar(client, financeiro)
+
+        assert not TrustedDevice.objects.filter(
+            user=financeiro, revoked_at__isnull=True
+        ).exists()
+        # A sessão de quem desativou continua; a pessoa não é jogada para fora.
+        assert client.get(reverse("accounts:conta")).status_code == 200
 
 
 class TestAdminDoDjango:

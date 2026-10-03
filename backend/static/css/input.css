@@ -53,6 +53,144 @@
 }
 
 @layer base {
+  /* ---------- Paleta por tema ----------
+     Cores são variáveis (canais "R G B", para o Tailwind aplicar opacidade);
+     o tailwind.config.js só aponta para elas. Claro em `:root`; escuro em
+     `[data-theme="dark"]`, escolhido por usuário na página Conta e gravado no
+     <html> pelo servidor (sem piscar). O escuro fica dentro de `@media screen`:
+     impressão sai sempre no claro, sem gastar tinta.
+     `.on-dark` (menu lateral, painel de login) repõe a paleta clara: ele já é
+     escuro nos dois temas e seus textos (`text-brand-100/70`…) dependem dela. */
+  :root,
+  .on-dark {
+    --brand-50: 238 245 247;
+    --brand-100: 216 232 237;
+    --brand-200: 179 208 218;
+    --brand-300: 130 175 191;
+    --brand-400: 79 138 157;
+    --brand-500: 47 109 130;
+    --brand-600: 31 86 107;
+    --brand-700: 25 70 89;
+    --brand-800: 20 57 73;
+    --brand-900: 15 45 58;
+    --brand-950: 10 29 39;
+    --sage-50: 241 246 243;
+    --sage-100: 223 234 228;
+    --sage-200: 192 214 201;
+    --sage-300: 152 185 166;
+    --sage-400: 114 156 133;
+    --sage-500: 88 132 106;
+    --sage-600: 70 112 90;
+    --sage-700: 57 90 73;
+    --sage-800: 47 73 60;
+    --sage-900: 39 61 51;
+    --gray-50: 246 248 249;
+    --gray-100: 238 241 243;
+    --gray-200: 225 230 233;
+    --gray-300: 205 212 217;
+    --gray-400: 155 166 174;
+    --gray-500: 102 114 123;
+    --gray-600: 79 90 99;
+    --gray-700: 59 69 77;
+    --gray-800: 39 47 54;
+    --gray-900: 22 28 33;
+    --amber-50: 253 247 232;
+    --amber-100: 250 236 198;
+    --amber-200: 242 213 143;
+    --amber-300: 232 187 85;
+    --amber-500: 183 121 31;
+    --amber-600: 154 98 18;
+    --amber-700: 127 79 14;
+    --amber-800: 104 65 15;
+    --amber-900: 85 53 16;
+    --red-50: 252 241 240;
+    --red-100: 249 222 220;
+    --red-200: 241 189 185;
+    --red-300: 229 152 146;
+    --red-500: 196 66 58;
+    --red-600: 171 52 45;
+    --red-700: 143 43 37;
+    --red-800: 118 37 32;
+    --red-900: 95 32 28;
+    --surface: 255 255 255;
+    --field: 255 255 255;
+    --action: 31 86 107;
+    --action-hover: 25 70 89;
+    --action-active: 20 57 73;
+    --action-edge: 25 70 89;
+    --danger: 171 52 45;
+    --danger-hover: 143 43 37;
+    --danger-active: 118 37 32;
+    --danger-edge: 143 43 37;
+    --accent: 31 86 107;
+    --shadow-float: 0 8px 24px -6px rgba(10, 29, 39, 0.18), 0 2px 6px -2px rgba(10, 29, 39, 0.10);
+  }
+  @media screen {
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --gray-50: 11 19 24;
+      --gray-100: 23 35 43;
+      --gray-200: 32 47 57;
+      --gray-300: 58 78 90;
+      --gray-400: 118 137 154;
+      --gray-500: 147 164 175;
+      --gray-600: 173 188 197;
+      --gray-700: 198 210 217;
+      --gray-800: 221 229 234;
+      --gray-900: 238 243 246;
+      --brand-50: 14 38 48;
+      --brand-100: 18 50 65;
+      --brand-200: 26 69 88;
+      --brand-300: 58 122 146;
+      --brand-400: 85 160 187;
+      --brand-500: 90 184 214;
+      --brand-600: 108 195 222;
+      --brand-700: 143 210 230;
+      --brand-800: 176 224 238;
+      --brand-900: 210 238 246;
+      --brand-950: 4 9 12;
+      --sage-50: 15 33 25;
+      --sage-100: 20 48 36;
+      --sage-200: 33 80 58;
+      --sage-300: 127 179 148;
+      --sage-400: 111 176 138;
+      --sage-500: 95 184 138;
+      --sage-600: 116 201 157;
+      --sage-700: 141 216 178;
+      --sage-800: 169 228 197;
+      --sage-900: 201 239 219;
+      --amber-50: 36 27 8;
+      --amber-100: 56 40 12;
+      --amber-200: 89 64 15;
+      --amber-300: 138 100 24;
+      --amber-500: 224 166 58;
+      --amber-600: 234 181 82;
+      --amber-700: 240 195 110;
+      --amber-800: 245 211 145;
+      --amber-900: 249 227 181;
+      --red-50: 42 18 20;
+      --red-100: 64 27 29;
+      --red-200: 97 42 44;
+      --red-300: 143 59 59;
+      --red-500: 240 112 106;
+      --red-600: 245 137 131;
+      --red-700: 249 162 157;
+      --red-800: 251 189 185;
+      --red-900: 253 214 211;
+      --surface: 17 27 34;
+      --field: 12 21 25;
+      --action: 31 111 138;
+      --action-hover: 42 128 156;
+      --action-active: 24 90 114;
+      --action-edge: 79 176 207;
+      --danger: 184 55 47;
+      --danger-hover: 200 69 60;
+      --danger-active: 159 47 40;
+      --danger-edge: 224 113 106;
+      --accent: 90 184 214;
+      --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.07), 0 18px 40px -12px rgb(0 0 0 / 0.65), 0 4px 10px -4px rgb(0 0 0 / 0.5);
+    }
+  }
   html {
     -webkit-text-size-adjust: 100%;
     scroll-padding-top: 5rem;
@@ -116,7 +254,7 @@
   }
   /* Foco visível e consistente em tudo que é interativo (teclado). */
   :focus-visible {
-    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface;
   }
   .on-dark :focus-visible {
     @apply ring-offset-brand-950;
@@ -174,19 +312,19 @@
     }
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white border-brand-700 hover:bg-brand-700 active:bg-brand-800;
+    @apply btn bg-action text-white border-action-edge hover:bg-action-hover active:bg-action-active;
   }
   .btn-secondary {
-    @apply btn bg-white text-gray-800 border-gray-300 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100;
+    @apply btn bg-surface text-gray-800 border-gray-300 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100;
   }
   .btn-ghost {
     @apply btn text-gray-700 hover:bg-gray-100 active:bg-gray-200;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white border-red-700 hover:bg-red-700 active:bg-red-800;
+    @apply btn bg-danger text-white border-danger-edge hover:bg-danger-hover active:bg-danger-active;
   }
   .btn-danger-outline {
-    @apply btn bg-white text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300;
+    @apply btn bg-surface text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300;
   }
   .btn-sm {
     @apply px-3 text-sm;
@@ -208,7 +346,7 @@
     @apply block text-sm font-medium text-gray-800 mb-1.5;
   }
   .field-input {
-    @apply block w-full min-h-touch rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900
+    @apply block w-full min-h-touch rounded-md border border-gray-300 bg-field px-3 py-2 text-gray-900
       placeholder:text-gray-400 shadow-none transition-colors hover:border-gray-400
       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus-visible:ring-offset-0
       disabled:bg-gray-100 disabled:text-gray-500;
@@ -245,11 +383,140 @@
   input[type="checkbox"],
   input[type="radio"] {
     @apply h-4 w-4 shrink-0 cursor-pointer border-gray-300 text-brand-600;
-    accent-color: theme("colors.brand.600");
+    accent-color: rgb(var(--accent));
   }
   input[type="file"].field-input {
     @apply py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm
       file:font-medium file:text-gray-700 hover:file:bg-gray-200;
+  }
+
+  /* ---------- Escolha de tema (página Conta) ----------
+     Duas miniaturas do próprio sistema, com cores fixas (não tokens): cada uma
+     mostra o seu tema por inteiro, qualquer que seja o tema ativo agora. */
+  .theme-choice {
+    @apply block cursor-pointer;
+  }
+  .theme-choice-box {
+    @apply block overflow-hidden rounded-lg border border-gray-200 bg-surface transition-colors;
+  }
+  .theme-choice:hover .theme-choice-box {
+    @apply border-gray-400;
+  }
+  .peer:checked ~ .theme-choice-box {
+    @apply border-brand-500 ring-2 ring-brand-500/30;
+  }
+  .peer:focus-visible ~ .theme-choice-box {
+    @apply ring-2 ring-brand-500 ring-offset-2 ring-offset-surface;
+  }
+  .theme-choice-label {
+    @apply flex min-h-touch items-center gap-2 border-t border-gray-200 px-3 py-2.5 text-sm;
+  }
+  .theme-choice-check {
+    @apply ml-auto hidden text-brand-600;
+  }
+  .peer:checked ~ .theme-choice-box .theme-choice-check {
+    @apply inline-flex;
+  }
+  .theme-preview {
+    display: grid;
+    grid-template-columns: 24% 1fr;
+    height: 6.75rem;
+    background: var(--tp-bg);
+  }
+  .theme-preview-light {
+    --tp-bg: #f6f8f9;
+    --tp-side: #0a1d27;
+    --tp-surface: #fff;
+    --tp-line: #e1e6e9;
+    --tp-ink: #161c21;
+    --tp-mute: #cdd4d9;
+    --tp-accent: #1f566b;
+    --tp-sage: #729c85;
+  }
+  .theme-preview-dark {
+    --tp-bg: #0b1318;
+    --tp-side: #060e13;
+    --tp-surface: #111b22;
+    --tp-line: #202f39;
+    --tp-ink: #eef3f6;
+    --tp-mute: #2c3d48;
+    --tp-accent: #5ab8d6;
+    --tp-sage: #5fb88a;
+  }
+  .theme-preview i,
+  .theme-preview b {
+    display: block;
+    border-radius: 9999px;
+  }
+  .tp-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.6rem 0.4rem;
+    background: var(--tp-side);
+  }
+  .tp-side i {
+    height: 0.28rem;
+    background: rgb(255 255 255 / 0.2);
+  }
+  .tp-side i:first-child {
+    width: 70%;
+    background: var(--tp-sage);
+  }
+  .tp-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+  }
+  .tp-head {
+    display: block;
+    height: 0.45rem;
+    width: 40%;
+    border-radius: 9999px;
+    background: var(--tp-ink);
+    opacity: 0.85;
+  }
+  .tp-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+  }
+  .tp-cards > span,
+  .tp-rows {
+    display: block;
+    padding: 0.35rem;
+    border: 1px solid var(--tp-line);
+    border-radius: 0.3rem;
+    background: var(--tp-surface);
+  }
+  .tp-cards i {
+    height: 0.2rem;
+    width: 50%;
+    background: var(--tp-mute);
+  }
+  .tp-cards b {
+    margin-top: 0.3rem;
+    height: 0.5rem;
+    width: 62%;
+    background: var(--tp-accent);
+  }
+  .tp-rows {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+  .tp-rows i {
+    height: 0.2rem;
+    background: var(--tp-mute);
+  }
+  .tp-rows i:nth-child(2) {
+    width: 80%;
+  }
+  .tp-rows i:nth-child(3) {
+    width: 55%;
   }
 
   /* Seção de formulário: título + descrição à esquerda, campos à direita
@@ -265,7 +532,7 @@
   }
   /* Ação principal fixa no rodapé no celular (docs/ux: "ação principal fixa"). */
   .form-actions {
-    @apply fixed inset-x-0 bottom-0 z-20 flex gap-2 justify-end border-t border-gray-200 bg-white/95 p-3
+    @apply fixed inset-x-0 bottom-0 z-20 flex gap-2 justify-end border-t border-gray-200 bg-surface/95 p-3
       backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none;
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
@@ -275,10 +542,10 @@
 
   /* ---------- Superfícies ---------- */
   .card {
-    @apply bg-white rounded-lg border border-gray-200 p-4 sm:p-5;
+    @apply bg-surface rounded-lg border border-gray-200 p-4 sm:p-5;
   }
   .card-flush {
-    @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
+    @apply bg-surface rounded-lg border border-gray-200 overflow-hidden;
   }
   .card-title {
     @apply text-sm font-semibold text-gray-900;
@@ -575,7 +842,7 @@
      inferior e a margem negativa empurra a última para fora do contêiner
      (overflow hidden), então qualquer quantidade de itens fecha limpa. */
   .stats {
-    @apply flex flex-wrap overflow-hidden rounded-lg border border-gray-200 bg-white;
+    @apply flex flex-wrap overflow-hidden rounded-lg border border-gray-200 bg-surface;
   }
   .stat {
     @apply flex flex-col border-b border-r border-gray-200 p-4 sm:p-5;
@@ -605,7 +872,7 @@
     @apply inline-flex min-h-touch items-center rounded px-3 py-1.5 text-gray-600 hover:text-gray-900 md:min-h-0;
   }
   .seg a[aria-current] {
-    @apply bg-white font-medium text-gray-900 shadow-sm;
+    @apply bg-surface font-medium text-gray-900 shadow-sm;
   }
 
   /* ---------- Vazio ---------- */
@@ -748,11 +1015,11 @@
     @apply flex min-w-0 items-stretch divide-x divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-gray-50;
   }
   .ctx-bar-stack {
-    @apply w-full flex-col divide-x-0 divide-y bg-white;
+    @apply w-full flex-col divide-x-0 divide-y bg-surface;
   }
   .ctx-cell {
     @apply relative flex min-w-0 flex-col justify-center px-3 py-1 transition-colors duration-150
-      hover:bg-white focus-within:bg-white focus-within:shadow-[inset_0_0_0_2px_theme(colors.brand.500/0.35)];
+      hover:bg-surface focus-within:bg-surface focus-within:shadow-[inset_0_0_0_2px_theme(colors.brand.500/0.35)];
   }
   .ctx-bar-stack .ctx-cell {
     @apply min-h-touch py-2;
@@ -781,7 +1048,7 @@
 
   /* Cabeçalho: sólido, com um fio de destaque quase invisível na base. */
   .app-header {
-    @apply sticky top-0 z-30 border-b border-gray-200 bg-white;
+    @apply sticky top-0 z-30 border-b border-gray-200 bg-surface;
   }
   .app-header::after {
     content: "";
@@ -840,7 +1107,7 @@
   }
 
   .cb-panel {
-    @apply fixed z-[70] flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-float;
+    @apply fixed z-[70] flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-surface shadow-float;
     outline: none;
     animation: cb-in 0.1s ease-out;
   }
@@ -952,14 +1219,14 @@
 
   /* ---------- Menus flutuantes e avisos ---------- */
   .menu {
-    @apply absolute z-50 mt-2 min-w-[14rem] rounded-lg border border-gray-200 bg-white p-1.5 shadow-float;
+    @apply absolute z-50 mt-2 min-w-[14rem] rounded-lg border border-gray-200 bg-surface p-1.5 shadow-float;
   }
   .menu-item {
     @apply flex w-full min-h-touch items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-gray-800
       hover:bg-gray-100 md:min-h-[2.25rem];
   }
   .toast {
-    @apply pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border bg-white p-3.5 text-sm
+    @apply pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border bg-surface p-3.5 text-sm
       text-gray-800 shadow-float;
   }
 
@@ -1018,7 +1285,7 @@
     grid-template-columns: repeat(auto-fill, minmax(11.75rem, 1fr));
   }
   .kpi {
-    @apply relative flex min-w-0 flex-col rounded-lg border border-gray-200 bg-white p-4;
+    @apply relative flex min-w-0 flex-col rounded-lg border border-gray-200 bg-surface p-4;
     border-left-width: 3px;
   }
   .kpi-hero {
@@ -1087,7 +1354,7 @@
   }
   .kpi-spark .spark-dot {
     fill: theme("colors.brand.600");
-    stroke: #fff;
+    stroke: rgb(var(--surface));
     stroke-width: 2;
   }
   .delta {
@@ -1168,7 +1435,7 @@
     @apply col-span-12 md:col-span-6 xl:col-span-3;
   }
   .dash-card {
-    @apply flex min-w-0 flex-col rounded-lg border border-gray-200 bg-white p-4;
+    @apply flex min-w-0 flex-col rounded-lg border border-gray-200 bg-surface p-4;
   }
   .dash-card-head {
     @apply mb-2 flex items-start justify-between gap-2;
@@ -1245,6 +1512,227 @@
     .kpi,
     .insight {
       break-inside: avoid;
+    }
+  }
+}
+
+/* =====================================================================
+   Tema escuro
+   Duas camadas: (1) a paleta, em variáveis, no topo deste arquivo — já faz
+   quase tudo, porque os componentes só falam em tokens (`gray`, `brand`,
+   `surface`…); (2) este bloco, só com o que um token não resolve: brilho,
+   transparência, o fundo ambiente e as poucas peças em que "mais escuro" no
+   claro deveria ser "mais claro" no escuro (hover de linha, botão secundário).
+   Não é inversão de cores: no escuro a elevação sobe clareando (fundo < cartão
+   < menu flutuante) e o realce é fino (fios de luz, não sombra pesada).
+   Regras com `:where([data-theme="dark"])` têm a especificidade do componente e
+   vencem pela ordem; utilitários em classe (`border-red-200`) continuam por cima.
+   Tudo em `@media screen`: a impressão sai no claro. */
+@layer components {
+  @media screen {
+    /* ---------- Fundo ambiente ----------
+       Duas manchas de luz muito baixas (petróleo no alto, sálvia embaixo) dão
+       profundidade ao fundo sem virar enfeite. Fixas: não rolam com a página. */
+    :where([data-theme="dark"]) body {
+      background-color: transparent;
+    }
+    [data-theme="dark"] body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(60rem 36rem at 80% -10%, rgb(var(--brand-500) / 0.11), transparent 62%),
+        radial-gradient(46rem 30rem at -8% 110%, rgb(var(--sage-500) / 0.07), transparent 64%);
+    }
+    [data-theme="dark"] ::selection {
+      background-color: rgb(var(--brand-500) / 0.38);
+      color: rgb(var(--gray-900));
+    }
+    /* Marca do logotipo é escura e transparente: sobre o cabeçalho escuro ela
+       sumiria, então ganha o mesmo ladrilho branco do menu lateral. */
+    :where([data-theme="dark"]) .logo-bare {
+      box-sizing: content-box;
+      padding: 0.125rem;
+      border-radius: 0.375rem;
+      background-color: #fff;
+    }
+
+    /* ---------- Superfícies ----------
+       Cartão: fio de luz no topo e um véu de claridade que some em 6 rem. */
+    :where([data-theme="dark"]) :is(.card, .card-flush, .table-wrap, .stats, .kpi, .dash-card) {
+      background-image: linear-gradient(180deg, rgb(255 255 255 / 0.035), rgb(255 255 255 / 0) 6rem);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+    }
+    /* Quem flutua (menu, lista do seletor, aviso, painéis) é translúcido com
+       desfoque: o conteúdo atrás continua sugerido, sem competir com o texto. */
+    :where([data-theme="dark"]) :is(.menu, .cb-panel, .toast),
+    [data-theme="dark"] .sheet {
+      background-color: rgb(var(--surface) / 0.9);
+      -webkit-backdrop-filter: blur(18px) saturate(1.25);
+      backdrop-filter: blur(18px) saturate(1.25);
+    }
+    /* Cabeçalho: o vidro fica num pseudo-elemento, porque `backdrop-filter` no
+       próprio elemento viraria o bloco de contenção de filhos `position: fixed`. */
+    :where([data-theme="dark"]) .app-header {
+      background-color: transparent;
+    }
+    [data-theme="dark"] .app-header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background-color: rgb(var(--surface) / 0.74);
+      -webkit-backdrop-filter: blur(16px) saturate(1.3);
+      backdrop-filter: blur(16px) saturate(1.3);
+    }
+    [data-theme="dark"] .app-header::after {
+      background: linear-gradient(90deg, transparent, rgb(var(--brand-500) / 0.55) 50%, transparent);
+    }
+    :where([data-theme="dark"]) .form-actions {
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    @media (min-width: 768px) {
+      :where([data-theme="dark"]) .form-actions {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+      }
+    }
+    /* Cortinas atrás de gaveta, painel e janela. */
+    [data-theme="dark"] .bg-brand-950\/60,
+    [data-theme="dark"] .cb-backdrop {
+      background-color: rgb(2 6 9 / 0.72);
+    }
+
+    /* ---------- Menu lateral e painel de login ----------
+       Já é escuro nos dois temas. No escuro ele desce um tom, abaixo do
+       conteúdo, com um fio claro na borda; o item ativo ganha um brilho sálvia. */
+    [data-theme="dark"] #menu-lateral {
+      background-color: #060e13;
+      background-image: linear-gradient(180deg, #0a1b24 0%, #060e13 55%);
+      box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.06);
+    }
+    [data-theme="dark"] .nav-item[aria-current="page"] {
+      background-image: linear-gradient(90deg, rgb(var(--sage-500) / 0.16), rgb(255 255 255 / 0.04) 70%);
+    }
+    [data-theme="dark"] .nav-item[aria-current="page"]::before {
+      box-shadow: 0 0 10px rgb(var(--sage-400) / 0.75);
+    }
+    /* Sobre o fundo mais fundo do escuro, o texto de apoio do menu (50% de
+       opacidade) ficaria um fio abaixo de 4,5:1: sobe um pouco. */
+    [data-theme="dark"] .nav-group,
+    [data-theme="dark"] .on-dark .text-brand-100\/50 {
+      color: rgb(var(--brand-100) / 0.6);
+    }
+    [data-theme="dark"] .auth-aside {
+      background-image:
+        radial-gradient(70% 55% at 12% 6%, rgb(var(--brand-500) / 0.30), transparent 70%),
+        linear-gradient(180deg, #0a1b24, #050d11);
+    }
+
+    /* ---------- Botões ---------- */
+    :where([data-theme="dark"]) .btn-primary {
+      background-image: linear-gradient(180deg, rgb(255 255 255 / 0.13), rgb(255 255 255 / 0) 72%);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 6px 18px -8px rgb(var(--brand-500) / 0.8);
+    }
+    :where([data-theme="dark"]) .btn-primary:hover {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 8px 24px -8px rgb(var(--brand-500) / 1);
+    }
+    :where([data-theme="dark"]) .btn-primary:disabled,
+    :where([data-theme="dark"]) .btn-danger:disabled {
+      box-shadow: none;
+    }
+    :where([data-theme="dark"]) .btn-danger {
+      background-image: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0) 72%);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+    }
+    /* Secundário: vidro fosco em vez de "mais escuro ao passar o mouse". */
+    :where([data-theme="dark"]) .btn-secondary {
+      background-color: rgb(255 255 255 / 0.04);
+    }
+    :where([data-theme="dark"]) .btn-secondary:hover {
+      background-color: rgb(255 255 255 / 0.09);
+    }
+    :where([data-theme="dark"]) .btn-secondary:active {
+      background-color: rgb(255 255 255 / 0.13);
+    }
+    :where([data-theme="dark"]) .btn-danger-outline {
+      background-color: rgb(var(--red-500) / 0.06);
+    }
+    :where([data-theme="dark"]) .btn-danger-outline:hover {
+      background-color: rgb(var(--red-500) / 0.14);
+    }
+
+    /* ---------- Campos ---------- */
+    [data-theme="dark"] .field-input:focus,
+    [data-theme="dark"] .cb-trigger.field-input[aria-expanded="true"] {
+      box-shadow: 0 0 0 3px rgb(var(--brand-500) / 0.2), 0 0 20px -6px rgb(var(--brand-500) / 0.55);
+    }
+    [data-theme="dark"] .field-input[aria-invalid="true"]:focus,
+    [data-theme="dark"] .field-input.is-invalid:focus {
+      box-shadow: 0 0 0 3px rgb(var(--red-500) / 0.2);
+    }
+    [data-theme="dark"] select.field-input,
+    [data-theme="dark"] .ctx-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2393a4af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
+    /* O preenchimento automático do Chrome pinta o campo de amarelo/azul. */
+    [data-theme="dark"] input:-webkit-autofill,
+    [data-theme="dark"] input:-webkit-autofill:hover,
+    [data-theme="dark"] input:-webkit-autofill:focus,
+    [data-theme="dark"] textarea:-webkit-autofill {
+      -webkit-text-fill-color: rgb(var(--gray-900));
+      caret-color: rgb(var(--gray-900));
+      -webkit-box-shadow: 0 0 0 1000px rgb(var(--field)) inset;
+      transition: background-color 600000s 0s;
+    }
+    :where([data-theme="dark"]) .cb-mark {
+      background-color: rgb(var(--brand-500) / 0.3);
+    }
+
+    /* ---------- Tabelas e listas ---------- */
+    :where([data-theme="dark"]) .table tbody tr:hover {
+      background-color: rgb(255 255 255 / 0.035);
+    }
+    [data-theme="dark"] .hover\:bg-gray-50:hover {
+      background-color: rgb(255 255 255 / 0.04);
+    }
+    [data-theme="dark"] .seg a[aria-current] {
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+    }
+
+    /* ---------- Status: vidro tingido, fio da própria cor e um ponto aceso ---------- */
+    :where([data-theme="dark"]) :is(.badge-confirmada, .badge-editada, .badge-pendencia, .badge-erro, .badge-excluida, .badge-rascunho) {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 26%, transparent);
+    }
+    :where([data-theme="dark"]) :is(.badge-confirmada, .badge-editada, .badge-erro)::before {
+      opacity: 1;
+      box-shadow: 0 0 6px currentColor;
+    }
+    :where([data-theme="dark"]) :is(.alert-info, .alert-success, .alert-warning, .alert-danger) {
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.02);
+    }
+
+    /* ---------- Dashboard ---------- */
+    :where([data-theme="dark"]) .kpi-hero {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), -10px 0 20px -12px rgb(var(--brand-500) / 0.85);
+    }
+    :where([data-theme="dark"]) .kpi-bom {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), -10px 0 20px -12px rgb(var(--sage-500) / 0.85);
+    }
+    :where([data-theme="dark"]) .kpi-atencao {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), -10px 0 20px -12px rgb(var(--amber-500) / 0.8);
+    }
+    :where([data-theme="dark"]) .kpi-ruim {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), -10px 0 20px -12px rgb(var(--red-500) / 0.8);
+    }
+    [data-theme="dark"] .dash-tab[aria-current="page"] {
+      box-shadow: 0 8px 14px -10px rgb(var(--brand-500) / 0.9);
+    }
+    [data-theme="dark"] .kpi-spark .spark-line {
+      filter: drop-shadow(0 0 3px rgb(var(--brand-500) / 0.6));
     }
   }
 }

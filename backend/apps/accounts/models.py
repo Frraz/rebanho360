@@ -17,6 +17,13 @@ class Role(models.TextChoices):
 ROLES_COM_ACESSO_AMPLO = (Role.ADMIN, Role.GESTOR)
 
 
+class Tema(models.TextChoices):
+    """Aparência da interface. O valor é o que vai no `data-theme` do <html>."""
+
+    CLARO = "light", "Claro"
+    ESCURO = "dark", "Escuro"
+
+
 class User(AbstractUser):
     """Usuário do sistema. Papel + escopo de fazenda definem o que vê."""
 
@@ -37,6 +44,15 @@ class User(AbstractUser):
     # Senha temporária definida por um administrador: a pessoa troca no primeiro
     # acesso (`PasswordChangeRequiredMiddleware`).
     must_change_password = models.BooleanField("Deve trocar a senha", default=False)
+    # Preferência de aparência, escolhida na página Conta. É do usuário, não do
+    # navegador: vale em qualquer aparelho. Preferência não é dado de negócio e
+    # não passa pela auditoria.
+    theme = models.CharField(
+        "Tema da interface",
+        max_length=5,
+        choices=Tema.choices,
+        default=Tema.CLARO,
+    )
     # Exclusão lógica (regra 5): o usuário sai da operação, nunca do banco — a
     # auditoria e os registros que ele lançou continuam apontando para ele.
     deleted_at = models.DateTimeField("Excluído em", null=True, blank=True)

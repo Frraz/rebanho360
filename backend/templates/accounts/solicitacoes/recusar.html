@@ -10,7 +10,7 @@
   </div>
 </header>
 <div class="max-w-2xl space-y-4">
-  <p class="whitespace-pre-line break-words rounded-md bg-white p-3 text-sm text-gray-800 shadow-sm ring-1 ring-gray-200">{{ s.message }}</p>
+  <p class="whitespace-pre-line break-words rounded-md bg-surface p-3 text-sm text-gray-800 shadow-sm ring-1 ring-gray-200">{{ s.message }}</p>
   {% if form.non_field_errors %}
   <div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div></div>
   {% endif %}

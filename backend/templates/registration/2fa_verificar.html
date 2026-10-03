@@ -17,13 +17,7 @@
     <input type="text" id="codigo" name="codigo" class="field-input text-lg tracking-widest" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" autofocus required aria-describedby="ajuda-codigo">
     <p class="field-help" id="ajuda-codigo">6 dígitos do aplicativo, ou um código de recuperação (ex.: ABCDE-FGHJK).</p>
   </div>
-  <label class="flex min-h-touch items-start gap-3 text-sm">
-    <input type="checkbox" name="confiar" value="1" class="mt-1" checked aria-describedby="ajuda-confiar">
-    <span>
-      <span class="font-medium text-gray-900">Confiar neste dispositivo por 30 dias</span>
-      <span class="block text-gray-500" id="ajuda-confiar">Neste navegador o código não será pedido de novo e você continua conectado. Não marque em computador compartilhado.</span>
-    </span>
-  </label>
+  {% include "registration/_confiar_dispositivo.html" %}
   <button type="submit" class="btn-primary w-full">{% icon "shield-check" %} Confirmar</button>
 </form>
 

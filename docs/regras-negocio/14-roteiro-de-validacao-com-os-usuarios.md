@@ -49,9 +49,9 @@ Mostrar: **reprodução** (ciclo da fazenda), **mortalidade por causa**, **confi
 | Perguntar | Resposta provisória |
 |---|---|
 | Todos terão **e-mail**? Entram por usuário ou e-mail? | E-mail obrigatório; entra pelos dois |
-| **Segundo fator** (código no celular): vai ser usado? Se sim, para todos? | **Em aberto** — `TWO_FACTOR_OBRIGATORIO` pronto para ligar |
+| **Segundo fator** (código no celular): vai ser usado? Se sim, para todos? | **Decidido (Warley, 2026-10-03):** opcional e recomendado para todos; `TWO_FACTOR_OBRIGATORIO` pronto para ligar se mudar |
 | Quem **aprova pedidos de acesso** e quem é avisado? | Admin e Gestor |
-| Quem **exporta** dados? PDF para todos os perfis? Excel/auditoria/retenção? | PDF para todos, dentro do escopo; o resto **em aberto** |
+| Quem **exporta** dados? PDF para todos os perfis? Excel/auditoria? (retenção: 30 dias, decidido) | PDF para todos, dentro do escopo; o resto **em aberto** |
 
 ## 5. O que ainda precisa de resposta de verdade
 

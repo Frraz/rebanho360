@@ -6,7 +6,7 @@
 <p class="mt-1 text-sm text-gray-500">Guarde estes códigos num lugar seguro, <strong>fora do celular</strong> (papel, gerenciador de senhas). Cada um vale uma vez e só aparece agora — se perder o celular, são eles que abrem o sistema.</p>
 
 <ul class="mt-6 grid grid-cols-2 gap-2" aria-label="Códigos de recuperação">
-  {% for c in codigos %}<li class="code rounded-md border border-gray-200 bg-white px-3 py-2 text-center text-base">{{ c }}</li>{% endfor %}
+  {% for c in codigos %}<li class="code rounded-md border border-gray-200 bg-surface px-3 py-2 text-center text-base">{{ c }}</li>{% endfor %}
 </ul>
 {% if not recem_ativado %}
 <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Os códigos anteriores deixaram de valer.</p>

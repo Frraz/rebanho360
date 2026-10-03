@@ -47,8 +47,11 @@ def use_context(**kwargs):
 
 
 def client_ip(request) -> str | None:
-    """IP do cliente, considerando proxy reverso (Nginx do host)."""
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    """IP do cliente atrás do Nginx do host.
+
+    Usa `X-Real-IP`, que o Nginx **sobrescreve** com `$remote_addr` (o cliente
+    não consegue forjá-lo; `deploy/nginx.conf.example`). `X-Forwarded-For` é
+    ignorado de propósito: o primeiro item dele vem do cliente. Sem proxy
+    (desenvolvimento, testes), vale o `REMOTE_ADDR`."""
+    real = (request.META.get("HTTP_X_REAL_IP") or "").strip()
+    return real or request.META.get("REMOTE_ADDR")

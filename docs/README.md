@@ -12,7 +12,7 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 | [00-visao-geral](00-visao-geral.md) | Problema, usuários, escopo e não-escopo |
 | [roadmap/](roadmap/README.md) | **As fases, tarefa a tarefa, até produção** — por onde começar |
 | [roadmap/definition-of-done](roadmap/definition-of-done.md) | Quando uma tarefa está realmente pronta |
-| [regras-negocio/99-pendencias](regras-negocio/99-pendencias.md) | **19 pendências de negócio abertas**, cada uma com padrão reversível — ler antes de codificar. As respondidas/dispensadas: [99-pendencias-resolvidas](regras-negocio/99-pendencias-resolvidas.md) |
+| [regras-negocio/99-pendencias](regras-negocio/99-pendencias.md) | **15 pendências de negócio abertas**, cada uma com padrão reversível — ler antes de codificar. As respondidas/dispensadas: [99-pendencias-resolvidas](regras-negocio/99-pendencias-resolvidas.md) |
 
 ### Arquitetura
 | Documento | Assunto |
@@ -58,6 +58,7 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 | [seguranca/01-seguranca](seguranca/01-seguranca.md) | Ameaças, controles, checklist |
 | [migracao/01-planilhas-e-importacao](migracao/01-planilhas-e-importacao.md) | Aba por aba: o que importar |
 | [relatorios/01-catalogo](relatorios/01-catalogo.md) | Relatórios por fase + leitura dos legados |
+| [operacao/01-seed-operacao-grande](operacao/01-seed-operacao-grande.md) | Dados de demonstração: 12 fazendas, 3 safras, e o comando que desfaz só o que o seed criou |
 
 ### Decisões (ADR)
 | ADR | Decisão |

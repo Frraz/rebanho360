@@ -18,29 +18,53 @@
   window.__rebanhoDash = true;
 
   // ------------------------------------------------------------------ tokens
-  // Categórica: validada com scripts/validate_palette.js (claro, fundo branco):
+  // Dois temas, cada um com a paleta validada para a sua superfície (no escuro
+  // não é inversão: os mesmos oito matizes com passos próprios, ver validador
+  // `--mode dark`). O tema vem do <html data-theme>, que o servidor grava; ele só
+  // muda na página Conta, e a página recarrega ao salvar.
+  //
+  // Categórica claro: validada com scripts/validate_palette.js (fundo branco):
   // lightness, croma, separação CVD ≥ 8 e piso de visão normal ≥ 15 passam. Três
   // cores ficam abaixo de 3:1 no branco — por isso há rótulo direto, legenda e
-  // tabela equivalente em todo gráfico (alívio obrigatório).
-  const CAT = ["#1a78a0", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
-  const TOKEN = {
-    marca: "#1f566b",
-    positivo: "#2f6d82", // polo "bom" do par divergente azul ↔ vermelho
-    negativo: "#c4423a", // polo "ruim"
-    neutro: "#9ba6ae",
-    alerta: "#eda100",
-    total: "#3b454d",
-  };
-  // Sequencial (magnitude) e ordinal (etapas ordenadas): a matiz petróleo da marca.
-  const SEQ = ["#eef5f7", "#b3d0da", "#4f8a9d", "#1f566b", "#0f2d3a"];
-  const ORD = ["#82afbf", "#4f8a9d", "#2f6d82", "#1f566b", "#194659", "#143949", "#0f2d3a"];
-  const TREE = ["#2f6d82", "#1f566b", "#143949", "#0f2d3a"];
-  const INK = "#161c21";
-  const INK2 = "#4f5a63";
-  const MUTED = "#66727b";
-  const GRID = "#e1e6e9";
-  const AXIS = "#cdd4d9";
-  const SURFACE = "#ffffff";
+  // tabela equivalente em todo gráfico (alívio obrigatório). Escura: passa todos os
+  // portões sobre #101a21 (CVD adjacente 8,4 · visão normal 19,3 · contraste ≥ 3:1).
+  const DARK = document.documentElement.dataset.theme === "dark";
+  const TEMA = DARK
+    ? {
+        cat: ["#3a9bc4", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"],
+        token: { marca: "#5ab8d6", positivo: "#4fa8c9", negativo: "#e5675f", neutro: "#76899a", alerta: "#e0a63a", total: "#8fa3b0" },
+        // Magnitude no escuro: o pouco some no fundo e o muito acende.
+        seq: ["#14303d", "#1f5a70", "#2f87a6", "#5ab8d6", "#a9e0ee"],
+        ord: ["#2a5a6e", "#34748c", "#3f8ea9", "#52a7c3", "#6dbdd8", "#8fd0e6", "#b4e2f0"],
+        tree: ["#27758f", "#205f74", "#194b5c", "#133a48"],
+        ink: "#eef3f6", ink2: "#adbcc5", muted: "#93a4af", grid: "#1d2b35", axis: "#2c3d48", surface: "#111b22",
+        tipBg: "#172229", tipBorder: "#2d3f4b", tipShadow: "0 12px 32px -8px rgba(0,0,0,.65)",
+        crumb: "#17232b", vazio: "#0f1a21", destaque: "rgba(90,184,214,0.10)", sombra: "rgba(255,255,255,0.05)",
+        hover: "rgba(255,255,255,0.10)", sobreClaro: "#06222d",
+      }
+    : {
+        cat: ["#1a78a0", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"],
+        token: { marca: "#1f566b", positivo: "#2f6d82", negativo: "#c4423a", neutro: "#9ba6ae", alerta: "#eda100", total: "#3b454d" },
+        // Sequencial (magnitude) e ordinal (etapas ordenadas): a matiz petróleo da marca.
+        seq: ["#eef5f7", "#b3d0da", "#4f8a9d", "#1f566b", "#0f2d3a"],
+        ord: ["#82afbf", "#4f8a9d", "#2f6d82", "#1f566b", "#194659", "#143949", "#0f2d3a"],
+        tree: ["#2f6d82", "#1f566b", "#143949", "#0f2d3a"],
+        ink: "#161c21", ink2: "#4f5a63", muted: "#66727b", grid: "#e1e6e9", axis: "#cdd4d9", surface: "#ffffff",
+        tipBg: "#ffffff", tipBorder: "#e1e6e9", tipShadow: "0 8px 24px -6px rgba(10,29,39,.18)",
+        crumb: "#eef1f3", vazio: "#f6f8f9", destaque: "rgba(47,109,130,0.08)", sombra: "rgba(22,28,33,0.05)",
+        hover: "rgba(22,28,33,0.08)", sobreClaro: "#ffffff",
+      };
+  const CAT = TEMA.cat;
+  const TOKEN = TEMA.token;
+  const SEQ = TEMA.seq;
+  const ORD = TEMA.ord;
+  const TREE = TEMA.tree;
+  const INK = TEMA.ink;
+  const INK2 = TEMA.ink2;
+  const MUTED = TEMA.muted;
+  const GRID = TEMA.grid;
+  const AXIS = TEMA.axis;
+  const SURFACE = TEMA.surface;
   const FONT = '"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
   const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -132,12 +156,12 @@
       aria: { enabled: true, label: { enabled: false }, decal: { show: state.texturas } },
       tooltip: {
         confine: true,
-        backgroundColor: SURFACE,
-        borderColor: GRID,
+        backgroundColor: TEMA.tipBg,
+        borderColor: TEMA.tipBorder,
         borderWidth: 1,
         padding: [8, 10],
         textStyle: { color: INK, fontSize: 12, fontFamily: FONT },
-        extraCssText: "box-shadow:0 8px 24px -6px rgba(10,29,39,.18);border-radius:8px;max-width:min(320px,86vw);white-space:normal;",
+        extraCssText: `box-shadow:${TEMA.tipShadow};border-radius:8px;max-width:min(320px,86vw);white-space:normal;`,
         transitionDuration: 0.1,
       },
     };
@@ -285,7 +309,7 @@
     if (alvo && o.faixa) {
       alvo.markArea = {
         silent: true,
-        itemStyle: { color: "rgba(47,109,130,0.08)" },
+        itemStyle: { color: TEMA.destaque },
         label: { color: INK2, fontSize: 11, position: "insideTopLeft" },
         data: [[{ yAxis: o.faixa.de, name: o.faixa.rotulo }, { yAxis: o.faixa.ate }]],
       };
@@ -315,7 +339,7 @@
         axisPointer: {
           type: horiz ? "shadow" : "line",
           lineStyle: { color: AXIS, width: 1, type: "solid" },
-          shadowStyle: { color: "rgba(22,28,33,0.05)" },
+          shadowStyle: { color: TEMA.sombra },
         },
         formatter: (params) => {
           const lista = Array.isArray(params) ? params : [params];
@@ -387,7 +411,7 @@
       },
       series: [{
         type: "treemap", roam: false, nodeClick: "zoomToNode", width: "100%", height: ctx.compact ? "100%" : "92%",
-        breadcrumb: { show: true, bottom: 0, height: 22, itemStyle: { color: "#eef1f3", textStyle: { color: INK2 }, borderColor: GRID } },
+        breadcrumb: { show: true, bottom: 0, height: 22, itemStyle: { color: TEMA.crumb, textStyle: { color: INK2 }, borderColor: GRID } },
         label: {
           show: true, color: "#fff", fontSize: ctx.compact ? 11 : 12, fontFamily: FONT,
           formatter: (p) => `${p.name}\n${short(p.value, f)}`, overflow: "truncate",
@@ -411,7 +435,7 @@
     const rotulos = o.celulas.length <= 60 && !ctx.compact;
     const data = o.celulas.map((c) => ({
       value: c,
-      label: { show: rotulos, color: c[2] / max > 0.5 ? "#fff" : INK, fontSize: 11, formatter: () => short(c[2], f) },
+      label: { show: rotulos, color: c[2] / max > 0.5 ? TEMA.sobreClaro : INK, fontSize: 11, formatter: () => short(c[2], f) },
     }));
     return {
       tooltip: {
@@ -470,7 +494,7 @@
       xAxis: { type: "category", data: nomes, axisTick: { show: false }, axisLine: { lineStyle: { color: AXIS } }, axisLabel: { color: INK2, interval: 0, width: ctx.compact ? 58 : 84, overflow: "break", lineHeight: 14 } },
       yAxis: { type: "value", axisLabel: { color: MUTED, formatter: (v) => short(v, f) }, splitLine: { lineStyle: { color: GRID, width: 1 } }, axisLine: { show: false }, axisTick: { show: false } },
       tooltip: {
-        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(22,28,33,0.05)" } },
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: TEMA.sombra } },
         formatter: (ps) => {
           const i = ps[0].dataIndex, p = o.passos[i];
           return tip(p.nome, [
@@ -527,7 +551,7 @@
         name: s.nome + "·alvo", type: "scatter", data: dados, z: 4,
         symbolSize: (v, par) => Math.max(26, par.data.size + 6),
         itemStyle: { color: "transparent", borderColor: "transparent" },
-        emphasis: { scale: false, itemStyle: { color: "rgba(22,28,33,0.08)", borderColor: INK, borderWidth: 1.25 } },
+        emphasis: { scale: false, itemStyle: { color: TEMA.hover, borderColor: INK, borderWidth: 1.25 } },
         tooltip: {
           trigger: "item",
           formatter: (p) => {
@@ -545,7 +569,7 @@
     const alvo = series[0];
     if (alvo && o.faixa) {
       alvo.markArea = {
-        silent: true, itemStyle: { color: "rgba(47,109,130,0.08)" },
+        silent: true, itemStyle: { color: TEMA.destaque },
         label: { color: INK2, fontSize: 11, position: "insideTopLeft" },
         data: [[{ yAxis: o.faixa.de, name: o.faixa.rotulo }, { yAxis: o.faixa.ate }]],
       };
@@ -610,7 +634,7 @@
         dayLabel: { firstDay: 1, nameMap: ["D", "S", "T", "Q", "Q", "S", "S"], color: MUTED, fontSize: 10 },
         monthLabel: { nameMap: ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"], color: MUTED },
         splitLine: { show: false },
-        itemStyle: { color: "#f6f8f9", borderColor: SURFACE, borderWidth: 2 },
+        itemStyle: { color: TEMA.vazio, borderColor: SURFACE, borderWidth: 2 },
       },
       series: [{ type: "heatmap", coordinateSystem: "calendar", data: o.dias, itemStyle: { borderColor: SURFACE, borderWidth: 2 } }],
     };
@@ -625,7 +649,7 @@
       xAxis: { type: "value", show: false },
       yAxis: { type: "category", inverse: true, data: o.etapas.map((e) => e.nome), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: INK2, width: ctx.compact ? 100 : 160, overflow: "truncate" } },
       tooltip: {
-        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(22,28,33,0.05)" } },
+        trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: TEMA.sombra } },
         formatter: (ps) => { const e = o.etapas[ps[0].dataIndex]; return tip(e.nome, [{ cor: ordCor(ps[0].dataIndex, n), nome: "Quantidade", valor: fmt(e.valor, f), extra: e.rotulo }]); },
       },
       series: [{
