@@ -16,12 +16,12 @@ publicados nem no `docker-compose.prod.yml` (sem `ports:` nesses serviços).
 
 ## Antes do primeiro deploy (F0-17)
 
-- [ ] Confirmar que a porta `8010` está livre no host (`ss -ltnp | grep 8010`)
-- [ ] Confirmar que `ufw status` (ou equivalente) só libera 22/80/443
+- [x] A porta `8010` estava ocupada (`agi_nginx`) — usamos a `8013` (`WEB_HOST_PORT` no `.env`). Confirme com `ss -ltnp | grep 8013`
+- [x] `ufw` ativado com 22/80/443 (estava inativo)
 - [ ] Documentar aqui qualquer exceção, com data e motivo
 
 ## Histórico de alterações
 
 | Data | Alteração | Motivo | Quem |
 |---|---|---|---|
-| — | Nenhuma alteração ainda | — | — |
+| 2026-10-03 | `ufw` ativado com 22, 80 e 443 (estava inativo) | Deploy do Rebanho360 no VPS compartilhado; efeito colateral a conferir: porta 3000 (`next-server`) deixa de ser acessível de fora e containers que chamem o host por IP podem ser barrados | Warley |

@@ -2,7 +2,21 @@
 
 Passo a passo para colocar o Rebanho360 no ar num **VPS Ubuntu compartilhado**, partindo de um servidor sem o sistema: entrar por SSH, baixar o código do GitHub, configurar, subir, ligar o HTTPS, criar o primeiro acesso e deixar o backup rodando.
 
-> **Como usar este guia.** Siga na ordem. Cada etapa termina com um bloco **✔ Confere se** — só avance quando ele estiver verdadeiro. Onde aparecer `rebanho360.seudominio.com.br`, troque pelo domínio real.
+> **Como usar este guia.** Siga na ordem. Cada etapa termina com um bloco **✔ Confere se** — só avance quando ele estiver verdadeiro.
+
+### Valores deste deploy (demonstração)
+
+O guia já está preenchido com os valores reais do VPS onde o sistema roda. Para outro servidor, troque estes:
+
+| O quê | Valor |
+|---|---|
+| Domínio | `rebanho360-demo.ferzion.com.br` |
+| IP do VPS | `147.93.15.214` |
+| Usuário SSH | `deploy` |
+| Pasta do projeto | `/var/www/docker-instances/rebanho360` |
+| Porta local do `web` | `8013` — a `8010` (padrão) já é do `agi_nginx`. Vem de `WEB_HOST_PORT` no `.env` |
+
+No VPS há **vários outros sistemas** (agi, byakugan, escolar, rh, safralog, ontime, fretes, conftech…) e até um Rebanho antigo (`rebanho_web`, `rebanho_db`, vhost `rebanho`, porta 8080). **Nada disso é nosso**: os nomes do Rebanho360 sempre levam o prefixo `rebanho360_`, que não colide com `rebanho_`.
 
 **Tempo estimado:** 1,5 a 3 horas (a maior parte é DNS, certificado e e-mail).
 
@@ -36,7 +50,7 @@ Passo a passo para colocar o Rebanho360 no ar num **VPS Ubuntu compartilhado**, 
 ```
 Internet ──443──► Nginx do host (já existe, compartilhado)
                      ├── /static/  → pasta do host  (/var/www/rebanho360/static)
-                     └── tudo mais → 127.0.0.1:8010
+                     └── tudo mais → 127.0.0.1:8013
                                          │
                        ┌─────────────────┴─────────────────────┐
                        │ Docker Compose (docker-compose.prod)  │
@@ -47,7 +61,7 @@ Internet ──443──► Nginx do host (já existe, compartilhado)
 
 Regras que valem o tempo todo (o VPS é **compartilhado** com outros sistemas):
 
-- Só o `web` publica porta, e **só em `127.0.0.1:8010`**. Postgres e Redis não têm porta publicada.
+- Só o `web` publica porta, e **só em `127.0.0.1:8013`** (porta definida por `WEB_HOST_PORT` no `.env`; o padrão do compose é 8010). Postgres e Redis não têm porta publicada.
 - **Não altere** vhosts, containers, volumes ou regras de firewall de outros sistemas.
 - Tudo nosso tem prefixo `rebanho360_`.
 - **Nunca rode `docker compose down -v`** nem `docker volume prune`: apagam o banco.
@@ -61,17 +75,18 @@ Reúna estes itens. Sem eles o deploy trava no meio.
 | Item | Para quê | Observação |
 |---|---|---|
 | Acesso SSH ao VPS com um usuário `sudo` | Tudo | Prefira chave SSH; senha desabilitada |
-| **Domínio ou subdomínio** | HTTPS e `ALLOWED_HOSTS` | Ex.: `rebanho360.seudominio.com.br` |
+| **Domínio ou subdomínio** | HTTPS e `ALLOWED_HOSTS` | `rebanho360-demo.ferzion.com.br` |
 | Acesso ao **DNS** do domínio | Apontar para o VPS | Registro `A` (e `AAAA` se o VPS tiver IPv6) |
 | Conta de **e-mail SMTP** | Convites, redefinição de senha, aviso de pedido de acesso | Precisa de **STARTTLS na porta 587** (ver [4.2](#42-e-mail-smtp)) |
 | Destino de **backup fora do VPS** | Backup de verdade | Backblaze B2, S3, Google Drive etc., via `rclone` |
-| Acesso ao repositório do GitHub | `git clone` | O repositório é **privado** → precisa de *deploy key* (etapa 3) |
+| Acesso ao repositório do GitHub | `git clone` | O repositório é **privado** → precisa de *deploy key* (etapa 3). **Neste VPS o clone já existe e o `git pull` funciona** |
 | Um **gerenciador de senhas** | Guardar `.env`, senhas e códigos de recuperação | O `.env` **não** está no Git; se o servidor morrer, ele se perde |
 
 ### Requisitos do servidor
 
 - Ubuntu 22.04 ou 24.04, arquitetura `x86_64` ou `aarch64` (o build do Tailwind só conhece essas duas).
-- **Memória:** os limites do compose somam ~2,8 GB (web 768M + worker 512M + beat 256M + db 1G + redis 256M). Com os outros sistemas do VPS, o ideal é **4 GB ou mais**. Confira com `free -h`.
+- **Memória:** os limites do compose somam ~2,8 GB (web 768M + worker 512M + beat 256M + db 1G + redis 256M). Com os outros sistemas do VPS, o ideal é **4 GB ou mais** livres. Confira com `free -h`.
+  - *Neste VPS (7,8 GB; ~3,9 GB em uso pelos outros sistemas; 2 GB de swap) cabe, mas sem folga: acompanhe `docker stats` e `free -h` nas primeiras semanas.*
 - **Disco:** pelo menos 10 GB livres para imagens, banco e backups.
 - **Saída para a internet** durante o build: a imagem baixa o Tailwind do GitHub e as dependências do PyPI/apt.
 
@@ -82,7 +97,7 @@ Reúna estes itens. Sem eles o deploy trava no meio.
 ### 2.1 Entrar e atualizar
 
 ```bash
-ssh seu_usuario@IP_DO_VPS
+ssh deploy@147.93.15.214
 
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git curl ca-certificates ufw
@@ -110,7 +125,7 @@ Verifique o que já existe (o VPS já hospeda outros sistemas, então provavelme
 
 ```bash
 docker --version
-docker compose version        # precisa ser o Compose v2 ("Docker Compose version v2.x")
+docker compose version        # Compose v2 ou superior (aqui: Docker 29.8.2, Compose v5.6.0)
 ```
 
 **Se não estiverem instalados**, use o repositório oficial da Docker:
@@ -132,7 +147,7 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo usermod -aG docker $USER
 # saia e entre de novo no SSH para o grupo valer:
 exit
-ssh seu_usuario@IP_DO_VPS
+ssh deploy@147.93.15.214
 docker ps        # tem que funcionar sem sudo
 ```
 
@@ -143,14 +158,14 @@ Antes de subir qualquer coisa, olhe o terreno:
 ```bash
 docker ps                                   # containers dos outros sistemas
 sudo ss -ltnp                               # portas em uso
-sudo ss -ltnp | grep -E ':8010\b' || echo "8010 livre"
+sudo ss -ltnp | grep -E ':8013\b' || echo "8013 livre"
 sudo nginx -v && ls /etc/nginx/sites-enabled /etc/nginx/conf.d
 sudo ufw status verbose
 df -h /                                     # espaço em disco
 free -h                                     # memória
 ```
 
-- **Porta `8010` ocupada?** Escolha outra livre (ex.: `8011`) e troque em **três** lugares: `ports:` do `web` em `docker-compose.prod.yml`, `proxy_pass` no vhost do Nginx e `HEALTHCHECK_URL` no `.env` (ver [4.3](#43-variáveis-opcionais-dos-scripts)).
+- **Porta ocupada?** O padrão do compose é `8010`, e **neste VPS ela já é do `agi_nginx`** (`0.0.0.0:8010`). Em uso aqui: 3000, 8001–8007, 8010–8012, 8080, 8110, 8120, 9000. Usamos a **`8013`**, que estava livre. Para outra porta, mude em **dois** lugares: `WEB_HOST_PORT` no `.env` (ver [4.3](#43-editar-o-env)) e o `proxy_pass` do vhost do Nginx. O `docker-compose.prod.yml` e o `healthcheck.sh` leem a porta do `.env` — **não edite arquivos do projeto no servidor**.
 - **Nginx não existe?** O guia assume o Nginx do host. Instale com `sudo apt install -y nginx` (e só nesse caso).
 
 ### 2.5 Firewall
@@ -172,9 +187,13 @@ sudo ufw status verbose
   ```
 
 - Se o VPS tem outros sistemas que usam outras portas, **não habilite o ufw às cegas**: liste o que está em uso (`ss -ltnp`) e combine antes.
+- **Neste VPS** o `ufw` estava inativo e foi ativado com 22/80/443 (em 2026-10-03). Efeitos a conferir logo depois — o servidor é compartilhado:
+  - **Abra os outros sistemas** no navegador (agi, byakugan, escolar, rh, safralog…) e confirme que seguem no ar. Containers que falam com serviços do host por IP/porta podem ser barrados.
+  - A porta **3000** (`next-server`, escuta em `*:3000`) deixou de ser acessível de fora. Se alguém a usava direto, em vez de pelo Nginx, deixou de funcionar.
+  - Portas que o Docker publica em `0.0.0.0` (ex.: `agi_nginx` na 8010) **continuam abertas**: o Docker insere as próprias regras antes do `ufw`. O `ufw` não as protege.
 - Registre qualquer mudança na tabela de histórico de [firewall.md](firewall.md).
 
-> Postgres (5432) e Redis (6379) não precisam de regra: não estão publicados. A porta 8010 está presa a `127.0.0.1`, então também não é alcançável de fora (o Docker costuma furar o `ufw` em portas publicadas em `0.0.0.0`; por isso o bind em `127.0.0.1` é essencial — não o altere).
+> Postgres (5432) e Redis (6379) não precisam de regra: não estão publicados. A porta 8013 está presa a `127.0.0.1`, então também não é alcançável de fora (o Docker costuma furar o `ufw` em portas publicadas em `0.0.0.0`; por isso o bind em `127.0.0.1` é essencial — não o altere).
 
 ### 2.6 DNS
 
@@ -182,15 +201,15 @@ No painel do seu domínio, crie o registro apontando para o IP do VPS:
 
 | Tipo | Nome | Valor |
 |---|---|---|
-| `A` | `rebanho360` | IP público do VPS |
+| `A` | `rebanho360-demo` (em `ferzion.com.br`) | `147.93.15.214` |
 
 Confira a propagação (pode levar de minutos a horas):
 
 ```bash
-dig +short rebanho360.seudominio.com.br      # tem que devolver o IP do VPS
+dig +short rebanho360-demo.ferzion.com.br      # tem que devolver 147.93.15.214
 ```
 
-> ✔ **Confere se:** `docker ps` funciona sem sudo · `timedatectl` mostra relógio sincronizado · porta 8010 livre (ou trocada) · o domínio resolve para o IP do VPS.
+> ✔ **Confere se:** `docker ps` funciona sem sudo · `timedatectl` mostra relógio sincronizado · porta 8013 livre · o domínio resolve para o IP do VPS.
 
 ---
 
@@ -227,18 +246,20 @@ ssh -T git@github-rebanho360
 
 ### 3.2 Clonar
 
-Use **`/opt/rebanho360`** (o nome da pasta importa — veja o aviso abaixo):
+> **Neste VPS esta etapa já foi feita:** `/var/www/docker-instances/rebanho360` já é o clone (o `git pull` responde `Already up to date`). Pule para a 3.3. Os comandos abaixo valem para um servidor novo.
+
+A pasta do projeto é **`/var/www/docker-instances/rebanho360`** (o nome da pasta importa — veja o aviso abaixo):
 
 ```bash
-sudo mkdir -p /opt/rebanho360
-sudo chown $USER:$USER /opt/rebanho360
-git clone git@github-rebanho360:Frraz/rebanho360.git /opt/rebanho360
-cd /opt/rebanho360
+sudo mkdir -p /var/www/docker-instances/rebanho360
+sudo chown $USER:$USER /var/www/docker-instances/rebanho360
+git clone git@github-rebanho360:Frraz/rebanho360.git /var/www/docker-instances/rebanho360
+cd /var/www/docker-instances/rebanho360
 git log --oneline | head -3
 git branch --show-current          # tem que ser "main"
 ```
 
-> ⚠️ **Não renomeie nem mova a pasta depois.** O Docker Compose usa o nome da pasta como nome do projeto e prefixa os volumes com ele (`rebanho360_rebanho360_pgdata`). Renomear a pasta faz o Compose criar volumes **novos e vazios**, e o sistema sobe com banco em branco. Os scripts de backup descobrem o volume pelo container, mas o banco em si fica atrelado a esse nome.
+> ⚠️ **Não renomeie nem mova a pasta depois.** O Docker Compose usa o nome da pasta como nome do projeto e prefixa os volumes com ele (`rebanho360_rebanho360_pgdata`; no clone, `ls` mostra a pasta chamada `rebanho360`, e é ela que dá o prefixo). Renomear a pasta faz o Compose criar volumes **novos e vazios**, e o sistema sobe com banco em branco. Os scripts de backup descobrem o volume pelo container, mas o banco em si fica atrelado a esse nome.
 
 ### 3.3 Um atalho importante
 
@@ -247,10 +268,10 @@ Na raiz do projeto há **dois** arquivos de Compose: `docker-compose.yml` (**des
 ```bash
 echo "alias dc='docker compose -f docker-compose.prod.yml'" >> ~/.bashrc
 source ~/.bashrc
-cd /opt/rebanho360 && dc ps        # lista vazia por enquanto: tudo bem
+cd /var/www/docker-instances/rebanho360 && dc ps        # lista vazia por enquanto: tudo bem
 ```
 
-O resto do guia usa `dc` (sempre dentro de `/opt/rebanho360`). Os scripts de `deploy/` já usam `-f docker-compose.prod.yml` por conta própria.
+O resto do guia usa `dc` (sempre dentro de `/var/www/docker-instances/rebanho360`). Os scripts de `deploy/` já usam `-f docker-compose.prod.yml` por conta própria.
 
 > ✔ **Confere se:** `git log` mostra os commits · `dc ps` roda sem erro.
 
@@ -261,7 +282,7 @@ O resto do guia usa `dc` (sempre dentro de `/opt/rebanho360`). Os scripts de `de
 O `.env` guarda segredos, **não está no Git** e precisa ser criado à mão no servidor.
 
 ```bash
-cd /opt/rebanho360
+cd /var/www/docker-instances/rebanho360
 cp .env.example .env
 chmod 600 .env
 ```
@@ -298,7 +319,7 @@ Abra com `nano .env` e preencha. **Substitua tudo que está em MAIÚSCULAS.**
 DJANGO_SETTINGS_MODULE=config.settings.prod
 DJANGO_SECRET_KEY=COLE_AQUI_O_HEX_DE_100_CARACTERES
 DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=rebanho360.seudominio.com.br
+DJANGO_ALLOWED_HOSTS=rebanho360-demo.ferzion.com.br
 
 # --- Banco ---
 POSTGRES_DB=rebanho360
@@ -315,7 +336,7 @@ EMAIL_HOST=smtp.seuprovedor.com
 EMAIL_PORT=587
 EMAIL_HOST_USER=usuario-smtp
 EMAIL_HOST_PASSWORD=senha-smtp
-DEFAULT_FROM_EMAIL=Rebanho360 <nao-responda@seudominio.com.br>
+DEFAULT_FROM_EMAIL=Rebanho360 <nao-responda@ferzion.com.br>
 ACCESS_REQUEST_NOTIFY_EMAILS=
 
 # --- Observabilidade (opcional) ---
@@ -328,10 +349,12 @@ DJANGO_HSTS_SECONDS=0
 AUDIT_CONSOLE_INCLUDE_GESTOR=False
 
 # --- Scripts de deploy ---
+# Porta local do web (o Nginx do host aponta para ela). A 8010 padrão já é do agi_nginx.
+WEB_HOST_PORT=8013
 STATIC_HOST_DIR=/var/www/rebanho360/static
 # RCLONE_REMOTE=meu-remoto:bucket/rebanho360     (etapa 10)
 # HEALTHCHECK_HOST=                              (padrão: o 1º de DJANGO_ALLOWED_HOSTS)
-# HEALTHCHECK_URL=http://127.0.0.1:8010/ready/   (só mude se trocou a porta 8010)
+
 ```
 
 Pontos que mais dão erro:
@@ -343,6 +366,7 @@ Pontos que mais dão erro:
 | `DATABASE_URL` | Senha idêntica à de `POSTGRES_PASSWORD`; host `db`. Senha com `@ : / # %` quebra a URL — por isso o `openssl rand -hex` |
 | `POSTGRES_PASSWORD` | **Só vale na primeira criação do volume do banco.** Mudar depois no `.env` não troca a senha do Postgres (ver [13](#13-solução-de-problemas)) |
 | Senhas com `$`, `#` ou espaço (SMTP, por exemplo) | Coloque o valor entre **aspas simples**: `EMAIL_HOST_PASSWORD='abc$123'` |
+| `WEB_HOST_PORT` | Porta livre no host (aqui `8013`). Tem que ser a **mesma** do `proxy_pass` no Nginx. Sem a variável, o compose usa 8010 |
 | `DJANGO_HSTS_SECONDS` | `0` por enquanto |
 
 Confira que não ficou nada vazio por esquecimento e que a permissão está certa:
@@ -384,7 +408,7 @@ chmod 700 /backups
 Tudo pronto para subir. O script faz, nesta ordem: backup (ignorado no primeiro deploy, pois ainda não há banco) → `git pull` → build → `migrate` → `collectstatic` → copia os estáticos para o host → sobe `web worker beat` → healthcheck.
 
 ```bash
-cd /opt/rebanho360
+cd /var/www/docker-instances/rebanho360
 ./deploy/deploy.sh
 ```
 
@@ -408,8 +432,8 @@ Se der `Permission denied`: `chmod +x deploy/*.sh` (e confira com `git status` s
 
 ```bash
 dc ps                                   # db, redis, web, worker, beat: "Up"
-curl -fsS -H "Host: rebanho360.seudominio.com.br" -H "X-Forwarded-Proto: https" \
-     http://127.0.0.1:8010/ready/
+curl -fsS -H "Host: rebanho360-demo.ferzion.com.br" -H "X-Forwarded-Proto: https" \
+     http://127.0.0.1:8013/ready/
 # → {"status": "ok", "checks": {"database": "ok", "redis": "ok"}}
 ls /var/www/rebanho360/static | head    # css, fonts, img, admin...
 ```
@@ -422,7 +446,7 @@ ls /var/www/rebanho360/static | head    # css, fonts, img, admin...
 
 ## 7. Nginx e HTTPS
 
-O sistema já está respondendo em `127.0.0.1:8010`. Agora o Nginx do host o expõe com HTTPS. **Não toque nos vhosts dos outros sistemas** — você só adiciona um arquivo novo.
+O sistema já está respondendo em `127.0.0.1:8013`. Agora o Nginx do host o expõe com HTTPS. **Não toque nos vhosts dos outros sistemas** — você só adiciona um arquivo novo.
 
 Veja como os vhosts existentes estão organizados e **siga o mesmo padrão**:
 
@@ -432,19 +456,25 @@ ls /etc/nginx/sites-enabled /etc/nginx/conf.d
 
 Os comandos abaixo usam `sites-available` + `sites-enabled` (padrão do Ubuntu). Se o servidor usa `conf.d/*.conf`, grave lá.
 
+**Neste VPS** os vhosts estão em `/etc/nginx/sites-enabled/` (`conf.d/` está vazio), um arquivo por domínio (`rh-demo.ferzion.com.br`, `safralog.ferzion.com.br`…), e o nosso segue o padrão: `rebanho360-demo.ferzion.com.br`. Já existe um vhost `rebanho` (o sistema antigo, porta 8080): **não o toque**; só confirme que ele não declara o nosso `server_name`:
+
+```bash
+sudo grep -rn "rebanho360-demo" /etc/nginx/sites-enabled/ || echo "domínio livre no nginx"
+```
+
 ### 7.1 Vhost provisório (só HTTP)
 
 O vhost definitivo ([nginx.conf.example](nginx.conf.example)) referencia o certificado, que ainda não existe — então o `nginx -t` falharia. Primeiro suba um vhost mínimo só na porta 80, para o Certbot poder validar o domínio:
 
 ```bash
-sudo tee /etc/nginx/sites-available/rebanho360 > /dev/null <<'EOF'
+sudo tee /etc/nginx/sites-available/rebanho360-demo.ferzion.com.br > /dev/null <<'EOF'
 server {
     listen 80;
-    server_name rebanho360.seudominio.com.br;
+    server_name rebanho360-demo.ferzion.com.br;
     location / { return 404; }
 }
 EOF
-sudo ln -s /etc/nginx/sites-available/rebanho360 /etc/nginx/sites-enabled/rebanho360
+sudo ln -s /etc/nginx/sites-available/rebanho360-demo.ferzion.com.br /etc/nginx/sites-enabled/rebanho360-demo.ferzion.com.br
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -452,11 +482,11 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx     # se ainda não houver certbot
-sudo certbot certonly --nginx -d rebanho360.seudominio.com.br \
+sudo certbot certonly --nginx -d rebanho360-demo.ferzion.com.br \
      -m seu-email@dominio.com --agree-tos --no-eff-email
 ```
 
-O DNS (etapa 2.6) precisa estar apontando para o VPS, e as portas 80/443 abertas. Ao terminar, o certificado fica em `/etc/letsencrypt/live/rebanho360.seudominio.com.br/`.
+O DNS (etapa 2.6) precisa estar apontando para o VPS, e as portas 80/443 abertas. Ao terminar, o certificado fica em `/etc/letsencrypt/live/rebanho360-demo.ferzion.com.br/`.
 
 Confira a renovação automática:
 
@@ -467,12 +497,13 @@ sudo certbot renew --dry-run                  # simula a renovação
 
 ### 7.3 Vhost definitivo
 
-Gere o vhost final a partir do exemplo do repositório, trocando o domínio:
+Gere o vhost final a partir do exemplo do repositório, trocando o domínio **e a porta** (o exemplo usa 8010):
 
 ```bash
-sudo sed 's/rebanho360\.exemplo\.com/rebanho360.seudominio.com.br/g' \
-    /opt/rebanho360/deploy/nginx.conf.example \
-  | sudo tee /etc/nginx/sites-available/rebanho360 > /dev/null
+sudo sed -e 's/rebanho360\.exemplo\.com/rebanho360-demo.ferzion.com.br/g' \
+         -e 's/127\.0\.0\.1:8010/127.0.0.1:8013/g' \
+    /var/www/docker-instances/rebanho360/deploy/nginx.conf.example \
+  | sudo tee /etc/nginx/sites-available/rebanho360-demo.ferzion.com.br > /dev/null
 
 sudo nginx -t                  # tem que dizer "syntax is ok" e "test is successful"
 sudo systemctl reload nginx
@@ -491,12 +522,12 @@ O que esse vhost faz — e não deve ser alterado sem entender:
 ### 7.4 Testar
 
 ```bash
-curl -I http://rebanho360.seudominio.com.br/             # 301 → https
-curl -I https://rebanho360.seudominio.com.br/contas/entrar/   # 200
-curl -I https://rebanho360.seudominio.com.br/static/css/output.css   # 200, content-type text/css
+curl -I http://rebanho360-demo.ferzion.com.br/             # 301 → https
+curl -I https://rebanho360-demo.ferzion.com.br/contas/entrar/   # 200
+curl -I https://rebanho360-demo.ferzion.com.br/static/css/output.css   # 200, content-type text/css
 ```
 
-Abra `https://rebanho360.seudominio.com.br/` no navegador **e no celular**. A tela de login precisa aparecer **com estilo, fontes e ícones**.
+Abra `https://rebanho360-demo.ferzion.com.br/` no navegador **e no celular**. A tela de login precisa aparecer **com estilo, fontes e ícones**.
 
 > ✔ **Confere se:** cadeado válido no navegador · tela de login estilizada · `output.css` responde 200 · os outros sistemas do VPS continuam abrindo normalmente.
 
@@ -511,7 +542,7 @@ Banco recém-migrado tem: classes de carcaça, tipos de tributo, classes e centr
 ### 8.1 Superusuário de suporte
 
 ```bash
-cd /opt/rebanho360
+cd /var/www/docker-instances/rebanho360
 dc exec web python manage.py criar_superusuario_oculto SEU_USUARIO --email seu-email@dominio.com
 ```
 
@@ -524,7 +555,7 @@ Use-o como conta de **suporte/emergência**, não como seu login do dia a dia (v
 
 ### 8.2 Entrar e ativar o segundo fator
 
-1. Abra `https://rebanho360.seudominio.com.br/contas/entrar/` e entre com o superusuário.
+1. Abra `https://rebanho360-demo.ferzion.com.br/contas/entrar/` e entre com o superusuário.
 2. Menu do avatar → **Conta → Segundo fator** → ative, leia o QR no aplicativo autenticador e **guarde os códigos de recuperação** no gerenciador de senhas.
 
 O 2FA é opcional, mas **altamente recomendado** a todos. Para conferir o relógio e ver quem já usa:
@@ -599,7 +630,7 @@ print('enviados:', n)
 Rode esta lista inteira antes de dar o sistema como entregue.
 
 ```bash
-cd /opt/rebanho360
+cd /var/www/docker-instances/rebanho360
 
 # 1. Todos os containers de pé
 dc ps
@@ -607,7 +638,7 @@ dc ps
 # 2. Saúde de verdade (banco + Redis)
 ./deploy/healthcheck.sh
 
-# 3. Nada exposto além do necessário — só 127.0.0.1:8010 do projeto
+# 3. Nada exposto além do necessário — só 127.0.0.1:8013 do projeto
 docker ps --format '{{.Names}}\t{{.Ports}}' | grep rebanho360
 sudo ss -ltnp | grep -E ':(5432|6379)\b' || echo "5432/6379 não expostos: OK"
 
@@ -660,7 +691,7 @@ RCLONE_REMOTE=backup-b2:nome-do-bucket/rebanho360
 ### 10.2 Rodar o primeiro backup à mão
 
 ```bash
-cd /opt/rebanho360
+cd /var/www/docker-instances/rebanho360
 ./deploy/backup.sh
 ls -lh /backups/db /backups/media
 rclone ls "$(grep ^RCLONE_REMOTE= .env | cut -d= -f2-)"     # o dump está lá fora?
@@ -677,10 +708,10 @@ crontab -e
 ```cron
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Backup diário às 03:00 (horário do servidor)
-0 3 * * * /opt/rebanho360/deploy/backup.sh >> $HOME/rebanho360-backup.log 2>&1
+0 3 * * * /var/www/docker-instances/rebanho360/deploy/backup.sh >> $HOME/rebanho360-backup.log 2>&1
 ```
 
-Se usar outra pasta de backup: `0 3 * * * BACKUP_ROOT=/outra/pasta /opt/rebanho360/deploy/backup.sh ...`.
+Se usar outra pasta de backup: `0 3 * * * BACKUP_ROOT=/outra/pasta /var/www/docker-instances/rebanho360/deploy/backup.sh ...`.
 
 Confira no dia seguinte: `tail -20 ~/rebanho360-backup.log` e se há um dump novo em `/backups/db/`.
 
@@ -697,7 +728,7 @@ Backup nunca restaurado é hipótese. Faça **uma restauração de teste logo ap
 Só em emergência. Pare a aplicação para ninguém gravar durante a restauração:
 
 ```bash
-cd /opt/rebanho360
+cd /var/www/docker-instances/rebanho360
 dc stop web worker beat
 
 # Escolha o dump (use o mais recente que você confia)
@@ -735,16 +766,16 @@ O HSTS manda o navegador **nunca mais** abrir o site por HTTP. Só ligue **depoi
 1. Primeiro, um valor curto (1 hora):
 
    ```bash
-   cd /opt/rebanho360
+   cd /var/www/docker-instances/rebanho360
    sed -i 's/^DJANGO_HSTS_SECONDS=.*/DJANGO_HSTS_SECONDS=3600/' .env
    dc up -d --force-recreate web worker beat
-   curl -sI https://rebanho360.seudominio.com.br/contas/entrar/ | grep -i strict-transport
+   curl -sI https://rebanho360-demo.ferzion.com.br/contas/entrar/ | grep -i strict-transport
    # → strict-transport-security: max-age=3600; includeSubDomains; preload
    ```
 
 2. Depois de alguns dias sem problema: `86400` (1 dia) → e por fim `31536000` (1 ano).
 
-> Com HSTS ligado, o `includeSubDomains` vale para **subdomínios do `rebanho360.seudominio.com.br`**, não para os outros subdomínios do seu domínio. Mesmo assim, não ligue se algum subdomínio abaixo dele precisar de HTTP.
+> Com HSTS ligado, o `includeSubDomains` vale para **subdomínios do `rebanho360-demo.ferzion.com.br`**, não para os outros subdomínios do seu domínio. Mesmo assim, não ligue se algum subdomínio abaixo dele precisar de HTTP.
 
 ---
 
@@ -755,8 +786,8 @@ O HSTS manda o navegador **nunca mais** abrir o site por HTTP. Só ligue **depoi
 Você sobe a mudança para o GitHub (`main`) e, no VPS:
 
 ```bash
-ssh seu_usuario@IP_DO_VPS
-cd /opt/rebanho360
+ssh deploy@147.93.15.214
+cd /var/www/docker-instances/rebanho360
 ./deploy/deploy.sh
 ```
 
@@ -764,7 +795,7 @@ O script faz backup, `git pull --ff-only origin main`, build, migrações, está
 
 Regras:
 
-- **Não edite arquivos dentro de `/opt/rebanho360`.** Alteração local faz o `git pull --ff-only` recusar. Mudou algo à mão? `git status` e `git diff` para ver; `git checkout -- arquivo` descarta.
+- **Não edite arquivos dentro de `/var/www/docker-instances/rebanho360`.** Alteração local faz o `git pull --ff-only` recusar. Mudou algo à mão? `git status` e `git diff` para ver; `git checkout -- arquivo` descarta.
 - O `deploy.sh` puxa a branch **`main`**.
 - Migração destrutiva (apaga coluna/tabela) exige janela combinada e backup recente.
 - Leia o que mudou antes: `git fetch && git log --oneline HEAD..origin/main`.
@@ -808,7 +839,7 @@ O que **nunca** fazer em produção: `dc down -v` · `docker volume rm` · `dock
 
 ### 12.5 Monitoramento mínimo
 
-- Monitor externo (UptimeRobot, Healthchecks, etc.) em `https://rebanho360.seudominio.com.br/ready/` — alerta se falhar por mais de 2 minutos.
+- Monitor externo (UptimeRobot, Healthchecks, etc.) em `https://rebanho360-demo.ferzion.com.br/ready/` — alerta se falhar por mais de 2 minutos.
 - Alerta de **disco acima de 80%** (dump enche disco calado).
 - Alerta se o backup externo parar de chegar.
 - `SENTRY_DSN` no `.env`, se quiser captura de erro não tratado.
@@ -833,16 +864,16 @@ O que **nunca** fazer em produção: `dc down -v` · `docker volume rm` · `dock
 | `ERR_TOO_MANY_REDIRECTS` | Nginx sem `X-Forwarded-Proto` | Conferir `proxy_set_header X-Forwarded-Proto $scheme;` no vhost |
 | `Bad Request (400)` ao abrir o domínio | Domínio fora de `DJANGO_ALLOWED_HOSTS`, ou Nginx sem `proxy_set_header Host $host;` | Ajustar o `.env` (e recriar) ou o vhost |
 | `403 CSRF verification failed` no login/POST | `Host`/`X-Forwarded-Proto` não repassados, ou acesso por `http://` | Conferir o vhost; acessar sempre por `https://` |
-| `502 Bad Gateway` | `web` fora do ar ou porta diferente de 8010 | `dc ps`; `curl 127.0.0.1:8010/health/`; conferir `proxy_pass` |
+| `502 Bad Gateway` | `web` fora do ar ou porta diferente da do `proxy_pass` | `dc ps`; `curl 127.0.0.1:8013/health/`; conferir `proxy_pass` |
 | `413 Request Entity Too Large` | Upload maior que o limite do Nginx | `client_max_body_size` (o exemplo usa 20m); no `http {}` global pode haver valor menor |
 | `nginx -t` falha por certificado inexistente | Aplicou o vhost final antes do Certbot | Volte ao vhost provisório (7.1), emita o certificado, e aí aplique o final |
 | Certbot não valida o domínio | DNS não propagou, ou 80/443 fechadas | `dig +short domínio`; conferir `ufw` e o firewall do provedor |
 | E-mail não chega | SMTP incorreto, porta 465, ou `.env` não recarregado | Rodar o teste de [8.5](#85-testar-o-e-mail); usar porta 587; `dc up -d --force-recreate`; olhar `dc logs worker` |
 | Código do 2FA "inválido" para todos | Relógio do servidor desajustado | `timedatectl`; `sudo timedatectl set-ntp true`; `conferir_segundo_fator` |
 | Usuário perdeu celular e códigos do 2FA | — | `dc exec web python manage.py resetar_segundo_fator USUARIO --motivo "..."` (fica na auditoria) |
-| Sistema subiu com **banco vazio** após mexer no servidor | Pasta do projeto renomeada/movida: o Compose criou volumes novos | Volte a pasta ao nome/local originais (`/opt/rebanho360`); os volumes antigos estão intactos (`docker volume ls | grep rebanho360`) |
+| Sistema subiu com **banco vazio** após mexer no servidor | Pasta do projeto renomeada/movida: o Compose criou volumes novos | Volte a pasta ao nome/local originais (`/var/www/docker-instances/rebanho360`); os volumes antigos estão intactos (`docker volume ls | grep rebanho360`) |
 | `web` morto por falta de memória (`Killed`, exit 137) | Limite de 768M estourado (ex.: PDF grande) | `docker stats`; `dmesg -T | grep -i oom`; ver [seção 14](#14-lacunas-conhecidas) |
-| `address already in use` na 8010 | Outro serviço usa a porta | Escolher outra porta (ver [2.4](#24-conhecer-o-que-já-roda-no-servidor-sem-mexer)) |
+| `address already in use` na 8013 | Outro serviço usa a porta | Escolher outra porta (ver [2.4](#24-conhecer-o-que-já-roda-no-servidor-sem-mexer)) |
 | `git pull` recusa (`Not possible to fast-forward`) | Alteração local ou histórico reescrito no GitHub | `git status`; descartar alteração local; se foi *force push*, falar com quem fez |
 | `Nenhuma imagem 'rebanho360_web:previous'` no rollback | Primeiro deploy | Esperado: não existe versão anterior para voltar |
 
@@ -876,8 +907,8 @@ Espelha o checklist de produção de [docs/arquitetura/02-infra-e-deploy.md](../
 **Servidor**
 - [ ] Relógio sincronizado (`timedatectl`)
 - [ ] Firewall: só 22/80/443 (mudanças registradas em `firewall.md`)
-- [ ] Porta 8010 só em `127.0.0.1`; 5432 e 6379 não publicadas
-- [ ] Pasta do projeto em `/opt/rebanho360` (sem renomear)
+- [ ] Porta 8013 só em `127.0.0.1`; 5432 e 6379 não publicadas
+- [ ] Pasta do projeto em `/var/www/docker-instances/rebanho360` (sem renomear)
 - [ ] Deploy key somente leitura no GitHub
 
 **Aplicação**

@@ -11,7 +11,7 @@ set -euo pipefail
 # shellcheck source=deploy/_lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-URL="${HEALTHCHECK_URL:-http://127.0.0.1:8010/ready/}"
+URL="${HEALTHCHECK_URL:-http://127.0.0.1:$(env_var WEB_HOST_PORT 8010)/ready/}"
 TENTATIVAS="${HEALTHCHECK_RETRIES:-10}"
 INTERVALO="${HEALTHCHECK_INTERVAL:-3}"
 
