@@ -29,6 +29,13 @@
       <input type="hidden" name="next" value="{{ next }}">
       <label class="font-medium text-gray-900" for="codigo">3. Digite o código que o aplicativo mostra</label>
       <input type="text" id="codigo" name="codigo" class="field-input text-lg tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+      <label class="flex min-h-touch items-start gap-3 text-sm">
+        <input type="checkbox" name="confiar" value="1" class="mt-1" checked aria-describedby="ajuda-confiar">
+        <span>
+          <span class="font-medium text-gray-900">Confiar neste dispositivo por 30 dias</span>
+          <span class="block text-gray-500" id="ajuda-confiar">Neste navegador o código não será pedido de novo e você continua conectado. Não marque em computador compartilhado.</span>
+        </span>
+      </label>
       <button type="submit" class="btn-primary w-full">{% icon "shield-check" %} Ativar</button>
     </form>
   </li>

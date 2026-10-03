@@ -2,15 +2,16 @@ from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 
 from apps.accounts import services as account_services
-from apps.accounts import two_factor
+from apps.accounts import trusted_devices, two_factor
 from apps.accounts import user_management as usuarios
 from apps.accounts.forms import ContaForm
+from apps.accounts.models import TrustedDevice
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
 from apps.core.exceptions import BusinessError
@@ -104,7 +105,22 @@ def contexto_da_conta(request, *, form=None, senha_form=None) -> dict:
         "fazendas_do_usuario": acessos,
         "segundo_fator_ativo": two_factor.dispositivo_confirmado(usuario) is not None,
         "codigos_restantes": two_factor.codigos_de_recuperacao_restantes(usuario),
+        "dispositivos_confiaveis": _dispositivos_para_a_conta(request),
     }
+
+
+def _dispositivos_para_a_conta(request) -> list[dict]:
+    """Os dispositivos confiáveis do usuário, com o que a lista precisa mostrar:
+    qual é este navegador e se o IP mudou desde que a confiança foi dada."""
+    atual = trusted_devices.dispositivo_valido(request)
+    return [
+        {
+            "dispositivo": d,
+            "este": atual is not None and d.pk == atual.pk,
+            "ip_mudou": bool(d.created_ip) and d.created_ip != d.last_ip,
+        }
+        for d in trusted_devices.dispositivos_ativos(request.user)
+    ]
 
 
 class ContaView(LoginRequiredMixin, View):
@@ -163,6 +179,15 @@ class PasswordChangeView(auth_views.PasswordChangeView):
             usuario.must_change_password = False
             usuario.save(update_fields=["must_change_password"])
         usuarios.auditar_troca_de_senha(usuario)
+        # Quem trocou a senha quer fechar portas: os outros navegadores voltam a
+        # pedir o código. O atual segue confiável (a sessão continua aberta).
+        atual = trusted_devices.dispositivo_valido(self.request)
+        trusted_devices.revogar_todos(
+            usuario,
+            motivo="Troca de senha pelo próprio usuário",
+            ator=usuario,
+            exceto_id=atual.pk if atual else None,
+        )
         if era_obrigatoria:
             return response
         messages.success(self.request, "✓ Senha alterada.")
@@ -194,6 +219,9 @@ class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        trusted_devices.revogar_todos(
+            form.user, motivo="Senha definida por link", ator=form.user
+        )
         # Quem definiu a própria senha por link não tem mais senha "temporária".
         if form.user.must_change_password:
             form.user.must_change_password = False
@@ -286,7 +314,7 @@ class ConfigurarSegundoFatorView(LoginRequiredMixin, View):
             )
         two_factor.limpar_falhas(request.user)
         two_factor.marcar_sessao_verificada(request)
-        return render_2fa(
+        resposta = render_2fa(
             request,
             "registration/2fa_codigos.html",
             {
@@ -295,6 +323,9 @@ class ConfigurarSegundoFatorView(LoginRequiredMixin, View):
                 "continuar": _destino_seguro(request),
             },
         )
+        if request.POST.get("confiar"):
+            trusted_devices.confiar_neste_dispositivo(request, resposta)
+        return resposta
 
 
 class VerificarSegundoFatorView(LoginRequiredMixin, View):
@@ -335,6 +366,7 @@ class VerificarSegundoFatorView(LoginRequiredMixin, View):
 
         two_factor.limpar_falhas(request.user)
         two_factor.marcar_sessao_verificada(request)
+        confiar = bool(request.POST.get("confiar"))
         registrar_auditoria(
             action=AuditAction.LOGIN,
             entity=request.user,
@@ -342,7 +374,8 @@ class VerificarSegundoFatorView(LoginRequiredMixin, View):
                 "Segundo fator verificado (código de recuperação)"
                 if como == "recuperacao"
                 else "Segundo fator verificado"
-            ),
+            )
+            + (" — dispositivo marcado como confiável" if confiar else ""),
             actor=request.user,
         )
         if como == "recuperacao":
@@ -353,7 +386,10 @@ class VerificarSegundoFatorView(LoginRequiredMixin, View):
                 f"Restam {restantes}. Se perdeu o celular, configure o aplicativo "
                 "de novo e gere códigos novos.",
             )
-        return redirect(_destino_seguro(request))
+        resposta = redirect(_destino_seguro(request))
+        if confiar:
+            trusted_devices.confiar_neste_dispositivo(request, resposta)
+        return resposta
 
 
 class AdiarLembreteDoSegundoFatorView(LoginRequiredMixin, View):
@@ -423,3 +459,45 @@ class StatusSegundoFatorView(LoginRequiredMixin, View):
             "registration/2fa_codigos.html",
             {"codigos": codigos, "recem_ativado": False},
         )
+
+
+# --------------------------------------------------------------------------
+# Dispositivos confiáveis (ADR 0009)
+# --------------------------------------------------------------------------
+
+
+class RevogarDispositivoConfiavelView(LoginRequiredMixin, View):
+    """Revoga um dispositivo confiável do próprio usuário. O registro de outro
+    usuário responde 404, como fora de escopo (regra 4)."""
+
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
+        dispositivo = get_object_or_404(
+            TrustedDevice, pk=pk, user=request.user, revoked_at__isnull=True
+        )
+        trusted_devices.revogar(
+            dispositivo, motivo="Revogado pelo próprio usuário", ator=request.user
+        )
+        messages.success(
+            request,
+            f"✓ Dispositivo revogado ({dispositivo.label}). "
+            "Nele, o código volta a ser pedido na próxima entrada.",
+        )
+        return redirect(reverse("accounts:conta") + "#seguranca")
+
+
+class RevogarDispositivosConfiaveisView(LoginRequiredMixin, View):
+    """ "Revogar todos": inclusive o deste navegador, que cai na próxima requisição."""
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        quantos = trusted_devices.revogar_todos(
+            request.user, motivo="Revogados pelo próprio usuário", ator=request.user
+        )
+        if quantos:
+            messages.success(request, f"✓ {quantos} dispositivo(s) revogado(s).")
+        else:
+            messages.info(request, "Não havia dispositivo confiável para revogar.")
+        return redirect(reverse("accounts:conta") + "#seguranca")

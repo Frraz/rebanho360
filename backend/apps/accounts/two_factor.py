@@ -29,7 +29,8 @@ from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 
-from apps.accounts.models import RecoveryCode, TOTPDevice, User
+from apps.accounts import trusted_devices
+from apps.accounts.models import RecoveryCode, TOTPDevice, TrustedDevice, User
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
 
@@ -159,13 +160,16 @@ def sessao_verificada(request) -> bool:
     return bool(request.session.get(SESSION_OTP_VERIFICADO))
 
 
-def marcar_sessao_verificada(request) -> None:
+def marcar_sessao_verificada(request, dispositivo: TrustedDevice | None = None) -> None:
     """Prova de segundo fator vale para esta sessão. Troca a chave da sessão
-    (fixação de sessão) e, para perfil sensível (`TWO_FACTOR_ROLES`), faz o
-    cookie morrer ao fechar o navegador (seguranca/01#sessão)."""
+    (fixação de sessão). Em dispositivo confiável a sessão é longa; fora dele,
+    perfil sensível (`TWO_FACTOR_ROLES`) faz o cookie morrer ao fechar o
+    navegador (seguranca/01#sessão)."""
     request.session.cycle_key()
     request.session[SESSION_OTP_VERIFICADO] = timezone.now().isoformat()
-    if request.user.role in settings.TWO_FACTOR_ROLES:
+    if dispositivo is not None:
+        trusted_devices.tornar_sessao_longa(request, dispositivo)
+    elif request.user.role in settings.TWO_FACTOR_ROLES:
         request.session.set_expiry(0)
 
 
@@ -332,7 +336,7 @@ def redefinir_segundo_fator(usuario: User, *, por=None, motivo: str = "") -> Non
     de comando do servidor. As sessões abertas do usuário são encerradas."""
     TOTPDevice.objects.filter(user=usuario).delete()
     RecoveryCode.objects.filter(user=usuario).delete()
-    encerrar_sessoes(usuario)
+    encerrar_sessoes(usuario)  # revoga também os dispositivos confiáveis
     registrar_auditoria(
         action=AuditAction.UPDATE,
         entity_type="TOTPDevice",
@@ -346,8 +350,12 @@ def redefinir_segundo_fator(usuario: User, *, por=None, motivo: str = "") -> Non
 
 
 def encerrar_sessoes(usuario: User) -> int:
+    """Derruba as sessões abertas **e** revoga os dispositivos confiáveis:
+    encerrar a sessão sem revogar o cookie deixaria o 2FA dispensado na
+    próxima entrada. Todo caminho que encerra sessões passa por aqui."""
     from django.contrib.sessions.models import Session
 
+    trusted_devices.revogar_todos(usuario, motivo="Sessões do usuário encerradas")
     encerradas = 0
     for sessao in Session.objects.filter(expire_date__gt=timezone.now()):
         if sessao.get_decoded().get("_auth_user_id") == str(usuario.pk):

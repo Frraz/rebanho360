@@ -184,6 +184,9 @@ Constraints: `amount > 0` · `document` não vazio · **`UNIQUE (invoice, docume
 ### `TOTPDevice` e `RecoveryCode` (`accounts`)
 Segundo fator. `TOTPDevice`: `user` (1:1), `secret`, `confirmed`, `last_used_step` (anti-replay). `RecoveryCode`: `user`, `code_hash` (HMAC, nunca o código), `used_at`. O segredo nunca entra em log, auditoria ou URL.
 
+### `TrustedDevice` (`accounts`)
+Navegador que o usuário marcou como confiável ao confirmar o código (ADR 0009). `user`, `token_hash` (HMAC, único; o token só existe no cookie), `label`, `user_agent`, `created_ip`, `last_ip`, `last_used_at`, `expires_at` (janela de 30 dias, renovada a cada uso), `absolute_expires_at` (teto de 90 dias; `CHECK expires_at <= absolute_expires_at`), `revoked_at`, `revoked_reason`. Não é exportável.
+
 ## Ciclo de compra (Fase 5)
 
 Nenhuma coluna nova em `Purchase`, `Lot`, `CostEntry`, `HerdMovement` ou `Invoice`. Regra em [08](../regras-negocio/08-ciclo-de-compra.md).

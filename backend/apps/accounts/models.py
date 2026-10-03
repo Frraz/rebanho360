@@ -180,6 +180,53 @@ class RecoveryCode(models.Model):
         return f"Código de recuperação de {self.user_id}"
 
 
+class TrustedDevice(models.Model):
+    """Navegador em que o usuário já provou o segundo fator e pediu para não ser
+    cobrado de novo por um tempo (ADR 0009).
+
+    O cookie do navegador carrega um token aleatório; aqui fica só o HMAC dele,
+    como nos códigos de recuperação — quem lê o banco não consegue se passar por
+    um dispositivo. A confiança vale `expires_at` (janela deslizante) e nunca
+    passa de `absolute_expires_at`. Mudar de IP **não** revoga: o IP é só
+    auditado, porque rede móvel troca de IP o tempo todo.
+    """
+
+    user = models.ForeignKey(
+        User,
+        verbose_name="Usuário",
+        related_name="trusted_devices",
+        on_delete=models.CASCADE,
+    )
+    token_hash = models.CharField("Hash do token", max_length=64, unique=True)
+    label = models.CharField("Navegador", max_length=80, blank=True)
+    user_agent = models.CharField("User-agent", max_length=400, blank=True)
+    created_ip = models.GenericIPAddressField("IP ao confiar", null=True, blank=True)
+    last_ip = models.GenericIPAddressField("Último IP", null=True, blank=True)
+    created_at = models.DateTimeField("Confiado em", auto_now_add=True)
+    last_used_at = models.DateTimeField("Último uso")
+    expires_at = models.DateTimeField("Vale até")
+    absolute_expires_at = models.DateTimeField("Teto de validade")
+    revoked_at = models.DateTimeField("Revogado em", null=True, blank=True)
+    revoked_reason = models.CharField("Motivo da revogação", max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "Dispositivo confiável"
+        verbose_name_plural = "Dispositivos confiáveis"
+        ordering = ["-last_used_at"]
+        indexes = [
+            models.Index(fields=["user", "revoked_at"], name="trusted_user_rev_idx")
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(expires_at__lte=models.F("absolute_expires_at")),
+                name="trusted_device_expiry_within_cap",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Dispositivo confiável de {self.user_id} ({self.label or 'sem rótulo'})"
+
+
 class AccessRequestStatus(models.TextChoices):
     PENDENTE = "PENDENTE", "Pendente"
     APROVADA = "APROVADA", "Aprovada"

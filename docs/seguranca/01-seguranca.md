@@ -18,7 +18,7 @@ E a ameaça mais provável não é invasão: é **erro humano**. Clique duplo qu
 HTTPS obrigatório · HSTS depois de confirmado o TLS · PostgreSQL e Redis sem porta publicada · firewall com 22, 80 e 443 apenas.
 
 ### Sessão
-Cookies `Secure`, `HttpOnly`, `SameSite=Lax` · sessão expira em 12 horas · `SESSION_EXPIRE_AT_BROWSER_CLOSE` para perfis sensíveis · logout invalida a sessão no servidor.
+Cookies `Secure`, `HttpOnly`, `SameSite=Lax` · sessão expira em 12 horas · com o 2FA ativo, o cookie de `ADMIN`/`FINANCEIRO` morre ao fechar o navegador (`set_expiry(0)` em `marcar_sessao_verificada`), **salvo em dispositivo confiável** (abaixo) · logout invalida a sessão no servidor.
 
 ### Autenticação
 Argon2 (`PASSWORD_HASHERS` com `Argon2PasswordHasher` primeiro) · **política de senha liberal, de propósito** (decisão de 2026-10-03: sistema privado, com limite de tentativas e segundo fator opcional) — vale qualquer senha com **4 ou mais caracteres**, inclusive `0000` ou `abcde`; sem exigir maiúscula, número ou símbolo (`SENHA_TAMANHO_MINIMO` e `AUTH_PASSWORD_VALIDATORS` em `config/settings/base.py`; endurecer é acrescentar validadores) · **rate limit de 5 tentativas por usuário e por IP em 15 minutos** · usuário inativo não autentica, mesmo com senha correta · todo login, logout e falha vai para `AuditEvent`.
@@ -30,7 +30,9 @@ Argon2 (`PASSWORD_HASHERS` com `Argon2PasswordHasher` primeiro) · **política d
 - 5 tentativas erradas em 15 minutos bloqueiam (como o login); toda falha vai para `AuditEvent`.
 - 10 códigos de recuperação de uso único, guardados só como HMAC. Gerar novos exige um código do aplicativo.
 - Perdeu celular **e** códigos: outro `ADMIN` redefine pela tela de usuários (**Usuários e acessos**), ou `manage.py resetar_segundo_fator`. Ambos auditados; as sessões do usuário são encerradas.
-- Com o 2FA ativo, a sessão de `ADMIN`/`FINANCEIRO` (`TWO_FACTOR_ROLES`) expira ao fechar o navegador.
+- Com o 2FA ativo, a sessão de `ADMIN`/`FINANCEIRO` (`TWO_FACTOR_ROLES`) expira ao fechar o navegador — a não ser em **dispositivo confiável**.
+- **Dispositivo confiável** ([ADR 0009](../arquitetura/adr/0009-dispositivo-confiavel-2fa.md), `apps/accounts/trusted_devices.py`): ao confirmar o código, "Confiar neste dispositivo por 30 dias" (marcada por padrão). Cookie `HttpOnly`/`Secure`/`SameSite=Lax` com token aleatório; no banco só o HMAC. Dispensa **o código**, nunca a senha. Vale 30 dias de uso (renova a cada uso), no máximo 90 desde que foi dado; a sessão ali dura 14 dias, com logout após 8 h sem uso. **Mudar de IP não revoga**: audita (`UPDATE` em `TrustedDevice`) e a Conta avisa. Revogam: o próprio usuário (Conta), troca de senha (os outros), senha definida por link, redefinição do 2FA, sessões encerradas pelo `ADMIN` e desativação/exclusão do usuário.
+- Parâmetros: `TRUSTED_DEVICE_DAYS`, `TRUSTED_DEVICE_MAX_DAYS`, `TRUSTED_SESSION_DAYS`, `TRUSTED_IDLE_HOURS` em `config/settings/base.py`. Uma tarefa diária (`accounts.manutencao`) apaga dispositivos vencidos há mais de 30 dias e roda `clearsessions`.
 - Não existe mais o interruptor `TWO_FACTOR_ENFORCED`. `manage.py conferir_segundo_fator` mostra a hora do servidor (os códigos dependem do relógio) e quem já usa.
 
 ### Autorização

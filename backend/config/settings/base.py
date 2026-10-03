@@ -52,13 +52,18 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Logo após a autenticação: tudo o que vem depois (sessão longa, segundo
+    # fator) audita com IP, user-agent e `request_id` da requisição.
+    "apps.core.middleware.RequestContextMiddleware",
+    # Antes do segundo fator: derruba a sessão longa cujo dispositivo foi
+    # revogado ou ficou inativo, antes de o `TwoFactorMiddleware` decidir.
+    "apps.accounts.middleware.SessaoLongaMiddleware",
     "apps.accounts.middleware.TwoFactorMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     # Depois das mensagens (usa `messages`) e do segundo fator (que vem primeiro).
     "apps.accounts.middleware.PasswordChangeRequiredMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
-    "apps.core.middleware.RequestContextMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -174,6 +179,8 @@ CELERY_TIMEZONE = TIME_ZONE
 # meio e apaga os arquivos vencidos. A cada 15 minutos basta.
 CELERY_BEAT_SCHEDULE = {
     "exports-manutencao": {"task": "exports.manutencao", "schedule": 15 * 60},
+    # Sessões vencidas (`django_session` só cresce) e dispositivos confiáveis velhos.
+    "accounts-manutencao": {"task": "accounts.manutencao", "schedule": 24 * 60 * 60},
 }
 
 # --- Exportação de dados (docs/regras-negocio/10-exportacao-de-dados.md) ---
@@ -202,6 +209,18 @@ TWO_FACTOR_ISSUER = "Rebanho360"
 # Passos de 30 s aceitos antes e depois do atual — tolera relógio de celular
 # levemente atrasado, sem abrir a janela demais.
 TWO_FACTOR_WINDOW = 1
+
+# --- Dispositivo confiável (ADR 0009, docs/seguranca/01#autenticação) ---
+# "Confiar neste dispositivo" dispensa o código do segundo fator (a senha
+# continua valendo) por `TRUSTED_DEVICE_DAYS` dias, renovados a cada uso e
+# nunca além de `TRUSTED_DEVICE_MAX_DAYS` desde que a confiança foi dada.
+# Nesse navegador a sessão persiste `TRUSTED_SESSION_DAYS` dias, com logout
+# depois de `TRUSTED_IDLE_HOURS` horas sem uso. Mudar de IP não revoga: só audita.
+TRUSTED_DEVICE_COOKIE = "r360_dispositivo"
+TRUSTED_DEVICE_DAYS = 30
+TRUSTED_DEVICE_MAX_DAYS = 90
+TRUSTED_SESSION_DAYS = 14
+TRUSTED_IDLE_HOURS = 8
 
 # --- Console de auditoria (docs/regras-negocio/06) ---
 AUDIT_CONSOLE_INCLUDE_GESTOR = config(

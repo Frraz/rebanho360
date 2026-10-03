@@ -11,7 +11,7 @@ Sistema de gestão pecuária para **uma operação real de fazenda a pasto, com 
 ## Antes de codificar
 
 1. Ler [`docs/00-visao-geral.md`](docs/00-visao-geral.md)
-2. Ler [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md) — **18 pendências abertas** (as 30 respondidas ou dispensadas estão em [`99-pendencias-resolvidas.md`](docs/regras-negocio/99-pendencias-resolvidas.md); a maior parte das respostas é do cliente em **2026-10-03**, provisórias, ver [`docs/regras-negocio/12`](docs/regras-negocio/12-decisoes-do-cliente-2026-10-03.md)); as demais abertas, cada uma com padrão reversível implementado
+2. Ler [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md) — **19 pendências abertas** (as 30 respondidas ou dispensadas estão em [`99-pendencias-resolvidas.md`](docs/regras-negocio/99-pendencias-resolvidas.md); a maior parte das respostas é do cliente em **2026-10-03**, provisórias, ver [`docs/regras-negocio/12`](docs/regras-negocio/12-decisoes-do-cliente-2026-10-03.md)); as demais abertas, cada uma com padrão reversível implementado
 3. Consultar [`docs/roadmap/`](docs/roadmap/README.md) para saber em que fase e em que tarefa estamos
 4. Vai mexer em tela? Ler [`docs/ux/02-design-system.md`](docs/ux/02-design-system.md) — componentes, tokens e padrões já existem; não inventar outro
 

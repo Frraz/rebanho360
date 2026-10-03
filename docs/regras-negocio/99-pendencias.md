@@ -8,7 +8,7 @@ Dúvidas que **continuam sem resposta**. Cada uma tem: a pergunta, por que impor
 
 Os números das pendências **não foram reordenados** (o código e os documentos citam "pendência #N"): faltam números porque esses itens estão no arquivo de resolvidas.
 
-**Abertas (18):** #3 · #7 · #13 · #14 · #19 · #21 · #26 · #29 · #35 · #37 · #38 · #39 · #40 · #42 · #44 · #45 · #47 · #48
+**Abertas (19):** #3 · #7 · #13 · #14 · #19 · #21 · #26 · #29 · #35 · #37 · #38 · #39 · #40 · #42 · #44 · #45 · #47 · #48 · #49
 
 ---
 
@@ -259,6 +259,16 @@ Os números das pendências **não foram reordenados** (o código e os documento
 **Implementado:** (a) `CAMPO` vê só *Visão geral* (sem dinheiro), *Rebanho* e *Lotes*; as demais abas dão `403`. (b) Os valores acima, todos constantes nomeadas no topo de `insights.py`, `compras.py` e `custos.py`. (c) Soma por lote, com o aviso "27 de 30 lotes com resultado" ao lado do número. (d) O cartão da *Visão geral* usa o **mesmo seletor do painel inicial** (lotes encerrados na safra); a aba *Vendas* mostra a margem por @ de todos os lotes com carcaça — os dois rótulos dizem qual é qual.
 
 **Custo de mudar:** baixo. (a) uma tupla em `escopo.py`; (b) uma constante cada; (c) e (d) uma função em `vendas.py`/`visao_geral.py`, sem migração: nada é gravado.
+
+---
+
+## #49 — 🟢 Dispositivo confiável: caixa marcada por padrão e IP forjável *(Fase 0)*
+
+**A dúvida:** (1) a caixa "Confiar neste dispositivo por 30 dias" deve vir **marcada** (menos cansaço) ou **desmarcada** (mais cautela em computador compartilhado)? (2) Os prazos (30 dias deslizantes, teto de 90, sessão de 14 dias, logout após 8 h sem uso) servem à operação?
+
+**Implementado:** marcada por padrão, com o aviso "Não marque em computador compartilhado"; prazos como acima, em `TRUSTED_*` (`config/settings/base.py`). Também: `client_ip` (`apps/core/request_context.py`) confia no primeiro item de `X-Forwarded-For`, que o cliente pode forjar — o IP da auditoria pode ser falso. Como o IP aqui só é auditado, não bloqueia; corrigir é configurar o número de proxies confiáveis.
+
+**Custo de mudar:** baixo. O padrão da caixa é um atributo `checked` em `2fa_verificar.html` e `2fa_configurar.html`; os prazos são constantes.
 
 ---
 

@@ -117,6 +117,54 @@
         <button type="submit" class="btn-secondary w-full sm:w-auto">Gerar novos códigos</button>
       </form>
       <p class="text-xs text-gray-500">Trocou de celular? Peça a um administrador para redefinir o seu segundo fator e configure de novo.</p>
+
+      <div class="space-y-3 border-t border-gray-200 pt-4" id="dispositivos">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900">Dispositivos confiáveis</h3>
+            <p class="mt-1 text-sm text-gray-600">Neles o código não é pedido de novo por até 30 dias de uso, e você continua conectado. Revogue os que não reconhece ou que não usa mais.</p>
+          </div>
+          {% if dispositivos_confiaveis %}
+          <form method="post" action="{% url 'accounts:dispositivos_revogar_todos' %}" class="shrink-0" onsubmit="return confirm('Revogar todos os dispositivos confiáveis? Em todos, inclusive neste, você terá de entrar de novo.')">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger-outline">Revogar todos</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if dispositivos_confiaveis %}
+        <div class="table-wrap">
+          <table class="table table-stack">
+            <thead>
+              <tr><th scope="col">Navegador</th><th scope="col">Último uso</th><th scope="col">Último IP</th><th scope="col">Vale até</th><th scope="col"><span class="sr-only">Ação</span></th></tr>
+            </thead>
+            <tbody>
+              {% for item in dispositivos_confiaveis %}
+              <tr>
+                <td class="cell-title">
+                  {{ item.dispositivo.label|default:"Navegador" }}
+                  {% if item.este %}<span class="badge-confirmada ml-1">Este dispositivo</span>{% endif %}
+                </td>
+                <td data-label="Último uso" class="muted nowrap">{{ item.dispositivo.last_used_at|date:"d/m/Y H:i" }}</td>
+                <td data-label="Último IP" class="muted">
+                  <span class="code">{{ item.dispositivo.last_ip|default:"—" }}</span>
+                  {% if item.ip_mudou %}<span class="badge-pendencia ml-1">IP mudou desde que você confiou ({{ item.dispositivo.created_ip }})</span>{% endif %}
+                </td>
+                <td data-label="Vale até" class="muted nowrap">{{ item.dispositivo.expires_at|date:"d/m/Y" }}</td>
+                <td>
+                  <form method="post" action="{% url 'accounts:dispositivo_revogar' item.dispositivo.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-secondary">Revogar</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">Nenhum dispositivo confiável. Ao confirmar o código, marque "Confiar neste dispositivo" para não precisar digitá-lo a cada entrada.</p>
+        {% endif %}
+      </div>
       {% else %}
       <div class="alert-info">{% icon "shield-check" %}<p>Não é obrigatório, mas recomendamos para todos: com ele, uma senha vazada não basta para entrar na sua conta.</p></div>
       <a href="{% url 'accounts:2fa_configurar' %}" class="btn-primary w-full sm:w-auto">Ativar o segundo fator</a>

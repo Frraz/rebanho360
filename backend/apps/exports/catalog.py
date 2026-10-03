@@ -573,6 +573,7 @@ CONJUNTOS: tuple[Conjunto, ...] = (
 NAO_EXPORTAVEIS = {
     "accounts.TOTPDevice": "segredo do segundo fator: nunca sai do sistema",
     "accounts.RecoveryCode": "códigos de recuperação do segundo fator: nunca saem do sistema",
+    "accounts.TrustedDevice": "dispositivos confiáveis do segundo fator: só o dono vê os seus, na página Conta",
     "exports.ExportJob": "é a própria exportação (o pedido fica na tela de exportações)",
 }
 

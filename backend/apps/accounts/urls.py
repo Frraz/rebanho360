@@ -27,6 +27,17 @@ urlpatterns = [
         views.VerificarSegundoFatorView.as_view(),
         name="2fa_verificar",
     ),
+    # Fora de `2fa/`: esse prefixo é liberado antes do segundo fator.
+    path(
+        "dispositivos/<int:pk>/revogar/",
+        views.RevogarDispositivoConfiavelView.as_view(),
+        name="dispositivo_revogar",
+    ),
+    path(
+        "dispositivos/revogar-todos/",
+        views.RevogarDispositivosConfiaveisView.as_view(),
+        name="dispositivos_revogar_todos",
+    ),
     path("conta/", views.ContaView.as_view(), name="conta"),
     path("senha/trocar/", views.PasswordChangeView.as_view(), name="password_change"),
     path("senha/redefinir/", views.PasswordResetView.as_view(), name="password_reset"),

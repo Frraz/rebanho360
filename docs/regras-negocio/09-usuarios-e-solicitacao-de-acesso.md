@@ -31,8 +31,8 @@ Menu do avatar → **Conta** (`/contas/conta/`, `accounts:conta`). Qualquer pape
 | Seção | O que o usuário faz | Regra |
 |---|---|---|
 | **Perfil** | Nome, sobrenome, telefone, data de nascimento e **CPF (opcional)** | Lista fechada no serviço (`CAMPOS_DA_PROPRIA_CONTA`): `role`, `email`, `username` e situação **não** mudam por aqui, nem com POST adulterado. Sem motivo (é a pessoa cuidando dos próprios dados), mas **audita antes/depois** com ela como autora, e só se algo mudou |
-| **Senha** | Senha atual + nova (validadores do projeto) | A troca **é auditada** (`changed_fields = ["password"]`, nunca o valor nem o hash) e encerra as outras sessões. A troca obrigatória (senha temporária) segue com tela própria, sem menu |
-| **Segundo fator** | Vê o estado, ativa e gera novos códigos de recuperação | Ativar e regenerar seguem as telas e regras do 2FA (código do aplicativo para regenerar) |
+| **Senha** | Senha atual + nova (validadores do projeto) | A troca **é auditada** (`changed_fields = ["password"]`, nunca o valor nem o hash) e encerra as outras sessões e **revoga os outros dispositivos confiáveis**. A troca obrigatória (senha temporária) segue com tela própria, sem menu |
+| **Segundo fator** | Vê o estado, ativa e gera novos códigos de recuperação; vê e **revoga os dispositivos confiáveis** (um ou todos) | Ativar e regenerar seguem as telas e regras do 2FA (código do aplicativo para regenerar). A lista mostra navegador, último uso, último IP e validade, e avisa quando o IP mudou desde que a confiança foi dada ([ADR 0009](../arquitetura/adr/0009-dispositivo-confiavel-2fa.md)) |
 
 - **CPF:** só dígitos no banco; confere os dígitos verificadores e rejeita sequência repetida; **um CPF, uma conta** (constraint parcial que ignora o vazio e o excluído). Na auditoria entra **mascarado** (`***.***.***-25`). Só o dono o vê inteiro; não vai para a exportação nem para a tela do administrador.
 - **E-mail é somente leitura** para o próprio usuário: é por ele que a senha se recupera, então a troca passa pelo administrador (pendência [#46](99-pendencias-resolvidas.md#46--troca-de-e-mail-pelo-próprio-usuário-fase-0)).
