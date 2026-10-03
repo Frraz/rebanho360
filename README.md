@@ -206,6 +206,8 @@ Dentro de cada app: `models / services / selectors / forms / permissions / tasks
 
 Produção usa `docker-compose.prod.yml` (imagem fixa, sem bind mount; só o `web` publica porta, e só em `127.0.0.1`) atrás do Nginx do host. Os scripts em [`deploy/`](deploy/) fazem backup antes de cada deploy, publicam os estáticos, conferem a saúde e permitem rollback.
 
+**Primeiro deploy do zero, passo a passo (VPS, `.env`, Nginx, HTTPS, primeiro acesso, backup): [`deploy/GUIA-DEPLOY-PRODUCAO.md`](deploy/GUIA-DEPLOY-PRODUCAO.md).**
+
 Pontos de atenção do primeiro deploy:
 
 - **Reconstruir a imagem**: `pydyf` está fixada em `0.10.0` (versões mais novas quebram o PDF do WeasyPrint) e a Fase 4 trouxe a `segno`, do QR do 2FA.
