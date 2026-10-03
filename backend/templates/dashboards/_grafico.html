@@ -1,0 +1,26 @@
+{% load core_tags %}
+<section class="dash-card {{ g.classe_largura }}" aria-labelledby="g-{{ g.id }}" x-data="{ tabela: false }">
+  <header class="dash-card-head">
+    <h3 id="g-{{ g.id }}" class="dash-card-title">{% if g.url %}<a href="{{ g.url }}" title="{{ g.rotulo_url }}">{{ g.titulo }}</a>{% else %}{{ g.titulo }}{% endif %}</h3>
+    {% if not g.vazio %}
+    <div class="dash-tools">
+      <button type="button" class="dash-tool" :aria-pressed="tabela" @click="tabela = !tabela" title="Ver os mesmos dados em tabela">
+        {% icon "table-2" "icon-sm" %}<span class="sr-only">Alternar entre gráfico e tabela</span>
+      </button>
+      <button type="button" class="dash-tool" data-dash-png="{{ g.id }}" title="Baixar o gráfico como imagem" x-show="!tabela">
+        {% icon "download" "icon-sm" %}<span class="sr-only">Baixar {{ g.titulo }} como imagem PNG</span>
+      </button>
+    </div>
+    {% endif %}
+  </header>
+  {% if g.vazio %}
+  <p class="dash-empty" style="min-height: {{ g.altura|default:200 }}px">{% icon "chart-column" %}<span class="max-w-md px-4 text-center">{{ g.mensagem_vazia }}</span></p>
+  {% else %}
+  <div class="dash-chart" data-chart="{{ g.id }}" style="height: {{ g.altura }}px" role="img"
+       aria-label="Gráfico: {{ g.titulo }}. A tabela equivalente está no botão de tabela." x-show="!tabela"></div>
+  <div x-show="tabela" x-cloak class="dash-twin">
+    {% include "dashboards/_tabela.html" with t=g.tabela analise=False %}
+  </div>
+  {% endif %}
+  {% if g.nota %}<p class="dash-note">{{ g.nota }}</p>{% endif %}
+</section>

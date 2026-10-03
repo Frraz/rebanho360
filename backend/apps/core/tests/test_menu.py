@@ -67,12 +67,15 @@ def test_relatorio_do_menu_aponta_o_slug_e_acende_so_um_item():
     assert ativos == ["Fretes e quebra de viagem"]
 
 
-def test_inicio_fica_fixo_no_topo_fora_dos_blocos():
+def test_inicio_e_dashboard_ficam_fixos_no_topo_fora_dos_blocos():
     gestor = User.objects.create_user(username="g", password="x", role=Role.GESTOR)
     menu = _menu(gestor, "/compras/")
 
     assert menu[0]["titulo"] is None
-    assert [i["rotulo"] for i in menu[0]["grupos"][0]["itens"]] == ["Início"]
+    assert [i["rotulo"] for i in menu[0]["grupos"][0]["itens"]] == [
+        "Início",
+        "Dashboard",
+    ]
 
 
 def test_so_o_bloco_da_tela_atual_abre():

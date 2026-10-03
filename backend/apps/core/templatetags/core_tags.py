@@ -27,7 +27,10 @@ register = Library()
 #: A rota é o nome da URL, ou `(nome, kwargs)` para apontar um relatório pelo
 #: slug. O subtítulo do grupo só aparece quando o bloco tem mais de um grupo e
 #: o grupo tem mais de um item.
-MENU_TOPO = (("dashboards:inicio", "Início", "house", None),)
+MENU_TOPO = (
+    ("dashboards:inicio", "Início", "house", None),
+    ("dashboards:dashboard", "Dashboard", "chart-column", None),
+)
 
 MENU = (
     (

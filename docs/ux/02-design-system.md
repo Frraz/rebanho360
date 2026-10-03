@@ -114,7 +114,7 @@ Todos em [`backend/static/css/input.css`](../../backend/static/css/input.css), c
 - **Detalhe:** voltar → código (mono) + selos → ações (primária, editar) → `.facts` → blocos em 2–3 colunas (`.dl`/`.rows`) → "o que este registro gerou" → zona de exclusão separada por linha, no fim.
 - **Lançamento:** `.form-section`s; prévia de indicadores atualizada por HTMX logo abaixo dos valores; salvar rascunho + confirmar.
 - **Exclusão:** análise de impacto antes ("Isto vai desfazer", dependentes, bloqueios com o caminho), motivo obrigatório, cascata só com confirmação explícita.
-- **Painel inicial:** pendências primeiro (cada uma é um link com exemplos), depois rebanho, faixa de indicadores da safra e últimos lançamentos. Sem gráfico até que mude uma decisão.
+- **Painel inicial:** pendências primeiro (cada uma é um link com exemplos), depois rebanho, faixa de indicadores da safra e últimos lançamentos. Sem gráfico: os gráficos moram no **Dashboard** ([seção 13](#13-dashboard-analítico)).
 
 ---
 
@@ -165,6 +165,40 @@ Nasceram dos componentes acima, sem classe nova. Convenções:
 
 Nasceu dos componentes acima, sem classe nova. Convenções: formulário em `.form-section` (o que exportar · formatos · filtros), com contagem por conjunto à direita de cada caixa e um resumo vivo ("12 selecionados · 8.420 registros", Alpine); andamento em fragmento HTMX (`exports/_estado.html`, `every 2s` só enquanto roda) com **barra** (`role="progressbar"`, texto de percentual ao lado: cor nunca sozinha) e tabela item a item com selo de situação (aguardando = `.badge-rascunho`, em andamento = `-editada`, pronto = `-confirmada`, com erro = `-erro`). Regras: [regra 10](../regras-negocio/10-exportacao-de-dados.md).
 
-## 13. Pendente neste design
+## 13. Dashboard analítico
+
+Decisão de 03/10/2026: a análise ganhou tela própria (**Dashboard**, abaixo de *Início*), com gráficos. Regras e abas em [`docs/regras-negocio/11`](../regras-negocio/11-dashboard-analitico.md). Nasceu dos componentes acima; as classes novas (`.dash-*`, `.kpi*`, `.delta*`, `.insight*`, `.mark*`, `.cell-bar`) estão em `input.css`, no fim da camada `components`.
+
+**Biblioteca.** ECharts 5.5 (Apache-2.0), **hospedado** em `static/vendor/echarts.min.js`, sem CDN (mesma regra das fontes: abre rápido com sinal ruim e não depende de terceiros). Só a tela do Dashboard o carrega. Justifica-se porque mapa de calor, árvore, Sankey, calendário e cascata não são viáveis à mão; não é biblioteca por moda.
+
+**Divisão de trabalho.** O servidor monta a especificação do gráfico (`bi/specs.py`: dados já calculados, rótulos, tabela equivalente); `static/js/dashboard.js` só desenha. Nada é recalculado no JavaScript e o template não calcula.
+
+**Cor.**
+
+| Papel | Valores | Regra |
+|---|---|---|
+| Categórica | `#1a78a0 #eb6834 #1baf7a #eda100 #e87ba4 #008300 #4a3aa7 #e34948` | Validada com o validador da skill `dataviz` (fundo branco): faixa de luminosidade, croma, separação para daltonismo e piso de visão normal passam. **Ordem fixa, nunca cíclica**; a cor segue a entidade (a mesma fazenda tem a mesma cor em todo gráfico). Três cores ficam abaixo de 3:1 no branco — por isso há rótulo, legenda e tabela equivalente em todo gráfico (alívio obrigatório). Série além de 8 vira "Outros" ou ranking. |
+| Magnitude (mapa de calor, árvore, calendário, etapas) | petróleo da marca, clara → escura | Uma matiz só. Etapas ordenadas usam a rampa **ordinal** (luz do extremo claro ≥ 2:1). |
+| Polaridade (lucro × prejuízo, aumento × redução) | `#2f6d82` ↔ `#c4423a`, ponto neutro cinza | Azul ↔ vermelho (seguro para daltonismo; verde ↔ vermelho não é). Sempre com o valor e o sinal escritos. |
+| Estado (KPI, tabela, leitura) | sálvia · âmbar · vermelho da marca | Reservada para estado; **sempre com ícone e texto**. |
+| Texto | tokens de texto (`gray-900/600/500`) | **Texto nunca usa a cor da série.** |
+
+**Marca do gráfico.** Barra de até 24 px com ponta arredondada; linha de 2 px; marcador final de 8 px com anel da cor da superfície; grade em fio contínuo e discreto; abertura de 2 px entre fatias e barras empilhadas; rótulo só no que importa (ponta, extremo), nunca em todo ponto; legenda sempre que há 2 séries ou mais; área em ~10% de opacidade quando é uma série só.
+
+**Um eixo só.** Nunca dois eixos de valor: a escala do segundo é arbitrária e inventa correlação. Duas grandezas → dois gráficos. Por isso o "Pareto" é um ranking de barras com a participação na tabela, e a soma acumulada é um gráfico à parte.
+
+**Interação.** Cruz de leitura na linha/barra vertical; tooltip por marca em barra e célula (valor em destaque, nome ao lado, chave em traço); alvo de toque ≥ 24 px nos pontos de dispersão (camada transparente maior); legenda clicável. **Tooltip nunca é o único caminho**: o botão de tabela de cada cartão mostra os mesmos dados, e o de download baixa o gráfico em PNG. O botão **Texturas nas cores** acrescenta hachuras (45° e 135°) a cada série, para quem não distingue cores; é opcional e a escolha fica no navegador. Texto de tooltip entra por escape (nome vem de dado).
+
+**KPI.** Rótulo em caixa alta, valor grande (sem algarismo tabular), nota, seta de variação (ícone + texto + leitura para leitor de tela), mini-gráfico de linha desenhado no servidor (SVG) e, quando há estado, ícone e texto ao lado da borda colorida. A explicação de como é calculado abre no "i" do cartão.
+
+**Tabela de análise.** `.table` com barra de dados dentro da célula numérica (`.cell-bar`), marca condicional **com texto** (`.mark`) e código de registro em mono. É relatório denso: tem rolagem própria (exceção prevista na seção 4), com cabeçalho fixo.
+
+**Grade.** 12 colunas no desktop, 1 no celular. As larguras pedidas por gráfico são só uma dica: `specs.reorganizar` fecha as linhas para nunca sobrar buraco ao lado de um cartão.
+
+**Armadilhas.** (1) Classe montada por interpolação no template (`kpi-{{ estado }}`) não é vista pelo Tailwind: está na `safelist` de `tailwind.config.js`; as classes de largura vêm do Python e o diretório `apps/dashboards/bi/` está no `content`. (2) Não dê ao contexto do template o nome `painel`: `partials/context_bar.html` o usa para escolher a versão empilhada do celular (o Dashboard usa `quadro`). (3) `float` no template é localizado em pt-BR ("93,0") e quebra atributo SVG: formate no Python. (4) O painel de ajuda ("i") é teleportado para o `<body>` pelo Alpine; com `hx-push-url` o retrato do histórico do HTMX o copiaria sem escopo — `dashboard.js` o tira do retrato e o devolve (`data-info-dialog`).
+
+**Checklist de gráfico novo:** forma certa para o trabalho do dado (ou nem é gráfico: cartão de número) · um eixo · cor pelo papel · tabela equivalente · estado vazio · 360 px sem rolagem horizontal · rodou o validador se a paleta mudou.
+
+## 14. Pendente neste design
 
 Páginas 403/404/500 próprias (com código de referência para erro inesperado) · máscara de dinheiro · modo escuro. Ver [`docs/ux/01-navegacao-e-ui.md`](01-navegacao-e-ui.md#implementação-do-redesign-01102026).

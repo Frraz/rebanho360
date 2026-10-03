@@ -664,6 +664,20 @@ Qualquer um exige um ADR e mexe em `Receiving.aplicar_efeitos` e em `closing.py`
 
 ---
 
+## #48 — 🟢 Dashboard: quem vê dinheiro, limiares das leituras e o "resultado da safra" *(Fase 6)*
+
+**Onde:** `apps/dashboards/bi/` — `escopo.py` (`PAPEIS_SEM_DINHEIRO`), `insights.py` (limiares), `vendas.py` (`resultado_da_safra`). Regra: [11](11-dashboard-analitico.md).
+
+**A dúvida:** (a) o pessoal de **campo** deve ver preço, custo e resultado, ou só rebanho e desempenho dos lotes? (b) Os limiares das leituras automáticas estão certos para esta operação: preço de compra que oscila mais de 10%, um vendedor com mais de 40% do valor comprado, custo por cabeça/dia que sobe mais de 15%, um centro com mais de 35% do custo, lote com GMD abaixo de metade da média, rendimento de carcaça que muda mais de 1 ponto? (c) O "resultado da safra" é a **soma do resultado dos lotes com venda na safra** (cada lote por inteiro, com custo pela fração já vendida) — ou deve ser só a receita e o custo **do período**, mesmo que o lote atravesse safras? (d) O custo por @ do dashboard deve usar o custo do lote com venda na safra ou só dos lotes **encerrados** (como o painel inicial)?
+
+**Por que importa:** (a) preço e comissão são dado comercial — o ciclo de compra já esconde de `CAMPO` ([#25](#25)); (b) leitura com limiar errado vira ruído ou deixa passar problema real; (c) e (d) decidem se o número do dashboard bate com a contabilidade da safra ou com a do lote.
+
+**Implementado:** (a) `CAMPO` vê só *Visão geral* (sem dinheiro), *Rebanho* e *Lotes*; as demais abas dão `403`. (b) Os valores acima, todos constantes nomeadas no topo de `insights.py`, `compras.py` e `custos.py`. (c) Soma por lote, com o aviso "27 de 30 lotes com resultado" ao lado do número. (d) O cartão da *Visão geral* usa o **mesmo seletor do painel inicial** (lotes encerrados na safra); a aba *Vendas* mostra a margem por @ de todos os lotes com carcaça — os dois rótulos dizem qual é qual.
+
+**Custo de mudar:** baixo. (a) uma tupla em `escopo.py`; (b) uma constante cada; (c) e (d) uma função em `vendas.py`/`visao_geral.py`, sem migração: nada é gravado.
+
+---
+
 ## Como usar este documento
 
 1. **Antes da Fase 1:** resolver #5 (bloqueia a carga) e #2. Confirmar #1.
@@ -678,6 +692,8 @@ Qualquer um exige um ADR e mexe em `Receiving.aplicar_efeitos` e em `closing.py`
 9. **Exportação de dados:** #44 e #45 são de política (quem exporta, por quanto tempo o arquivo fica); funcionam com os padrões reversíveis e não bloqueiam nada. Responder #44 **antes** de liberar a tela a usuários além dos administradores.
 
 10. **Mais de uma empresa:** #47 — a barra do topo não troca de empresa e as fazendas não são filtradas por ela. Hoje só a primeira empresa é operável; responder antes de cadastrar dado real na segunda.
+
+11. **Dashboard analítico:** #48 é de política (quem vê dinheiro e os limiares das leituras automáticas); funciona com os padrões reversíveis e não bloqueia nada.
 
 #9 é de permissão, não de modelagem: pode ser ajustada a qualquer momento.
 

@@ -1,0 +1,87 @@
+{% load core_tags %}
+<nav class="dash-tabs" aria-label="Seções do dashboard">
+  {% for a in abas %}
+  <a href="{% url 'dashboards:dashboard_aba' a.slug %}" class="dash-tab"
+     {% if a.slug == aba.slug %}aria-current="page"{% endif %}
+     hx-get="{% url 'dashboards:dashboard_aba' a.slug %}" hx-target="#dash" hx-swap="innerHTML show:#dash:top"
+     hx-push-url="true">
+    {% icon a.icone %}<span>{{ a.rotulo }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+<div class="dash-body" id="dash-aba-{{ aba.slug }}">
+  <div class="dash-intro">
+    <h2 class="dash-intro-title">{{ aba.rotulo }}</h2>
+    <p class="dash-intro-text">{{ aba.resumo }}</p>
+  </div>
+
+  {% if not escopo %}
+  {% include "partials/_empty.html" with icone="calendar" titulo="Escolha uma safra" texto="O dashboard analisa uma safra por vez. Cadastre ou escolha a safra no topo da tela." url=safra_url acao="Ver safras" %}
+  {% elif quadro.vazio %}
+  <div class="card">
+    {% include "partials/_empty.html" with icone="chart-column" titulo="Nada para analisar ainda" texto=quadro.vazio %}
+  </div>
+  {% else %}
+
+  {% if quadro.avisos %}
+  <div class="alert-warning mb-5" role="note">
+    {% icon "triangle-alert" %}
+    <div class="flex-1">
+      <p class="font-medium">Leia os números com isto em mente</p>
+      <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+        {% for aviso in quadro.avisos %}<li>{{ aviso }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if quadro.kpis %}
+  <section aria-label="{{ quadro.kpis_titulo|default:'Indicadores' }}">
+    <div class="dash-kpis">
+      {% for kpi in quadro.kpis %}{% include "dashboards/_kpi.html" %}{% endfor %}
+    </div>
+    {% if escopo.anterior %}
+    <p class="dash-note mt-2">Variações comparam com a safra {{ escopo.anterior.season.name }} no mesmo ponto: até {{ escopo.anterior.fim|date:"d/m/Y" }}, o equivalente a hoje.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if quadro.insights %}
+  <section class="dash-section" aria-labelledby="dash-insights">
+    <h2 id="dash-insights" class="section-title">O que merece atenção</h2>
+    <ul class="card-flush divide-y divide-gray-100">
+      {% for i in quadro.insights %}
+      <li class="insight insight-{{ i.nivel }}">
+        <div class="min-w-0 flex-1">
+          <p class="insight-title"><span class="insight-kind insight-kind-{{ i.nivel }}">{% icon i.icone "icon-sm" %}<span class="sr-only">{{ i.nivel|capfirst }}:</span></span>{{ i.titulo }}</p>
+          <p class="insight-text">{{ i.texto }}</p>
+        </div>
+        {% if i.url %}<a href="{{ i.url }}" class="btn-secondary btn-sm shrink-0">{{ i.rotulo_url }}</a>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% for secao in quadro.secoes %}
+  <section class="dash-section" aria-labelledby="dash-sec-{{ forloop.counter }}">
+    <h2 id="dash-sec-{{ forloop.counter }}" class="section-title">{{ secao.titulo }}</h2>
+    {% if secao.descricao %}<p class="-mt-2 mb-3 text-sm text-gray-500">{{ secao.descricao }}</p>{% endif %}
+    {% if secao.graficos %}
+    <div class="dash-grid">
+      {% for g in secao.graficos %}{% include "dashboards/_grafico.html" %}{% endfor %}
+    </div>
+    {% endif %}
+    {% for t in secao.tabelas %}{% include "dashboards/_tabela.html" with t=t analise=True %}{% endfor %}
+  </section>
+  {% endfor %}
+
+  <p class="dash-note mt-8">
+    Dados até {{ escopo.fim|date:"d/m/Y" }} · {{ calculado_em|date:"d/m/Y H:i" }} · calculado em {{ segundos|numero:2 }} s.
+    Cada indicador vem do mesmo serviço da tela do registro: o número é o mesmo em qualquer lugar.
+  </p>
+  {% endif %}
+
+  {{ graficos_json|json_script:"dash-dados" }}
+</div>

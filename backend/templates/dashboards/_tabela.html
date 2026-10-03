@@ -1,0 +1,33 @@
+{% load core_tags %}
+{# Tabela de análise (`analise`) ou gêmea de um gráfico. Linhas e células já vêm resolvidas (specs.Tabela.linhas_prontas). #}
+{% if analise %}<div class="dash-analysis mt-4">{% if t.titulo %}<h3 class="card-title mb-2">{{ t.titulo }}</h3>{% endif %}{% endif %}
+<div class="table-wrap{% if not analise %} dash-twin-wrap{% endif %}">
+  <table class="table dash-table">
+    {% if t.legenda %}<caption class="sr-only">{{ t.legenda }}</caption>{% endif %}
+    <thead>
+      <tr>
+        {% for c in t.colunas %}<th scope="col"{% if forloop.counter0 in t.numericas %} class="num"{% endif %}>{{ c }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for linha in t.linhas_prontas %}
+      <tr{% if linha.url %} class="is-link"{% endif %}>
+        {% for c in linha.celulas %}
+        <td class="{% if c.numerica %}num{% endif %} {% if c.codigo %}nowrap{% endif %}">
+          {% if forloop.first and linha.url %}<a href="{{ linha.url }}" class="row-link{% if c.codigo %} code{% endif %}">{{ c.texto }}</a>
+          {% else %}
+          {% if c.barra is not None %}<span class="cell-bar" style="--w: {{ c.barra|stringformat:'.1f' }}%"><span class="cell-bar-text">{{ c.texto }}</span></span>
+          {% elif c.codigo %}<span class="code">{{ c.texto }}</span>
+          {% else %}{{ c.texto }}{% endif %}
+          {% endif %}
+          {% if c.estado_texto %}<span class="mark mark-{{ c.estado }}">{% icon c.icone "icon-sm" %}{{ c.estado_texto }}</span>{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{{ t.colunas|length }}" class="muted">{{ t.vazio }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if analise %}</div>{% endif %}

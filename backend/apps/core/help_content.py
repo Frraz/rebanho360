@@ -892,6 +892,49 @@ AJUDA: dict[str, dict] = {
         ],
     },
     # --------------------------------------------------- Relatórios e sistema
+    "dashboard": {
+        "titulo": "Dashboard",
+        "resumo": [
+            "É a análise da safra: indicadores com comparação, gráficos e tabelas que respondem às perguntas de gestão — quanto o rebanho cresceu, quanto custou, a que preço se comprou e se vendeu, quem está atrasado e quais lotes estão rendendo.",
+            "Cada aba cuida de um assunto e carrega só quando você abre. Tudo respeita a safra e a fazenda escolhidas no topo da tela, e os dados são os do próprio sistema, calculados na hora.",
+        ],
+        "relacoes": [
+            (
+                "Mesmo número em qualquer lugar",
+                "Custo por @, GMD, resultado do lote, mortalidade e rendimento vêm dos mesmos cálculos das telas de lote, venda e movimentação. Se um número aqui for diferente do da tela do registro, é defeito: avise.",
+            ),
+            (
+                "Comparação com a safra anterior",
+                "As setas dos indicadores comparam com a safra anterior no mesmo ponto: se a atual está no dia 90, a anterior também vai até o dia 90. Seta e cor trazem sempre o texto da variação e se ela é favorável ou não.",
+            ),
+            (
+                "Quem vê o quê",
+                "Compras, vendas, custos, financeiro e ciclo de compra mostram dinheiro e só aparecem para quem pode vê-lo. O pessoal de campo vê o rebanho e o desempenho dos lotes. Cada pessoa só enxerga as fazendas a que tem acesso.",
+            ),
+            (
+                "Gráfico e tabela",
+                "Todo gráfico tem uma tabela com os mesmos dados (botão de tabela no canto do cartão) e pode ser baixado como imagem. O botão Texturas nas cores acrescenta padrões às cores, para quem não distingue bem as cores.",
+            ),
+        ],
+        "perguntas": [
+            (
+                'Por que um gráfico diz "Sem dados neste recorte"?',
+                "Porque não há lançamento confirmado que se encaixe na safra e na fazenda escolhidas. Mude o contexto no topo ou lance o que falta.",
+            ),
+            (
+                "O que é o bloco O que merece atenção?",
+                "São leituras automáticas dos próprios números: mortalidade acima do limite, lote no prejuízo, título vencido, concentração de compras em um vendedor, alta de preço. Cada uma diz o valor e leva ao registro para você conferir. Os limites usados são os do sistema e podem ser ajustados.",
+            ),
+            (
+                "Por que alguns indicadores aparecem como traço?",
+                "Falta dado para calcular: um lote com uma pesagem só não tem GMD, uma venda sem peso de carcaça não tem valor por @, um lote sem compra registrada não tem resultado. O painel avisa quantos registros ficaram de fora e nunca estima o que não foi informado.",
+            ),
+            (
+                "O resultado do lote inclui custos que ainda vão chegar?",
+                "Inclui o que está lançado até hoje. Lote que ainda tem animais mostra resultado parcial, com o custo rateado pela fração já vendida; ele fecha quando o saldo zera.",
+            ),
+        ],
+    },
     "inicio": {
         "titulo": "Início",
         "resumo": [

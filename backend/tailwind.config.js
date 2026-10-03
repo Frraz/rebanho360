@@ -10,8 +10,17 @@ module.exports = {
     "./templates/**/*.html",
     "./apps/**/templates/**/*.html",
     "./apps/**/templatetags/*.py",
+    // Classes de largura dos gráficos do dashboard vêm do Python.
+    "./apps/dashboards/bi/*.py",
     // Classes montadas em JS (seletor com busca) também entram no CSS.
     "./static/js/**/*.js",
+  ],
+  // Classes de estado do dashboard montadas por interpolação no template
+  // (`kpi-{{ kpi.estado }}`): o Tailwind não as enxerga no texto.
+  safelist: [
+    ...["bom", "atencao", "ruim"].flatMap((e) => [`kpi-${e}`, `mark-${e}`]),
+    ...["bom", "ruim", "neutro"].map((e) => `delta-${e}`),
+    ...["alerta", "atencao", "positivo", "info"].flatMap((n) => [`insight-${n}`, `insight-kind-${n}`]),
   ],
   theme: {
     extend: {

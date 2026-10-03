@@ -24,6 +24,8 @@ Não construir 80 telas antes de qualquer uma servir.
 | **Até aposentar a planilha** (0+1+2+Virada) | **~180-250** |
 | **Até o sistema completo** (+3+4) | **~260-350** |
 
+> **Dashboard analítico (03/10/2026), sem tarefa numerada.** Pedido de Warley depois da Fase 5: tela de análise com KPIs, gráficos e leituras automáticas, logo abaixo de *Início*. Só leitura (nenhum modelo novo), sobre os serviços que já existem. Regra em [11-dashboard-analitico](../regras-negocio/11-dashboard-analitico.md); pendência [#48](../regras-negocio/99-pendencias.md#48--🟢-dashboard-quem-vê-dinheiro-limiares-das-leituras-e-o-resultado-da-safra-fase-6). Deploy pendente, como as demais fases.
+
 > **Intermezzo — redesenho da interface (01/10/2026), entre a Fase 3 e a Fase 4.** Só frontend, sem tarefa nova de negócio: shell, componentes, todas as telas e design system. Ver [Fase 3](fase-3-vendas-e-indicadores.md#pós-fase-redesenho-da-interface-2026-10-01), [design system](../ux/02-design-system.md) e [ADR 0007](../arquitetura/adr/0007-design-system-proprio-sobre-tailwind.md). Toda tela das Fases 4 em diante nasce dos componentes dele.
 
 **100 tarefas** até a Fase 5, cada uma com dependência, estimativa, link para a regra e critério de pronto. **Situação:** Fases 0 a 5 com código pronto; faltam só as tarefas de deploy (F0-17/18, F1-16, F2-15, F3-13, F4-10, F5-20), que dependem de um servidor real.
