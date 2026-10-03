@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if object %}Editar empresa{% else %}Nova empresa{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+{% url 'organizations:empresa_lista' as voltar %}
+{% if object %}{% include "partials/_form_page.html" with titulo="Editar empresa" voltar=voltar voltar_rotulo="Empresas" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova empresa" voltar=voltar voltar_rotulo="Empresas" %}{% endif %}
+{% endblock %}

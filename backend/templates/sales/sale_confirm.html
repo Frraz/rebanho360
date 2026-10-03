@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Confirmar {{ venda.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'sales:detalhe' venda.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ venda.code }}</a>
+    <h1 class="page-title">Confirmar venda</h1>
+  </div>
+</header>
+{% for alerta in alertas %}
+<div class="alert-warning mb-3 max-w-2xl">{% icon "triangle-alert" %}<p>{{ alerta }}</p></div>
+{% endfor %}
+<section class="card max-w-2xl">
+  <h2 class="card-title mb-3">Confirmar esta venda vai:</h2>
+  <ul class="space-y-2 text-sm">
+    {% for e in efeitos %}<li class="flex items-start gap-2.5">{% icon "check" "mt-0.5 text-sage-600" %}<span>{{ e }}</span></li>{% endfor %}
+  </ul>
+  <p class="mt-4 text-sm text-gray-600">Se não houver saldo suficiente, nada é alterado e o sistema diz quantas cabeças há. Depois de confirmada, a venda continua editável — a correção desfaz e reaplica a saída, com motivo registrado.</p>
+  <form method="post" class="mt-5 flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+    {% csrf_token %}
+    <a href="{% url 'sales:detalhe' venda.pk %}" class="btn-secondary">Voltar</a>
+    <button type="submit" class="btn-primary">Confirmar venda</button>
+  </form>
+</section>
+{% endblock %}

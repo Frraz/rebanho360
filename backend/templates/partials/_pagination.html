@@ -1,0 +1,16 @@
+{% load core_tags %}
+{# Paginação. Usa url_pagina: preserva os filtros da querystring ao trocar de página. #}
+{% if page_obj.has_other_pages %}
+<nav class="pager" aria-label="Paginação">
+  <p class="hidden sm:block">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} registro{{ page_obj.paginator.count|pluralize:"s" }}</p>
+  <p class="sm:hidden">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</p>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+    <a class="btn-secondary btn-sm" href="{% url_pagina page_obj.previous_page_number %}" rel="prev">{% icon "chevron-left" "icon-sm" %} Anterior</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+    <a class="btn-secondary btn-sm" href="{% url_pagina page_obj.next_page_number %}" rel="next">Próxima {% icon "chevron-right" "icon-sm" %}</a>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}

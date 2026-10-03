@@ -1,0 +1,29 @@
+{% extends "registration/_auth.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Solicitar acesso · Rebanho360{% endblock %}
+{% block auth_body %}
+<h1 class="text-2xl font-semibold tracking-tight">Solicitar acesso</h1>
+<p class="mt-1 text-sm text-gray-500">Preencha os dados. Os administradores recebem o pedido e, se aprovarem, você recebe um e-mail para definir a sua senha.</p>
+
+{% if form.non_field_errors %}
+<div class="alert-danger mt-6" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" class="mt-6 space-y-4" novalidate>
+  {% csrf_token %}
+  {% include "partials/_field.html" with field=form.full_name %}
+  {% include "partials/_field.html" with field=form.email %}
+  {% include "partials/_field.html" with field=form.phone %}
+  {% include "partials/_field.html" with field=form.message %}
+  {# Isca para robôs: fora da tela e do teclado; gente nunca preenche. #}
+  <div class="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+    <label for="{{ form.website.id_for_label }}">Não preencha este campo</label>
+    {{ form.website|attr:"tabindex:-1"|attr:"autocomplete:off" }}
+  </div>
+  <button type="submit" class="btn-primary w-full">Enviar solicitação</button>
+</form>
+<p class="mt-5 text-center text-sm"><a href="{% url 'accounts:login' %}" class="link">Já tenho acesso: entrar</a></p>
+{% endblock %}

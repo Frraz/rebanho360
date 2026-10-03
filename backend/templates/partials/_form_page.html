@@ -1,0 +1,26 @@
+{% load core_tags %}
+{# Página de cadastro simples. Parâmetros: titulo, subtitulo, voltar (url), voltar_rotulo, salvar. #}
+<header class="page-header">
+  <div>
+    {% if voltar %}<a href="{{ voltar }}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ voltar_rotulo|default:"Voltar" }}</a>{% endif %}
+    <h1 class="page-title">{{ titulo }}</h1>
+    {% if subtitulo %}<p class="page-subtitle">{{ subtitulo }}</p>{% endif %}
+  </div>
+</header>
+
+{% if form.non_field_errors %}
+<div class="alert-danger mb-4 max-w-2xl" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" class="card max-w-2xl space-y-5">
+  {% csrf_token %}
+  {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  {% for field in form.visible_fields %}{% include "partials/_field.html" %}{% endfor %}
+  <div class="flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+    {% if voltar %}<a href="{{ voltar }}" class="btn-secondary">Cancelar</a>{% endif %}
+    <button type="submit" class="btn-primary">{{ salvar|default:"Salvar" }}</button>
+  </div>
+</form>

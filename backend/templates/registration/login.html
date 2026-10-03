@@ -1,0 +1,31 @@
+{% extends "registration/_auth.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Entrar · Rebanho360{% endblock %}
+{% block auth_body %}
+<h1 class="text-2xl font-semibold tracking-tight">Entrar</h1>
+<p class="mt-1 text-sm text-gray-500">Use seu usuário e senha para acessar o sistema.</p>
+
+{% if form.non_field_errors %}
+<div class="alert-danger mt-6" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" class="mt-6 space-y-4">
+  {% csrf_token %}
+  <div>
+    <label class="field-label" for="{{ form.username.id_for_label }}">Usuário</label>
+    {{ form.username|add_class:"field-input"|attr:"autocomplete:username"|attr:"autofocus" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ form.password.id_for_label }}">Senha</label>
+    {{ form.password|add_class:"field-input"|attr:"autocomplete:current-password" }}
+  </div>
+  <button type="submit" class="btn-primary w-full">Entrar</button>
+</form>
+<p class="mt-5 text-center text-sm"><a href="{% url 'accounts:password_reset' %}" class="link">Esqueci minha senha</a></p>
+<div class="mt-6 border-t border-gray-200 pt-5 text-center text-sm text-gray-600">
+  Ainda não tem acesso? <a href="{% url 'accounts:solicitar_acesso' %}" class="link font-medium">Solicitar acesso</a>
+</div>
+{% endblock %}

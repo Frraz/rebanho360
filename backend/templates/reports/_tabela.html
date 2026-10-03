@@ -1,0 +1,33 @@
+{# `tabela` vem de `services.para_tela` — o template não calcula, só mostra. #}
+<!-- celular: cada linha vira um cartão -->
+<div class="card-flush divide-y divide-gray-100 sm:hidden">
+  {% for cartao in tabela.cartoes %}
+  <div class="px-4 py-3 text-sm {% if forloop.last and tabela.tem_totais %}bg-gray-50 font-medium{% endif %}">
+    {% for rotulo, valor in cartao %}
+    {# texto longo (ex.: "Por que há —") empilha: rótulo em cima, valor embaixo #}
+    <p class="flex {% if valor|length > 26 %}flex-col gap-0.5 py-1{% else %}items-baseline justify-between gap-3 py-0.5{% endif %}"><span class="text-gray-500">{{ rotulo }}</span> <span class="{% if valor|length > 26 %}break-words{% else %}text-right tabular-nums{% endif %}">{{ valor }}</span></p>
+    {% endfor %}
+  </div>
+  {% empty %}
+  <p class="px-4 py-8 text-center text-sm text-gray-500">Sem dados neste filtro.</p>
+  {% endfor %}
+</div>
+<!-- desktop: tabela. Relatório denso: a rolagem é da tabela, não da página. -->
+<div class="hidden sm:block table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        {% for rotulo in tabela.cabecalho %}<th scope="col" class="{% if forloop.counter0 in tabela.indices_numericos %}num{% endif %}">{{ rotulo }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for linha in tabela.celulas %}
+      <tr class="{% if forloop.last and tabela.tem_totais %}bg-gray-50 font-semibold{% endif %}">
+        {% for valor, numerica in linha %}<td class="{% if numerica %}num whitespace-nowrap{% endif %}">{{ valor }}</td>{% endfor %}
+      </tr>
+      {% empty %}
+      <tr><td class="!py-8 text-center text-gray-500" colspan="{{ tabela.cabecalho|length }}">Sem dados neste filtro.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

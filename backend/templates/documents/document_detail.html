@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ documento.title }} · Documento · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'documents:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Documentos gerados</a>
+    <h1 class="page-title">{{ documento.title }}</h1>
+    <p class="page-subtitle">Documento PDF · pedido por {{ documento.generated_by }} em {{ documento.generated_at|date:"d/m/Y H:i" }}</p>
+  </div>
+</header>
+
+<div class="card mb-6 max-w-2xl">
+  {% include "documents/_estado.html" %}
+</div>
+
+<section class="card max-w-2xl" aria-label="Rastreabilidade do documento">
+  <dl class="dl">
+    <div><dt>Filtros impressos</dt><dd class="!font-normal">{% for f in documento.filters %}{{ f }}{% if not forloop.last %} · {% endif %}{% endfor %}</dd></div>
+    <div><dt>Código do documento</dt><dd class="code !whitespace-normal break-all">{{ documento.document_id }}</dd></div>
+    <div><dt>Versão do layout</dt><dd>{{ documento.template_version }}</dd></div>
+    {% if documento.file_hash %}<div><dt>SHA-256</dt><dd class="code !whitespace-normal break-all">{{ documento.file_hash }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<p class="mt-6 text-sm"><a class="link" href="{% url 'reports:indice' %}">Relatórios</a></p>
+{% endblock %}

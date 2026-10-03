@@ -1,0 +1,19 @@
+{# Um campo de decisão de uma linha pendente: name = r<id>__<campo> #}
+<div>
+  <label class="field-label" for="r{{ row.pk }}__{{ campo.nome }}">{{ campo.rotulo }}</label>
+  {% if campo.tipo == "select" %}
+  <select id="r{{ row.pk }}__{{ campo.nome }}" name="r{{ row.pk }}__{{ campo.nome }}" class="field-input">
+    <option value="">— decidir —</option>
+    {% for valor, rotulo in campo.opcoes %}
+    <option value="{{ valor }}" {% if campo.valor == valor|stringformat:"s" %}selected{% endif %}>{{ rotulo }}</option>
+    {% endfor %}
+  </select>
+  {% elif campo.tipo == "data" %}
+  <input type="date" id="r{{ row.pk }}__{{ campo.nome }}" name="r{{ row.pk }}__{{ campo.nome }}" value="{{ campo.valor }}" class="field-input">
+  {% elif campo.tipo == "numero" %}
+  <input type="text" inputmode="decimal" id="r{{ row.pk }}__{{ campo.nome }}" name="r{{ row.pk }}__{{ campo.nome }}" value="{{ campo.valor }}" class="field-input">
+  {% else %}
+  <input type="text" id="r{{ row.pk }}__{{ campo.nome }}" name="r{{ row.pk }}__{{ campo.nome }}" value="{{ campo.valor }}" class="field-input">
+  {% endif %}
+  {% if campo.sugestao %}<p class="field-help">Sugestão: {{ campo.sugestao }} <span class="italic">(só vale se você escolher)</span></p>{% endif %}
+</div>

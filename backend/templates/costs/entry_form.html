@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Lançar custo · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'costs:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Custos</a>
+    <h1 class="page-title">Lançar custo</h1>
+    <p class="page-subtitle">Fazenda, centro e classe são obrigatórios: custo sem centro não dá para analisar.</p>
+  </div>
+</header>
+
+{% if form.non_field_errors %}
+<div class="alert-danger mb-4 max-w-2xl" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" class="card max-w-2xl space-y-5 pb-24 md:pb-5" data-rascunho="custo">
+  {% csrf_token %}
+  {% for field in form %}{% include "partials/_field.html" %}{% endfor %}
+  <div class="form-actions md:border-t md:border-gray-100 md:pt-5">
+    <a href="{% url 'costs:lista' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Lançar custo</button>
+  </div>
+</form>
+
+<script>
+/* Rascunho em localStorage: sinal ruim não apaga o que foi digitado. */
+(function () {
+  var form = document.querySelector('form[data-rascunho]');
+  if (!form) return;
+  var chave = 'rascunho:' + form.dataset.rascunho;
+  var concluido = new URLSearchParams(location.search).get('ok') === '1';
+  if (concluido) { try { localStorage.removeItem(chave); } catch (e) {} return; }
+  try {
+    var salvo = JSON.parse(localStorage.getItem(chave) || '{}');
+    Object.keys(salvo).forEach(function (nome) {
+      var campo = form.elements[nome];
+      if (campo && !campo.value) { campo.value = salvo[nome]; if (campo._cb) campo._cb.sync(); }
+    });
+  } catch (e) {}
+  form.addEventListener('input', function () {
+    var dados = {};
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (campo.name && campo.name !== 'csrfmiddlewaretoken') dados[campo.name] = campo.value;
+    });
+    try { localStorage.setItem(chave, JSON.stringify(dados)); } catch (e) {}
+  });
+})();
+</script>
+{% endblock %}

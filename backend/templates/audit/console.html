@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Auditoria · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Auditoria</h1>
+      {% info "auditoria" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'audit:export_csv' %}?{{ request.GET.urlencode }}" class="btn-secondary">{% icon "download" %} Exportar CSV</a>
+  </div>
+</header>
+
+<form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+  <div>
+    <label class="field-label" for="f-user">Usuário</label>
+    <select name="user" id="f-user" class="field-input">
+      <option value="">Todos</option>
+      {% for u in usuarios %}
+        <option value="{{ u.pk }}" {% if filtros.user == u.pk|stringformat:'s' %}selected{% endif %}>{{ u }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="field-label" for="f-action">Ação</label>
+    <select name="action" id="f-action" class="field-input">
+      <option value="">Todas</option>
+      {% for value, label in acoes %}
+        <option value="{{ value }}" {% if filtros.action == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="field-label" for="f-entity">Entidade</label>
+    <select name="entity_type" id="f-entity" class="field-input">
+      <option value="">Todas</option>
+      {% for et in entidades %}
+        <option value="{{ et }}" {% if filtros.entity_type == et %}selected{% endif %}>{{ et }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="field-label" for="f-de">De</label>
+    <input type="date" name="de" id="f-de" value="{{ filtros.de|default:'' }}" class="field-input">
+  </div>
+  <div>
+    <label class="field-label" for="f-ate">Até</label>
+    <input type="date" name="ate" id="f-ate" value="{{ filtros.ate|default:'' }}" class="field-input">
+  </div>
+  <div class="flex justify-end gap-2 sm:col-span-2 lg:col-span-5">
+    <a href="{% url 'audit:console' %}" class="btn-secondary">Limpar</a>
+    <button type="submit" class="btn-primary">{% icon "search" %} Filtrar</button>
+  </div>
+</form>
+
+<div class="card-flush divide-y divide-gray-100">
+  {% for row in rows %}
+  {% with e=row.primary %}
+  <div class="p-4 sm:px-5" x-data="{ aberto: false }">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">{{ e.timestamp|date:"d/m/Y H:i" }}</p>
+        <p class="mt-0.5 font-medium">
+          {{ e.actor|default:"Sistema" }}
+          <span class="font-normal text-gray-600">{{ e.get_action_display|lower }}</span>
+          {{ e.entity_type }}{% if e.entity_id %} <span class="code">#{{ e.entity_id }}</span>{% endif %}
+        </p>
+        {% if e.reason %}<p class="mt-1 text-sm text-gray-600">Motivo: "{{ e.reason }}"</p>{% endif %}
+        {% if row.is_cascade %}
+          <p class="mt-1 flex items-center gap-1.5 text-sm text-amber-800">{% icon "layers" "icon-sm" %} Em cascata: {{ row.group|length }} eventos</p>
+        {% endif %}
+      </div>
+      <div class="flex shrink-0 flex-wrap gap-2">
+        {% if e.changed_fields or e.before or e.after %}
+          <button type="button" class="btn-secondary btn-sm" @click="aberto = !aberto" :aria-expanded="aberto">
+            <span x-text="aberto ? 'Ocultar diff' : 'Ver detalhes'"></span>
+          </button>
+        {% endif %}
+        {% if e.action == 'DELETE' %}
+        <form method="post" action="{% url 'audit:restore' e.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn-secondary btn-sm">{% icon "rotate-ccw" "icon-sm" %} Restaurar</button>
+        </form>
+        {% endif %}
+        {% if e.entity_id %}
+        <a href="{% url 'audit:timeline' e.entity_type e.entity_id %}" class="btn-ghost btn-sm">{% icon "history" "icon-sm" %} Linha do tempo</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div x-show="aberto" x-cloak class="mt-3 border-t border-gray-100 pt-3 text-sm">
+      {% if row.is_cascade %}
+        <ul class="list-disc space-y-1 pl-5">
+          {% for item in row.group %}
+            <li>{{ item.get_action_display }} {{ item.entity_type }} #{{ item.entity_id }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if e.changed_fields %}
+        <div class="mt-2 overflow-x-auto rounded-md border border-gray-200">
+          <table class="table">
+            <thead><tr><th scope="col">Campo</th><th scope="col">Antes</th><th scope="col">Depois</th></tr></thead>
+            <tbody>
+            {% for campo in e.changed_fields %}
+              <tr>
+                <td class="font-medium">{{ campo }}</td>
+                <td class="muted">{{ e.before|get_item:campo|default:"—" }}</td>
+                <td>{{ e.after|get_item:campo|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endwith %}
+  {% empty %}
+  {% include "partials/_empty.html" with icone="history" titulo="Nenhum evento encontrado" texto="Ajuste os filtros acima." %}
+  {% endfor %}
+  {% if page.has_other_pages %}
+  {% include "partials/_pagination.html" with page_obj=page %}
+  {% endif %}
+</div>
+{% endblock %}

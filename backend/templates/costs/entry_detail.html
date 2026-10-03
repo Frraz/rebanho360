@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Custo · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'costs:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Custos</a>
+    <h1 class="page-title">
+      {{ custo.description }}
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% status_badge custo.status %}
+        {% if custo.version > 1 %}<span class="badge-editada">Editada (v{{ custo.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if custo.status == "CONFIRMADA" and pode_editar and not gerado_por_compra %}
+    <a href="{% url 'costs:editar' custo.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>
+    {% endif %}
+  </div>
+</header>
+
+{% if custo.status == "EXCLUIDA" %}
+<div class="alert-warning mb-4" role="status">{% icon "triangle-alert" %}<p>Excluído por {{ custo.deleted_by }}{% if custo.delete_reason %}: "{{ custo.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+{% if gerado_por_compra %}
+<div class="alert-info mb-4">
+  {% icon "info" %}
+  <p>Este custo foi gerado pela compra <strong>{{ custo.source_purchase.code }}</strong>. Para corrigir ou excluir, vá até a compra — os custos acompanham.
+    <a class="link whitespace-nowrap" href="{% url 'purchases:detalhe' custo.source_purchase.pk %}">Abrir a compra</a></p>
+</div>
+{% endif %}
+
+<section class="card" aria-label="Dados do custo">
+  <p class="stat-label">Valor</p>
+  <p class="stat-value mt-1.5">{{ custo.amount|brl }}</p>
+  <dl class="facts mt-6 border-t border-gray-100 pt-5">
+    <div><dt>Data</dt><dd>{{ custo.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ custo.season.name }}</span></dd></div>
+    <div><dt>Fazenda</dt><dd>{{ custo.farm.name }}</dd></div>
+    <div><dt>Centro</dt><dd>{{ custo.cost_center.name }} <span class="text-gray-500">· {{ custo.cost_class.name }}</span></dd></div>
+    <div><dt>Tipo</dt><dd>{% if custo.lot %}Direto — lote {{ custo.lot.code }}{% else %}Indireto — rateado entre os lotes da fazenda{% endif %}</dd></div>
+    {% if custo.payer %}<div><dt>Pagador</dt><dd>{{ custo.payer.name }}</dd></div>{% endif %}
+    {% if custo.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ custo.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+{% if not gerado_por_compra and pode_excluir %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if custo.status == "CONFIRMADA" %}
+  <a href="{% url 'costs:excluir' custo.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir custo</a>
+  {% elif custo.status == "EXCLUIDA" %}
+  <form method="post" action="{% url 'costs:restaurar' custo.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,13 @@
+{% load core_tags %}
+{# Resumo do título no alto das telas de decisão: o que se está programando, aprovando ou pagando. Parâmetro: titulo. #}
+<section class="card mb-5 max-w-2xl" aria-label="Resumo do título">
+  <dl class="facts">
+    <div><dt>Título</dt><dd class="code">{{ titulo.code }}</dd></div>
+    <div><dt>{{ titulo.favorecido_rotulo }}</dt><dd>{{ titulo.payee.name|default:"A definir" }}</dd></div>
+    <div><dt>Valor</dt><dd>{{ titulo.amount|brl }}</dd></div>
+    <div><dt>Falta</dt><dd>{{ titulo.balance|brl }}</dd></div>
+    <div><dt>Vencimento</dt><dd>{{ titulo.due_date|date:"d/m/Y" }}</dd></div>
+    {% if titulo.scheduled_date %}<div><dt>Programado para</dt><dd>{{ titulo.scheduled_date|date:"d/m/Y" }}</dd></div>{% endif %}
+    {% if titulo.approved_by %}<div><dt>Aprovado por</dt><dd>{{ titulo.approved_by }} <span class="text-gray-500">· {{ titulo.approved_at|date:"d/m/Y H:i" }}</span></dd></div>{% endif %}
+  </dl>
+</section>

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Recusar acesso · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'accounts:solicitacoes' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Solicitações</a>
+    <h1 class="page-title">Recusar acesso</h1>
+    <p class="mt-1 text-base font-medium text-gray-700">{{ s.full_name }} <span class="break-all text-sm font-normal text-gray-500">{{ s.email }}</span></p>
+  </div>
+</header>
+<div class="max-w-2xl space-y-4">
+  <p class="whitespace-pre-line break-words rounded-md bg-white p-3 text-sm text-gray-800 shadow-sm ring-1 ring-gray-200">{{ s.message }}</p>
+  {% if form.non_field_errors %}
+  <div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div></div>
+  {% endif %}
+  <form method="post" class="card space-y-4">
+    {% csrf_token %}
+    {% include "partials/_field.html" with field=form.motivo %}
+    {% include "partials/_field.html" with field=form.avisar %}
+    <div class="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+      <a href="{% url 'accounts:solicitacoes' %}" class="btn-secondary">Cancelar</a>
+      <button type="submit" class="btn-danger">{% icon "x" %} Recusar solicitação</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

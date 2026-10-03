@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Corrigir {{ titulo.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ titulo.code }}</a>
+    <h1 class="page-title">Corrigir título</h1>
+    {% if titulo.origem %}
+    <p class="page-subtitle">Este título nasceu de {{ titulo.origem }}: valor e favorecido (de animais e de venda) acompanham a operação. Para mudá-los, corrija a operação.</p>
+    {% endif %}
+  </div>
+</header>
+{% if titulo.payment_status == "PROGRAMADO" or titulo.payment_status == "APROVADO" %}
+<div class="alert-warning mb-4 max-w-4xl">{% icon "triangle-alert" %}<p>Se mudar valor, favorecido, conta ou vencimento, a programação e a aprovação deste título deixam de valer: elas eram para os dados antigos.</p></div>
+{% endif %}
+<form method="post" class="card max-w-4xl pb-24 md:pb-5">
+  {% csrf_token %}
+  {% include "finance/_titulo_campos.html" %}
+  <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+    <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Salvar correção</button>
+  </div>
+</form>
+{% endblock %}

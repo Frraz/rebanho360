@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static core_tags %}
+{# Moldura das telas sem login: painel de marca à esquerda (só no desktop), formulário à direita. #}
+{% block guest_content %}
+<div class="min-h-screen lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+  <aside class="auth-aside on-dark hidden flex-col justify-between p-12 text-white lg:flex" aria-hidden="true">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-white">
+        <img src="{% static 'img/logo-mark.png' %}" alt="" width="30" height="30" class="h-[1.875rem] w-[1.875rem]">
+      </span>
+      <span class="text-lg font-semibold tracking-tight">Rebanho<span class="text-sage-300">360</span></span>
+    </div>
+    <div>
+      <p class="max-w-sm text-3xl font-semibold leading-tight tracking-tight">Cada cabeça no lugar certo, em cada safra.</p>
+      <p class="mt-4 max-w-sm text-sm leading-6 text-brand-100/70">Saldo do rebanho, compras, vendas e custos num só lugar, com histórico de tudo o que foi lançado, corrigido ou desfeito.</p>
+    </div>
+    <p class="text-xs text-brand-100/50">Acesso restrito a usuários autorizados.</p>
+  </aside>
+
+  <div class="flex min-h-screen flex-col justify-center px-5 py-10 sm:px-10">
+    <div class="mx-auto w-full max-w-sm">
+      <div class="mb-8 flex items-center gap-3 lg:hidden">
+        <img src="{% static 'img/logo-mark.png' %}" alt="" width="36" height="36" class="h-9 w-9">
+        <span class="text-lg font-semibold tracking-tight">Rebanho<span class="text-sage-600">360</span></span>
+      </div>
+      {% include "partials/toasts.html" %}
+      {% block auth_body %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

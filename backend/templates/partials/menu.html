@@ -1,0 +1,30 @@
+{% load core_tags %}
+{% nav_menu as blocos %}
+{% for bloco in blocos %}
+{% with bloco_id=forloop.counter %}
+{% if bloco.titulo %}
+{# Bloco recolhível: nativo (<details>), sem JS. Abre sozinho o da tela atual. #}
+<details class="nav-block"{% if bloco.aberto %} open{% endif %}>
+  <summary class="nav-section" id="nav-{{ bloco_id }}">
+    {% icon bloco.icone %}
+    <span class="flex-1 truncate">{{ bloco.titulo }}</span>
+    {% icon "chevron-down" "nav-chevron" %}
+  </summary>
+{% endif %}
+{% for grupo in bloco.grupos %}
+{% if grupo.mostrar_titulo %}<div class="nav-group" id="nav-{{ bloco_id }}-{{ forloop.counter }}">{{ grupo.titulo }}</div>{% endif %}
+<ul {% if grupo.mostrar_titulo %}aria-labelledby="nav-{{ bloco_id }}-{{ forloop.counter }}"{% elif bloco.titulo %}aria-labelledby="nav-{{ bloco_id }}"{% endif %} class="space-y-px{% if not bloco.titulo %} pt-3{% endif %}">
+  {% for item in grupo.itens %}
+  <li>
+    <a href="{{ item.url }}" class="nav-item" {% if item.ativo %}aria-current="page"{% endif %}>
+      {% icon item.icone %}
+      <span class="flex-1 truncate">{{ item.rotulo }}</span>
+      {% if item.contagem %}<span class="nav-count" title="{{ item.contagem }} solicitaç{{ item.contagem|pluralize:'ão,ões' }} de acesso pendente{{ item.contagem|pluralize }}">{{ item.contagem }}<span class="sr-only"> solicitaç{{ item.contagem|pluralize:"ão,ões" }} pendente{{ item.contagem|pluralize }}</span></span>{% endif %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endfor %}
+{% if bloco.titulo %}</details>{% endif %}
+{% endwith %}
+{% endfor %}

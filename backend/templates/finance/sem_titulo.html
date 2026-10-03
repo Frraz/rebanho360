@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Operações sem título · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'finance:contas_a_pagar' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Contas a pagar</a>
+    <h1 class="page-title">Operações sem título</h1>
+    <p class="page-subtitle">Compras e vendas confirmadas antes do financeiro existir. Muitas já foram pagas fora do sistema: gere título só das que ainda estão em aberto — gerar todas encheria "vencidos" de coisa antiga.</p>
+  </div>
+</header>
+
+<form method="post">
+  {% csrf_token %}
+  {% if compras or vendas %}
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th scope="col"><span class="sr-only">Gerar</span></th><th scope="col">Operação</th><th scope="col">Data</th><th scope="col">Parceiro</th><th scope="col" class="num">Valor</th></tr></thead>
+      <tbody>
+        {% for c in compras %}
+        <tr>
+          <td class="cell-title"><label class="flex min-h-touch items-center gap-2.5"><input type="checkbox" name="operacao" value="compra:{{ c.pk }}"> <span class="code">{{ c.code }}</span></label></td>
+          <td data-label="Operação">Compra · {{ c.destination_farm.name }}</td>
+          <td data-label="Data" class="nowrap">{{ c.date|date:"d/m/Y" }}</td>
+          <td data-label="Parceiro" class="muted">{{ c.seller.name|default:"—" }}</td>
+          <td data-label="Valor" class="num nowrap font-medium">{{ c.animal_value|brl }}</td>
+        </tr>
+        {% endfor %}
+        {% for v in vendas %}
+        <tr>
+          <td class="cell-title"><label class="flex min-h-touch items-center gap-2.5"><input type="checkbox" name="operacao" value="venda:{{ v.pk }}"> <span class="code">{{ v.code }}</span></label></td>
+          <td data-label="Operação">{{ v.get_type_display }} · {{ v.farm.name }}</td>
+          <td data-label="Data" class="nowrap">{{ v.date|date:"d/m/Y" }}</td>
+          <td data-label="Parceiro" class="muted">{{ v.buyer.name }}</td>
+          <td data-label="Valor" class="num nowrap font-medium">{{ v.total_value|brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-4 flex justify-end"><button type="submit" class="btn-primary">Gerar títulos das marcadas</button></div>
+  {% else %}
+  <div class="table-wrap">{% include "partials/_empty.html" with icone="circle-check" titulo="Nada sem título" texto="Toda compra e venda confirmada já passou pelo financeiro." %}</div>
+  {% endif %}
+</form>
+{% endblock %}

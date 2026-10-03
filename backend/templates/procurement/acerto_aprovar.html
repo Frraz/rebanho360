@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Aprovar {{ acerto.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'procurement:acerto_detalhe' acerto.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ acerto.code }}</a>
+    <h1 class="page-title">Aprovar acerto</h1>
+  </div>
+</header>
+
+<div class="max-w-2xl space-y-4">
+  {% if calculo.pendencias %}
+  <div class="alert-danger" role="alert">
+    {% icon "circle-x" %}
+    <div><p class="font-medium">Ainda não dá para aprovar:</p>
+      <ul class="mt-1 list-disc space-y-1 pl-5">{% for p in calculo.pendencias %}<li>{{ p }}</li>{% endfor %}</ul></div>
+  </div>
+  {% endif %}
+
+  <section class="card">
+    <h2 class="card-title mb-3">Aprovar este acerto vai:</h2>
+    <ul class="space-y-2 text-sm">
+      {% for dados in calculo.itens %}{% if dados.recebido %}
+      <li class="flex items-start gap-2.5">{% icon "check" "mt-0.5 text-sage-600" %}<span>gerar a compra do item {{ dados.item.number }} ({{ dados.item.category.name }}): {{ dados.cabecas_recebidas }} cabeças dão entrada no rebanho, a {{ dados.valor_do_item|brl }} em animais</span></li>
+      {% endif %}{% endfor %}
+      <li class="flex items-start gap-2.5">{% icon "check" "mt-0.5 text-sage-600" %}<span>lançar o custo de aquisição de {{ calculo.custo_aquisicao|brl }} (animais, frete, tributos e comissão)</span></li>
+      <li class="flex items-start gap-2.5">{% icon "check" "mt-0.5 text-sage-600" %}<span>gerar os títulos a pagar: ao vendedor, {{ calculo.liquido_ao_produtor|brl }} líquidos; frete e comissão, com favorecido quando se sabe quem é</span></li>
+      <li class="flex items-start gap-2.5">{% icon "lock" "mt-0.5 text-gray-500" %}<span>travar os valores: depois, corrigir exige reabrir o acerto, com motivo</span></li>
+    </ul>
+    {% for a in calculo.avisos %}<p class="mt-3 flex items-start gap-2 text-xs text-amber-800">{% icon "triangle-alert" "icon-sm mt-px" %} {{ a }}</p>{% endfor %}
+    <form method="post" class="mt-5 flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+      {% csrf_token %}
+      <a href="{% url 'procurement:acerto_detalhe' acerto.pk %}" class="btn-secondary">Voltar</a>
+      <button type="submit" class="btn-primary" {% if calculo.pendencias %}disabled{% endif %}>Aprovar acerto</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

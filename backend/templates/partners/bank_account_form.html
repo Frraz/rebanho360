@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Conta bancária · {{ parceiro.name }}{% endblock %}
+{% block content %}
+{% url 'partners:detalhe' parceiro.pk as voltar %}
+{% if form.instance.pk %}
+{% include "partials/_form_page.html" with titulo="Editar conta bancária" subtitulo=parceiro.name voltar=voltar voltar_rotulo="Parceiro" %}
+{% else %}
+{% include "partials/_form_page.html" with titulo="Nova conta bancária" subtitulo=parceiro.name voltar=voltar voltar_rotulo="Parceiro" %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Regras de comissão · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Regras de comissão</h1>
+      {% info "comissao" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if pode_gerenciar %}<a href="{% url 'commercial:comissao_nova' %}" class="btn-primary">{% icon "plus" %} Nova regra</a>{% endif %}
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if regras %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Comissionado</th><th scope="col">Categoria</th><th scope="col">Regra</th><th scope="col">Vigência</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for regra in regras %}
+      <tr>
+        <td class="cell-title font-medium">{% if regra.commissioned %}{{ regra.commissioned.name }}{% else %}Qualquer comprador{% endif %}</td>
+        <td data-label="Categoria">{% if regra.category %}{{ regra.category.name }}{% else %}Qualquer{% endif %}</td>
+        <td data-label="Regra">
+          {% if regra.type == "PERCENTUAL" %}{{ regra.value|numero:2 }}% sobre {{ regra.get_base_display|lower }}{% else %}R$ {{ regra.value|numero:2 }} por cabeça{% endif %}
+        </td>
+        <td data-label="Vigência">{{ regra.valid_from|date:"d/m/Y" }} a {% if regra.valid_to %}{{ regra.valid_to|date:"d/m/Y" }}{% else %}sem fim{% endif %}</td>
+        <td data-label="Situação" class="cell-status">{% if regra.is_active %}<span class="badge-confirmada">Ativa</span>{% else %}<span class="badge-excluida">Inativa</span>{% endif %}</td>
+        <td class="cell-actions num">{% if pode_gerenciar %}<a href="{% url 'commercial:comissao_editar' regra.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'commercial:comissao_nova' as url_nova %}
+  {% if pode_gerenciar %}
+  {% include "partials/_empty.html" with icone="tag" titulo="Nenhuma regra de comissão" texto="Sem regra, o compromisso pode ter a comissão informada à mão." url=url_nova acao="Nova regra" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="tag" titulo="Nenhuma regra de comissão" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

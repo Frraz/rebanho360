@@ -1,0 +1,28 @@
+{% extends "registration/_auth.html" %}
+{% load core_tags %}
+{% block title %}Segundo fator · Rebanho360{% endblock %}
+{% block auth_body %}
+<a href="{% url 'dashboards:inicio' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Voltar ao sistema</a>
+<h1 class="text-2xl font-semibold tracking-tight">Segundo fator</h1>
+
+{% if erro %}<div class="alert-danger mt-6" role="alert">{% icon "circle-x" %}<p>{{ erro }}</p></div>{% endif %}
+
+{% if ativo %}
+<p class="mt-3 flex items-center gap-2 text-sm"><span class="badge-confirmada">Ativo</span> O código do aplicativo é pedido a cada entrada.</p>
+<p class="mt-4 text-sm text-gray-600">Códigos de recuperação restantes: <strong>{{ restantes }}</strong>.</p>
+{% if restantes < 4 %}<div class="alert-warning mt-3">{% icon "triangle-alert" %}<p>Restam poucos códigos. Gere um lote novo.</p></div>{% endif %}
+
+<form method="post" class="mt-6 space-y-3 border-t border-gray-200 pt-5">
+  {% csrf_token %}
+  <h2 class="text-base font-semibold">Gerar novos códigos de recuperação</h2>
+  <p class="text-sm text-gray-600">Os atuais deixam de valer. Confirme com o código que o aplicativo mostra agora.</p>
+  <label class="field-label" for="codigo">Código do aplicativo</label>
+  <input type="text" id="codigo" name="codigo" class="field-input text-lg tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+  <button type="submit" class="btn-secondary w-full">Gerar novos códigos</button>
+</form>
+<p class="mt-5 text-xs text-gray-500">Trocou de celular? Peça a um administrador para redefinir o seu segundo fator e configure de novo.</p>
+{% else %}
+<p class="mt-3 flex items-center gap-2 text-sm"><span class="badge-rascunho">Desativado</span> Opcional, mas recomendado a todos.</p>
+<a href="{% url 'accounts:2fa_configurar' %}" class="btn-primary mt-6 w-full">Ativar o segundo fator</a>
+{% endif %}
+{% endblock %}

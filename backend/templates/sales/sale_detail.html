@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load core_tags l10n finance_tags %}
+{% block title %}{{ venda.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'sales:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Vendas e abates</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ venda.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% status_badge venda.status %}
+        {% if venda.version > 1 and venda.status != "RASCUNHO" %}<span class="badge-editada">Editada (v{{ venda.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if pode_confirmar %}<a href="{% url 'sales:confirmar' venda.pk %}" class="btn-primary">{% icon "check" %} Confirmar venda</a>{% endif %}
+    {% if pode_editar %}<a href="{% url 'sales:editar' venda.pk %}" class="btn-secondary">{% icon "pencil" %} {% if venda.sem_carcaca %}Informar carcaça / editar{% else %}Editar{% endif %}</a>{% endif %}
+  </div>
+</header>
+
+{% for alerta in alertas %}
+<div class="alert-warning mb-3">{% icon "triangle-alert" %}<p>{{ alerta }}</p></div>
+{% endfor %}
+{% if venda.status == "EXCLUIDA" %}
+<div class="alert-warning mb-3" role="status">{% icon "triangle-alert" %}<p>Excluída por {{ venda.deleted_by }}{% if venda.delete_reason %}: "{{ venda.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+
+<section class="card mt-3" aria-label="Dados da venda">
+  <dl class="facts">
+    <div><dt>Data</dt><dd>{{ venda.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ venda.season.name }}</span></dd></div>
+    <div><dt>Tipo</dt><dd>{{ venda.get_type_display }} <span class="text-gray-500">· {{ venda.get_sale_form_display }}</span></dd></div>
+    <div><dt>Comprador</dt><dd>{{ venda.buyer.name }}</dd></div>
+    <div><dt>Origem</dt><dd>{{ venda.farm.name }} <span class="text-gray-500">· {{ venda.category.name }}</span></dd></div>
+    <div><dt>Lote</dt><dd><a class="link code" href="{% url 'livestock:lote_detalhe' venda.lot.pk %}">{{ venda.lot.code }}</a></dd></div>
+    <div><dt>Cabeças</dt><dd>{{ venda.head_count }}</dd></div>
+    <div><dt>Peso vivo</dt><dd>{{ venda.total_weight_kg|kg:0 }}</dd></div>
+    {% if venda.carcass_weight_kg %}<div><dt>Carcaça</dt><dd>{{ venda.carcass_weight_kg|kg:2 }}</dd></div>{% endif %}
+    {% if venda.partnership %}<div><dt>Parceria</dt><dd>{{ venda.partnership }}</dd></div>{% endif %}
+    {% if venda.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ venda.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-resultado">
+    <h2 id="titulo-resultado" class="card-title mb-2">Resultado da venda</h2>
+    <dl class="dl">
+      <div class="total"><dt>Valor total</dt><dd>{{ venda.total_value|brl }}</dd></div>
+      <div><dt>Valor por cabeça</dt><dd>{{ indicadores.valor_por_cabeca|brl }}</dd></div>
+      <div><dt>Peso médio vivo</dt><dd>{{ indicadores.peso_medio_vivo|kg:2 }}</dd></div>
+      {% if venda.type == "ABATE" %}
+      <div><dt>Carcaça média</dt><dd>{{ indicadores.carcaca_media|kg:2 }}</dd></div>
+      <div><dt>Rendimento</dt><dd>{{ indicadores.rendimento|pct }}</dd></div>
+      <div><dt>@ de carcaça</dt><dd>{{ indicadores.arrobas_carcaca|arroba }}</dd></div>
+      <div><dt>Valor por @</dt><dd>{{ indicadores.valor_por_arroba|brl }}</dd></div>
+      {% else %}
+      <div><dt>Valor por kg vivo</dt><dd>{{ indicadores.valor_por_kg_vivo|brl }}</dd></div>
+      {% endif %}
+    </dl>
+    {% if venda.type == "ABATE" and indicadores.rendimento is None %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Indisponível: falta o peso de carcaça (romaneio do frigorífico).</p>{% endif %}
+  </section>
+
+  {% if venda.status == "CONFIRMADA" %}
+  <div class="space-y-6">
+    <section class="card" aria-labelledby="titulo-gerou">
+      <h2 id="titulo-gerou" class="card-title mb-2">O que esta venda gerou</h2>
+      <ul class="divide-y divide-gray-100 text-sm">
+        {% if movimento %}<li class="py-2.5">Saída do rebanho: <a class="link code" href="{% url 'herd:movimento_detalhe' movimento.pk %}">{{ movimento.code }}</a> <span class="text-gray-600">· −{{ movimento.quantity }} cabeças</span></li>{% endif %}
+        {% if venda.lot.status == "ENCERRADO" %}<li class="py-2.5">Lote <a class="link code" href="{% url 'livestock:lote_detalhe' venda.lot.pk %}">{{ venda.lot.code }}</a> encerrado em {{ venda.lot.exit_date|date:"d/m/Y" }} — sem animais.</li>{% endif %}
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="titulo-proximos">
+      <h2 id="titulo-proximos" class="card-title mb-2">Próximos passos</h2>
+      <ul class="space-y-3 text-sm">
+        <li class="flex items-start gap-2.5">{% icon "arrow-right" "mt-0.5 text-gray-400" %}<span><a class="link" href="{% url 'herd:pesagem_nova' %}?date={{ venda.date|date:'Y-m-d' }}&farm={{ venda.farm_id }}&lot={{ venda.lot_id }}&reason={{ venda.type }}&head_count={{ venda.head_count }}&total_weight_kg={{ venda.total_weight_kg|unlocalize }}">Registrar a pesagem de saída</a> — é o que fecha o GMD e a @ produzida do lote.</span></li>
+        <li class="flex items-start gap-2.5">{% icon "arrow-right" "mt-0.5 text-gray-400" %}<span><a class="link" href="{% url 'livestock:lote_detalhe' venda.lot.pk %}">Ver o resultado do lote {{ venda.lot.code }}</a></span></li>
+      </ul>
+    </section>
+  </div>
+  {% endif %}
+</div>
+
+
+{% if ver_financeiro and venda.status == "CONFIRMADA" %}
+<section class="card mt-6" aria-labelledby="titulo-financeiro">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="titulo-financeiro" class="card-title">Financeiro</h2>
+  </div>
+  {% if titulos %}
+  <ul class="divide-y divide-gray-100 text-sm">
+    {% for t in titulos %}
+    <li class="flex flex-wrap items-center justify-between gap-2 py-2.5">
+      <span><a class="link code" href="{% url 'finance:titulo_detalhe' t.pk %}">{{ t.code }}</a> <span class="text-gray-600">· {{ t.get_component_display }} · {{ t.amount|brl }} · vence {{ t.due_date|date:"d/m/Y" }}{% if t.payee %} · {{ t.payee.name }}{% endif %}</span></span>
+      <span class="inline-flex gap-1.5">{% titulo_selos t %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-gray-600">Esta venda ainda não passou pelo financeiro: nenhum título a receber foi gerado.</p>
+  {% if pode_gerar_titulos %}
+  <form method="post" action="{% url 'finance:sem_titulo' %}" class="mt-3">
+    {% csrf_token %}
+    <input type="hidden" name="operacao" value="venda:{{ venda.pk }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <button type="submit" class="btn-secondary btn-sm">Gerar título desta venda</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'sales:excluir' venda.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir venda</a>{% endif %}
+  {% if pode_restaurar %}
+  <form method="post" action="{% url 'sales:restaurar' venda.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar venda</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

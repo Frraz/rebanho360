@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Nova compra · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'purchases:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Compras</a>
+    <h1 class="page-title">Nova compra</h1>
+    <p class="page-subtitle">Confirmar dá entrada no rebanho e lança os custos — sem digitar duas vezes.</p>
+  </div>
+</header>
+
+<form method="post" id="form-compra" class="card max-w-4xl pb-24 md:pb-5" data-rascunho="compra">
+  {% csrf_token %}
+  {% include "purchases/_campos.html" %}
+  <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+    <button type="submit" name="acao" value="rascunho" class="btn-secondary">Salvar rascunho</button>
+    <button type="submit" name="acao" value="confirmar" class="btn-primary">Confirmar compra</button>
+  </div>
+</form>
+
+<script>
+/* Rascunho em localStorage: sinal ruim não apaga o que foi digitado. */
+(function () {
+  var form = document.getElementById('form-compra');
+  var chave = 'rascunho:' + form.dataset.rascunho;
+  try {
+    var salvo = JSON.parse(localStorage.getItem(chave) || '{}');
+    Object.keys(salvo).forEach(function (nome) {
+      var campo = form.elements[nome];
+      if (campo && !campo.value) { campo.value = salvo[nome]; if (campo._cb) campo._cb.sync(); }
+    });
+  } catch (e) {}
+  form.addEventListener('input', function () {
+    var dados = {};
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (campo.name && ['csrfmiddlewaretoken', 'acao'].indexOf(campo.name) < 0) dados[campo.name] = campo.value;
+    });
+    try { localStorage.setItem(chave, JSON.stringify(dados)); } catch (e) {}
+  });
+  form.addEventListener('submit', function () {
+    /* Só limpa depois que o servidor aceitar: a página seguinte é o detalhe. */
+    form.dataset.enviando = '1';
+  });
+  if (document.referrer === '' && new URLSearchParams(location.search).get('limpar')) {
+    try { localStorage.removeItem(chave); } catch (e) {}
+  }
+})();
+</script>
+{% endblock %}

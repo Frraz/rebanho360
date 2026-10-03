@@ -1,0 +1,45 @@
+{# Empresa · Safra · Fazenda numa barra única. `painel=True` = versão empilhada do painel mobile. #}
+{# O rótulo não é <label>: clicar nele não pode cair no <select> escondido pelo seletor com busca. #}
+<div class="ctx-bar{% if painel %} ctx-bar-stack{% endif %}">
+  {% if current_company %}
+  <div class="ctx-cell ctx-static">
+    <span class="ctx-label">Empresa</span>
+    <span>{{ current_company.name }}</span>
+  </div>
+  {% endif %}
+
+  {% if available_seasons %}
+  <form method="post" action="{% url 'organizations:trocar_safra' %}" class="ctx-cell {% if painel %}w-full{% else %}w-44 shrink-0{% endif %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <span class="ctx-label" id="ctx-safra-{% if painel %}m{% else %}d{% endif %}">Safra</span>
+    <select name="season_id" onchange="this.form.submit()" class="ctx-select" aria-labelledby="ctx-safra-{% if painel %}m{% else %}d{% endif %}">
+      {% for safra in available_seasons %}
+      <option value="{{ safra.pk }}" {% if current_season and safra.pk == current_season.pk %}selected{% endif %}>
+        {{ safra.name }}{% if safra.status == "ENCERRADA" %} (encerrada){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </form>
+  {% else %}
+  <div class="ctx-cell ctx-static"><span class="ctx-label">Safra</span><span class="text-gray-500">Nenhuma cadastrada</span></div>
+  {% endif %}
+
+  {% if available_farms %}
+  <form method="post" action="{% url 'properties:trocar_fazenda' %}" class="ctx-cell {% if painel %}w-full{% else %}w-52 shrink-0{% endif %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <span class="ctx-label" id="ctx-fazenda-{% if painel %}m{% else %}d{% endif %}">Fazenda</span>
+    <select name="farm_id" onchange="this.form.submit()" class="ctx-select" aria-labelledby="ctx-fazenda-{% if painel %}m{% else %}d{% endif %}">
+      <option value="">Todas as fazendas</option>
+      {% for fazenda in available_farms %}
+      <option value="{{ fazenda.pk }}" {% if current_farm and fazenda.pk == current_farm.pk %}selected{% endif %}>
+        {{ fazenda.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </form>
+  {% else %}
+  <div class="ctx-cell ctx-static"><span class="ctx-label">Fazenda</span><span class="text-gray-500">Nenhuma acessível</span></div>
+  {% endif %}
+</div>

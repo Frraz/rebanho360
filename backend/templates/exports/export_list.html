@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Exportações · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Exportações</h1>
+      {% info "exportacao" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'exports:nova' %}" class="btn-primary">{% icon "download" %} Nova exportação</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if pedidos %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Pedida em</th><th scope="col">O que</th><th scope="col">Formatos</th><th scope="col">Tamanho</th><th scope="col">Situação</th></tr>
+    </thead>
+    <tbody>
+      {% for pedido in pedidos %}
+      <tr class="is-link">
+        <td class="cell-title nowrap"><a href="{% url 'exports:detalhe' pedido.job_id %}" class="row-link">{{ pedido.created_at|date:"d/m/Y H:i" }}</a></td>
+        <td data-label="O que" class="muted">{{ pedido.items|length }} ite{{ pedido.items|length|pluralize:"m,ns" }}{% if pedido.params.opcoes.incluir_arquivos %} · com anexos{% endif %}</td>
+        <td data-label="Formatos" class="muted uppercase">{{ pedido.params.formatos|join:", "|default:"—" }}</td>
+        <td data-label="Tamanho" class="num nowrap">{% if pedido.size_bytes %}{{ pedido.size_bytes|filesizeformat }}{% else %}—{% endif %}</td>
+        <td data-label="Situação" class="cell-status">
+          {% if pedido.status == "PRONTO" %}<span class="badge-confirmada">Pronta</span>
+          {% elif pedido.status == "PROCESSANDO" %}<span class="badge-editada">Processando · {{ pedido.percentual }}%</span>
+          {% elif pedido.status == "PENDENTE" %}<span class="badge-pendencia">Na fila</span>
+          {% elif pedido.status == "ERRO" %}<span class="badge-erro">Com erro</span>
+          {% elif pedido.status == "CANCELADO" %}<span class="badge-excluida">Cancelada</span>
+          {% else %}<span class="badge-excluida">Arquivo removido</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'exports:nova' as url_nova %}
+  {% include "partials/_empty.html" with icone="download" titulo="Nenhuma exportação ainda" texto="Leve seus dados para fora do sistema: tudo, ou só o que precisar, em CSV, Excel, JSON ou PDF." url=url_nova acao="Nova exportação" %}
+  {% endif %}
+</div>
+{% endblock %}

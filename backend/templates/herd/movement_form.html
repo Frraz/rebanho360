@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Lançar movimentação · Rebanho360{% endblock %}
+{% block content %}
+<div
+  x-data="{
+    tipo: document.getElementById('id_type').value,
+    duasLinhas: ['TRANSFERENCIA', 'EVOLUCAO', 'RECLASSIFICACAO'],
+    entrada: ['SALDO_INICIAL', 'COMPRA', 'NASCIMENTO'],
+    saida: ['ABATE', 'VENDA', 'MORTE', 'CONSUMO_DOACAO'],
+    get mostraOrigem() { return this.duasLinhas.includes(this.tipo) || this.saida.includes(this.tipo) || this.tipo === 'AJUSTE_INVENTARIO' },
+    get mostraDestino() { return this.duasLinhas.includes(this.tipo) || this.entrada.includes(this.tipo) || this.tipo === 'AJUSTE_INVENTARIO' },
+    get motivoObrigatorio() { return this.tipo === 'MORTE' || this.tipo === 'AJUSTE_INVENTARIO' },
+  }"
+  class="max-w-4xl"
+>
+  <header class="page-header">
+    <div>
+      <a href="{% url 'herd:movimento_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Movimentações</a>
+      <h1 class="page-title">Registrar movimentação</h1>
+      <p class="page-subtitle">Transferências e mudanças de categoria dão baixa na origem e entrada no destino, na mesma operação.</p>
+    </div>
+  </header>
+
+  {% if form.non_field_errors %}
+  <div class="alert-danger mb-4" role="alert">
+    {% icon "circle-x" %}
+    <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="form-movimentacao" class="card pb-24 md:pb-5">
+    {% csrf_token %}
+    {% include "herd/_campos_movimento.html" %}
+    <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+      <a href="{% url 'herd:movimento_lista' %}" class="btn-secondary">Cancelar</a>
+      <button type="submit" class="btn-primary">Registrar</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("form-movimentacao");
+  var chave = "rebanho360-rascunho-movimentacao";
+  var urlAtual = new URL(window.location.href);
+
+  if (urlAtual.searchParams.get("ok") === "1") {
+    localStorage.removeItem(chave);
+  } else {
+    try {
+      var salvo = JSON.parse(localStorage.getItem(chave) || "{}");
+      Object.keys(salvo).forEach(function (nome) {
+        var campo = form.elements[nome];
+        if (campo) { campo.value = salvo[nome]; if (campo._cb) campo._cb.sync(); }
+      });
+      if (window.Alpine && form.elements["type"]) {
+        form.elements["type"].dispatchEvent(new Event("change"));
+      }
+    } catch (e) {}
+  }
+
+  form.addEventListener("input", function () {
+    var dados = {};
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (campo.name) dados[campo.name] = campo.value;
+    });
+    localStorage.setItem(chave, JSON.stringify(dados));
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+{# Contrato de compra para imprimir. CSS inline: o WeasyPrint não carrega o Tailwind. Sem dado bancário. #}
+{% load core_tags %}
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Contrato de compra {{ compromisso.code }} · Rebanho360</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 14mm 18mm 14mm;
+    @bottom-left { content: "Emitido por {{ emitido_por }} em {{ emitido_em|date:'d/m/Y H:i' }} · layout {{ versao }}"; font-size: 8pt; color: #555; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8pt; color: #555; }
+  }
+  html { font-family: "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #1a1a1a; }
+  header { border-bottom: 1.5pt solid #194659; padding-bottom: 4mm; margin-bottom: 5mm; }
+  .sistema { font-size: 8pt; color: #194659; font-weight: bold; letter-spacing: .05em; text-transform: uppercase; }
+  h1 { font-size: 16pt; margin: 1mm 0 0; }
+  .emitente { font-size: 9pt; color: #333; margin-top: 1mm; }
+  .codigo { font-family: "DejaVu Sans Mono", monospace; font-size: 12pt; font-weight: bold; margin: 3mm 0; }
+  h2 { font-size: 10.5pt; margin: 6mm 0 2mm; border-bottom: .5pt solid #bbb; padding-bottom: 1mm; }
+  dl { display: grid; grid-template-columns: 38mm 1fr; gap: 1mm 4mm; margin: 0; }
+  dt { color: #555; font-size: 8.5pt; }
+  dd { margin: 0; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+  thead { display: table-header-group; }
+  th { text-align: left; font-size: 8pt; border-bottom: 1pt solid #666; padding: 1.5mm 2mm; background: #eef5f7; }
+  th.num, td.num { text-align: right; }
+  td { padding: 1.5mm 2mm; border-bottom: .4pt solid #ddd; font-size: 9pt; }
+  td.num { white-space: nowrap; }
+  tr { page-break-inside: avoid; }
+  .nota { font-size: 8pt; color: #444; margin: 2mm 0; }
+  .assinaturas { margin-top: 22mm; display: flex; gap: 14mm; page-break-inside: avoid; }
+  .assinaturas div { flex: 1; border-top: .6pt solid #333; padding-top: 1.5mm; text-align: center; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+<header>
+  <div class="sistema">Rebanho360 · Contrato de compra de animais</div>
+  <h1>{% if empresa %}{{ empresa.legal_name|default:empresa.name }}{% else %}Contrato de compra{% endif %}</h1>
+  {% if empresa %}<div class="emitente">{% if empresa.tax_id %}CNPJ {{ empresa.tax_id }}{% endif %}{% if empresa.address %} · {{ empresa.address }}{% endif %}{% if empresa.city %} · {{ empresa.city }}{% if empresa.state %}-{{ empresa.state }}{% endif %}{% endif %}{% if empresa.phone %} · {{ empresa.phone }}{% endif %}</div>{% endif %}
+</header>
+
+<div class="codigo">Documento {{ compromisso.code }}</div>
+
+<h2>Produtor</h2>
+<dl>
+  <dt>Produtor</dt><dd>{{ compromisso.seller.name }}</dd>
+  {% if compromisso.seller.document %}<dt>CPF/CNPJ</dt><dd>{{ compromisso.seller.document }}</dd>{% endif %}
+  {% if compromisso.origin_property %}<dt>Propriedade</dt><dd>{{ compromisso.origin_property }}</dd>{% endif %}
+  {% if compromisso.seller.address %}<dt>Endereço</dt><dd>{{ compromisso.seller.address }}</dd>{% endif %}
+  {% if compromisso.origin_city or compromisso.seller.city %}<dt>Cidade</dt><dd>{{ compromisso.origin_city|default:compromisso.seller.city }}{% if compromisso.seller.state %}-{{ compromisso.seller.state }}{% endif %}</dd>{% endif %}
+  {% if compromisso.seller.phone %}<dt>Telefone</dt><dd>{{ compromisso.seller.phone }}</dd>{% endif %}
+</dl>
+
+<h2>Condições</h2>
+<dl>
+  <dt>Data do movimento</dt><dd>{{ compromisso.date|date:"d/m/Y" }}</dd>
+  <dt>Data da retirada</dt><dd>{% if compromisso.pickup_date %}{{ compromisso.pickup_date|date:"d/m/Y" }}{% else %}a combinar{% endif %}</dd>
+  <dt>Data prevista do abate</dt><dd>{% if compromisso.slaughter_date %}{{ compromisso.slaughter_date|date:"d/m/Y" }}{% else %}a combinar{% endif %}</dd>
+  <dt>Condição de pagamento</dt><dd>{% if compromisso.payment_days %}{{ compromisso.payment_days }} dias{% else %}à vista{% endif %}</dd>
+  <dt>Fazenda de destino</dt><dd>{{ compromisso.destination_farm.name }}</dd>
+  {% if compromisso.commissioned %}<dt>Comprador</dt><dd>{{ compromisso.commissioned.name }}</dd>{% endif %}
+  {% if compromisso.second_buyer %}<dt>Comprador adicional</dt><dd>{{ compromisso.second_buyer.name }}</dd>{% endif %}
+  {% if compromisso.distance_km %}<dt>Distância</dt><dd>{{ compromisso.distance_km }} km</dd>{% endif %}
+  {% if compromisso.trucks %}<dt>Caminhões previstos</dt><dd>{{ compromisso.trucks }}</dd>{% endif %}
+</dl>
+
+<h2>Animais e preços</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Item</th><th>Produto</th><th class="num">Cabeças</th><th class="num">Peso médio previsto</th>
+      <th class="num">Faixa 1</th><th class="num">Faixa 2</th><th class="num">Faixa 3</th><th class="num">Faixa 4</th><th class="num">Faixa 5</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in itens %}
+    <tr>
+      <td>{{ item.number }}</td>
+      <td>{{ item.category.name }}{% if item.product_code %} ({{ item.product_code }}){% endif %}</td>
+      <td class="num">{{ item.head_count }}</td>
+      <td class="num">{% if item.avg_weight_kg %}{{ item.avg_weight_kg|numero:1 }} kg{% else %}—{% endif %}</td>
+      {% if item.price_basis == por_arroba %}
+      <td class="num">{{ item.price_band_1|brl }}</td><td class="num">{{ item.price_band_2|brl }}</td><td class="num">{{ item.price_band_3|brl }}</td><td class="num">{{ item.price_band_4|brl }}</td><td class="num">{{ item.price_band_5|brl }}</td>
+      {% else %}
+      <td class="num" colspan="5">{{ item.unit_price|brl }} por cabeça</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="nota">Preços por faixa em R$ por @ de carcaça (arroba = 15 kg). A faixa aplicada a cada animal depende da classificação da carcaça no abate.</p>
+{% if compromisso.notes %}<h2>Observações</h2><p>{{ compromisso.notes }}</p>{% endif %}
+
+<div class="assinaturas">
+  <div>{{ compromisso.seller.name }}<br>Produtor</div>
+  <div>{% if empresa %}{{ empresa.name }}{% else %}Comprador{% endif %}<br>Comprador</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Registrar pesagem · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'herd:pesagem_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Pesagens</a>
+    <h1 class="page-title">Registrar pesagem</h1>
+    <p class="page-subtitle">O peso médio do lote vem do peso total dividido pelas cabeças pesadas.</p>
+  </div>
+</header>
+
+{% if form.non_field_errors %}
+<div class="alert-danger mb-4 max-w-2xl" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" class="card max-w-2xl space-y-5 pb-24 md:pb-5">
+  {% csrf_token %}
+  {% include "partials/_field.html" with field=form.date %}
+  <div>
+    <label class="field-label" for="id_farm">{{ form.farm.label }}</label>
+    {{ form.farm|add_class:"field-input"|attr:"hx-get:/rebanho/movimentacoes/lotes-da-fazenda/?campo=lot"|attr:"hx-target:#id_lot"|attr:"hx-swap:outerHTML"|attr:"hx-trigger:change" }}
+    {% include "partials/_errors.html" with field=form.farm %}
+  </div>
+  {% include "partials/_field.html" with field=form.lot %}
+  {% include "partials/_field.html" with field=form.reason %}
+  <div>
+    <label class="field-label" for="id_head_count">{{ form.head_count.label }}</label>
+    {{ form.head_count|add_class:"field-input"|attr:"inputmode:numeric" }}
+    {% include "partials/_errors.html" with field=form.head_count %}
+  </div>
+  <div>
+    <label class="field-label" for="id_total_weight_kg">{{ form.total_weight_kg.label }}</label>
+    {{ form.total_weight_kg|add_class:"field-input"|attr:"inputmode:decimal" }}
+    {% include "partials/_errors.html" with field=form.total_weight_kg %}
+  </div>
+  <div class="form-actions md:border-t md:border-gray-100 md:pt-5">
+    <a href="{% url 'herd:pesagem_lista' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Registrar</button>
+  </div>
+</form>
+{% endblock %}

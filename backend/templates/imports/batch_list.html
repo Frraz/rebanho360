@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Importações · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Importações</h1>
+      {% info "importacao" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'imports:nova' %}" class="btn-primary">{% icon "upload" %} Importar planilha</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if lotes %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Tipo</th><th scope="col">Arquivo</th><th scope="col">Enviado em</th><th scope="col">Por</th><th scope="col">Situação</th></tr>
+    </thead>
+    <tbody>
+      {% for lote in lotes %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'imports:detalhe' lote.pk %}" class="row-link">{{ lote.get_kind_display }}</a></td>
+        <td data-label="Arquivo" class="muted max-w-xs truncate">{{ lote.original_name }}</td>
+        <td data-label="Enviado em" class="nowrap">{{ lote.created_at|date:"d/m/Y H:i" }}</td>
+        <td data-label="Por" class="muted">{{ lote.created_by }}</td>
+        <td data-label="Situação" class="cell-status">
+          {% if lote.status == "IMPORTADO" %}<span class="badge-confirmada">Importada</span>
+          {% elif lote.status == "CANCELADO" %}<span class="badge-excluida">Cancelada</span>
+          {% else %}<span class="badge-pendencia">Em prévia</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% url 'imports:nova' as url_nova %}
+  {% include "partials/_empty.html" with icone="upload" titulo="Nenhuma importação ainda" texto="Comece pelos custos." url=url_nova acao="Importar planilha" %}
+  {% endif %}
+</div>
+{% endblock %}

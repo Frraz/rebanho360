@@ -1,0 +1,11 @@
+{% load core_tags procurement_tags %}
+{# Os passos do ciclo, com o atual marcado. Parâmetro: etapa. #}
+{% progresso_do_ciclo etapa as passos %}
+<ol class="flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Etapas do ciclo de compra">
+  {% for passo in passos %}
+  <li class="inline-flex items-center gap-1.5 {% if passo.atual %}font-semibold text-gray-900{% elif passo.feito %}text-gray-700{% else %}text-gray-400{% endif %}" {% if passo.atual %}aria-current="step"{% endif %}>
+    {% if passo.feito %}{% icon "check" "icon-sm text-sage-600" %}{% elif passo.atual %}{% icon "chevron-right" "icon-sm" %}{% else %}<span class="inline-block h-1.5 w-1.5 rounded-full bg-gray-300" aria-hidden="true"></span>{% endif %}
+    {{ passo.rotulo }}{% if passo.atual %}<span class="sr-only"> (etapa atual)</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>

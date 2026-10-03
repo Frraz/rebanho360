@@ -1,0 +1,8 @@
+{% load widget_tweaks core_tags %}
+{# Campo numérico que recalcula a prévia de indicadores (HTMX). Parâmetro: field. #}
+<div>
+  <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-red-600" aria-hidden="true"> *</span>{% endif %}</label>
+  {{ field|add_class:"field-input"|attr:"hx-get:/vendas/previa/"|attr:"hx-trigger:input changed delay:300ms"|attr:"hx-target:#previa-indicadores"|attr:"hx-swap:outerHTML"|attr:"hx-include:#form-venda"|attr:"hx-sync:#form-venda:replace" }}
+  {% if field.help_text %}<p class="field-help">{{ field.help_text }}</p>{% endif %}
+  {% include "partials/_errors.html" %}
+</div>

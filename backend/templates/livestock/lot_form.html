@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Editar lote{% else %}Novo lote{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+{% url 'livestock:lote_lista' as voltar %}
+{% if object %}
+{% include "partials/_form_page.html" with titulo="Editar lote" voltar=voltar voltar_rotulo="Lotes" %}
+{% else %}
+{% include "partials/_form_page.html" with titulo="Novo lote" subtitulo="O código é gerado automaticamente ao salvar." voltar=voltar voltar_rotulo="Lotes" %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% load core_tags %}
+{# Abas do gerenciamento de acesso. Parâmetros: aba ("usuarios" ou "solicitacoes"), pendentes. #}
+<nav class="seg mb-5" aria-label="Gerenciamento de acesso">
+  <a href="{% url 'accounts:usuarios' %}" {% if aba == "usuarios" %}aria-current="page"{% endif %}>Usuários</a>
+  <a href="{% url 'accounts:solicitacoes' %}" {% if aba == "solicitacoes" %}aria-current="page"{% endif %}>
+    Solicitações de acesso
+    {% if pendentes %}<span class="badge-pendencia ml-2">{{ pendentes }} pendente{{ pendentes|pluralize }}</span>{% endif %}
+  </a>
+</nav>

@@ -1,0 +1,73 @@
+{% load core_tags %}
+{% if form.non_field_errors %}
+<div class="alert-danger mb-5" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Origem e destino</h2>
+    <p class="mt-1 text-sm text-gray-500">Quem vendeu, onde os animais entram e em qual lote.</p>
+  </header>
+  <div class="fields">
+    {% include "partials/_field.html" with field=form.date %}
+    {% include "partials/_field.html" with field=form.seller %}
+    {% include "partials/_field.html" with field=form.destination_farm %}
+    {% include "partials/_field.html" with field=form.category %}
+    {% include "partials/_field.html" with field=form.lot %}
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Animais</h2>
+    <p class="mt-1 text-sm text-gray-500">Sem o peso total, custo por @ e por kg ficam em branco.</p>
+  </header>
+  <div class="fields">
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% include "purchases/_campo_previa.html" with field=form.head_count %}
+      {% include "purchases/_campo_previa.html" with field=form.total_weight_kg %}
+    </div>
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Valores</h2>
+    <p class="mt-1 text-sm text-gray-500">A prévia abaixo se atualiza enquanto você digita.</p>
+  </header>
+  <div class="fields">
+    {% include "purchases/_campo_previa.html" with field=form.animal_value %}
+    <div id="valores" class="grid gap-4 sm:grid-cols-3">
+      {% include "purchases/_campo_previa.html" with field=form.freight_value %}
+      {% include "purchases/_campo_previa.html" with field=form.commission_value %}
+      {% include "purchases/_campo_previa.html" with field=form.tax_value %}
+    </div>
+    {% include "purchases/_previa_custo.html" %}
+    {% include "partials/_field.html" with field=form.payment_days %}
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Complemento</h2>
+  </header>
+  <div class="fields">
+    {% include "partials/_field.html" with field=form.partnership %}
+    {% include "partials/_field.html" with field=form.notes %}
+  </div>
+</section>
+
+{% if form.edit_reason %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2>
+    <p class="mt-1 text-sm text-gray-500">Obrigatório em compra confirmada. Fica na auditoria.</p>
+  </header>
+  <div class="fields">
+    {% include "partials/_field.html" with field=form.edit_reason %}
+  </div>
+</section>
+{% endif %}

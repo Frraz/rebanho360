@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Pesagens · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Pesagens</h1>
+      {% info "pesagem" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'herd:pesagem_nova' %}" class="btn-primary">{% icon "plus" %} Nova pesagem</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if pesagens %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Lote</th><th scope="col">Data</th><th scope="col">Motivo</th><th scope="col" class="num">Cabeças</th><th scope="col" class="num">Peso médio</th></tr>
+    </thead>
+    <tbody>
+      {% for pesagem in pesagens %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'livestock:lote_detalhe' pesagem.lot_id %}" class="row-link code">{{ pesagem.lot.code }}</a></td>
+        <td data-label="Data" class="nowrap">{{ pesagem.date|date:"d/m/Y" }}</td>
+        <td data-label="Motivo">{{ pesagem.get_reason_display }}</td>
+        <td data-label="Cabeças" class="num">{{ pesagem.head_count }}</td>
+        <td data-label="Peso médio" class="num nowrap">{{ pesagem.average_weight_kg|numero:0 }} kg</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'herd:pesagem_nova' as url_nova %}
+  {% include "partials/_empty.html" with icone="scale" titulo="Nenhuma pesagem registrada" texto="Registre pesagens para acompanhar o ganho de peso de cada lote." url=url_nova acao="Nova pesagem" %}
+  {% endif %}
+</div>
+{% endblock %}

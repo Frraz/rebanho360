@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load core_tags widget_tweaks %}
+{% block title %}Conta · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Conta</h1>
+      {% info "conta" %}
+    </div>
+    <p class="page-subtitle">Seus dados, sua senha e a proteção da sua entrada no sistema.</p>
+  </div>
+</header>
+
+<nav class="seg mb-5" aria-label="Seções da conta">
+  <a href="#perfil">Perfil</a>
+  <a href="#senha">Senha</a>
+  <a href="#seguranca">Segundo fator</a>
+</nav>
+
+{% if form.errors or senha_form.errors %}
+<div class="alert-danger mb-5 max-w-2xl" role="alert">
+  {% icon "circle-x" %}
+  <p>
+    {% if form.errors %}Não foi possível salvar o perfil. Confira os campos marcados em <a href="#perfil" class="field-error">Perfil</a>.{% endif %}
+    {% if senha_form.errors %}A senha não foi trocada. Veja o que faltou em <a href="#senha" class="field-error">Senha</a>.{% endif %}
+  </p>
+</div>
+{% endif %}
+
+<div class="max-w-2xl space-y-6">
+
+  <!-- Perfil -->
+  <section id="perfil" class="space-y-4" aria-labelledby="perfil-titulo">
+    <div class="card">
+      <div class="flex items-center gap-3">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-50 text-base font-semibold uppercase text-brand-800 ring-1 ring-brand-200">{{ user|iniciais }}</span>
+        <div class="min-w-0">
+          <p class="truncate text-base font-semibold text-gray-900">{{ user.get_full_name|default:user.username }}</p>
+          <p class="text-sm text-gray-500">{{ user.get_role_display }}</p>
+        </div>
+      </div>
+      <dl class="dl mt-4">
+        <div><dt>Usuário</dt><dd><span class="code">{{ user.username }}</span></dd></div>
+        <div><dt>E-mail</dt><dd>{{ user.email|default:"—" }}</dd></div>
+        <div><dt>Papel</dt><dd>{{ user.get_role_display }}</dd></div>
+        <div>
+          <dt>Fazendas</dt>
+          <dd>{% if user.has_broad_access %}Todas{% elif fazendas_do_usuario %}{{ fazendas_do_usuario|join:", " }}{% else %}Nenhuma liberada{% endif %}</dd>
+        </div>
+      </dl>
+      <p class="field-help">Usuário, e-mail, papel e fazendas são definidos pelo administrador. Para trocar o e-mail, fale com ele.</p>
+    </div>
+
+    <form method="post" class="card space-y-5">
+      {% csrf_token %}
+      <h2 id="perfil-titulo" class="text-base font-semibold text-gray-900">Dados pessoais</h2>
+      {% if form.non_field_errors %}
+      <div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div></div>
+      {% endif %}
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.first_name %}
+        {% include "partials/_field.html" with field=form.last_name %}
+      </div>
+      {% include "partials/_field.html" with field=form.phone %}
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.birth_date %}
+        {% include "partials/_field.html" with field=form.cpf %}
+      </div>
+      <button type="submit" class="btn-primary w-full sm:w-auto">Salvar perfil</button>
+    </form>
+  </section>
+
+  <!-- Senha -->
+  <section id="senha" aria-labelledby="senha-titulo">
+    <form method="post" action="{% url 'accounts:password_change' %}" class="card space-y-5">
+      {% csrf_token %}
+      <div>
+        <h2 id="senha-titulo" class="text-base font-semibold text-gray-900">Senha</h2>
+        <p class="mt-1 text-sm text-gray-600">Use uma senha que você não usa em outro lugar.</p>
+      </div>
+      {% for field in senha_form %}
+      <div>
+        <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field|add_class:"field-input" }}
+        {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+        {% for error in field.errors %}<p class="field-error">{% icon "circle-x" "icon-sm mt-0.5" %}<span>{{ error }}</span></p>{% endfor %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Salvar senha</button>
+    </form>
+  </section>
+
+  <!-- Segundo fator -->
+  <section id="seguranca" aria-labelledby="seguranca-titulo">
+    <div class="card space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="seguranca-titulo" class="text-base font-semibold text-gray-900">Segundo fator</h2>
+          <p class="mt-1 text-sm text-gray-600">Além da senha, o aplicativo autenticador no seu celular gera um código a cada entrada.</p>
+        </div>
+        {% if segundo_fator_ativo %}<span class="badge-confirmada shrink-0">Ativo</span>{% else %}<span class="badge-rascunho shrink-0">Desativado</span>{% endif %}
+      </div>
+
+      {% if segundo_fator_ativo %}
+      <p class="text-sm text-gray-600">Códigos de recuperação restantes: <strong>{{ codigos_restantes }}</strong>.</p>
+      {% if codigos_restantes < 4 %}<div class="alert-warning">{% icon "triangle-alert" %}<p>Restam poucos códigos. Gere um lote novo.</p></div>{% endif %}
+
+      <form method="post" action="{% url 'accounts:2fa_status' %}" class="space-y-3 border-t border-gray-200 pt-4">
+        {% csrf_token %}
+        <h3 class="text-sm font-semibold text-gray-900">Gerar novos códigos de recuperação</h3>
+        <p class="text-sm text-gray-600">Os atuais deixam de valer. Confirme com o código que o aplicativo mostra agora.</p>
+        <div>
+          <label class="field-label" for="codigo">Código do aplicativo</label>
+          <input type="text" id="codigo" name="codigo" class="field-input max-w-[12rem] text-lg tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+        </div>
+        <button type="submit" class="btn-secondary w-full sm:w-auto">Gerar novos códigos</button>
+      </form>
+      <p class="text-xs text-gray-500">Trocou de celular? Peça a um administrador para redefinir o seu segundo fator e configure de novo.</p>
+      {% else %}
+      <div class="alert-info">{% icon "shield-check" %}<p>Não é obrigatório, mas recomendamos para todos: com ele, uma senha vazada não basta para entrar na sua conta.</p></div>
+      <a href="{% url 'accounts:2fa_configurar' %}" class="btn-primary w-full sm:w-auto">Ativar o segundo fator</a>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Solicitações de acesso · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Usuários e acessos</h1>
+      {% info "solicitacoes" %}
+    </div>
+  </div>
+</header>
+
+{% include "accounts/_abas.html" %}
+
+<nav class="seg mb-5" aria-label="Situação do pedido">
+  {% for valor, rotulo in situacoes %}<a href="?situacao={{ valor }}" {% if situacao == valor %}aria-current="page"{% endif %}>{{ rotulo }}</a>{% endfor %}
+</nav>
+
+{% if pagina.object_list %}
+<div class="space-y-3">
+  {% for s in pagina.object_list %}
+  <article class="card" aria-labelledby="sol-{{ s.pk }}">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
+        <h2 id="sol-{{ s.pk }}" class="text-base font-semibold text-gray-900">{{ s.full_name }}</h2>
+        <p class="mt-0.5 break-all text-sm text-gray-600">{{ s.email }}{% if s.phone %} · {{ s.phone }}{% endif %}</p>
+        <p class="mt-0.5 text-xs text-gray-500">Pedido em {{ s.created_at|date:"d/m/Y H:i" }}</p>
+      </div>
+      <div class="shrink-0">
+        {% if s.status == "PENDENTE" %}<span class="badge-pendencia">Pendente</span>
+        {% elif s.status == "APROVADA" %}<span class="badge-confirmada">Aprovada</span>
+        {% else %}<span class="badge-excluida">Recusada</span>{% endif %}
+      </div>
+    </div>
+    <p class="mt-3 whitespace-pre-line break-words rounded-md bg-gray-50 p-3 text-sm text-gray-800">{{ s.message }}</p>
+    {% if s.status == "PENDENTE" %}
+    <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+      <a href="{% url 'accounts:solicitacao_recusar' s.pk %}" class="btn-danger-outline btn-sm">{% icon "x" "icon-sm" %} Recusar</a>
+      <a href="{% url 'accounts:solicitacao_aprovar' s.pk %}" class="btn-primary btn-sm">{% icon "check" "icon-sm" %} Aprovar…</a>
+    </div>
+    {% else %}
+    <p class="mt-3 text-sm text-gray-600">
+      {% if s.status == "APROVADA" %}Aprovada{% else %}Recusada{% endif %} por {{ s.decided_by|default:"—" }} em {{ s.decided_at|date:"d/m/Y H:i" }}.
+      {% if s.status == "APROVADA" and s.user %}Conta: <a class="link font-medium" href="{% url 'accounts:usuario_detalhe' s.user.pk %}">{{ s.user.username }}</a>.{% endif %}
+      {% if s.decision_reason %}Motivo: {{ s.decision_reason }}{% endif %}
+    </p>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% include "partials/_pagination.html" with page_obj=pagina %}
+{% else %}
+<div class="table-wrap">
+  {% if situacao == "PENDENTE" %}
+  {% include "partials/_empty.html" with icone="circle-check" titulo="Nenhuma solicitação pendente" texto="Quando alguém pedir acesso pela tela de entrada, o pedido aparece aqui e chega no e-mail dos administradores." %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="users" titulo="Nenhuma solicitação nesta situação" %}
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

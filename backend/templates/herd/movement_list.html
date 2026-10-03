@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Movimentações · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Movimentações</h1>
+      {% info "movimento" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'herd:lancar_movimento' %}" class="btn-primary">{% icon "plus" %} Lançar movimentação</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if movimentos %}
+  <table class="table table-stack">
+    <thead>
+      <tr>
+        <th scope="col">Registro</th><th scope="col">Data</th><th scope="col">Tipo</th>
+        <th scope="col" class="num">Cabeças</th><th scope="col">Fazenda</th><th scope="col">Situação</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for movimento in movimentos %}
+      <tr class="is-link">
+        <td class="cell-title">
+          <a href="{% url 'herd:movimento_detalhe' movimento.pk %}" class="row-link code">{{ movimento.code }}</a>
+        </td>
+        <td data-label="Data" class="nowrap">{{ movimento.date|date:"d/m/Y" }}</td>
+        <td data-label="Tipo">{{ movimento.get_type_display }}</td>
+        <td data-label="Cabeças" class="num">{{ movimento.quantity }}</td>
+        <td data-label="Fazenda">
+          {% if movimento.origin_farm and movimento.destination_farm %}{{ movimento.origin_farm.name }} → {{ movimento.destination_farm.name }}
+          {% elif movimento.origin_farm %}<span class="muted">de</span> {{ movimento.origin_farm.name }}
+          {% elif movimento.destination_farm %}<span class="muted">para</span> {{ movimento.destination_farm.name }}
+          {% else %}—{% endif %}
+        </td>
+        <td data-label="Situação" class="cell-status">
+          <span class="inline-flex flex-wrap items-center justify-end gap-1.5">
+            {% status_badge movimento.status %}
+            {% if movimento.version > 1 %}<span class="badge-editada">Editada (v{{ movimento.version }})</span>{% endif %}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% url 'herd:lancar_movimento' as url_nova %}
+  {% include "partials/_empty.html" with icone="arrow-left-right" titulo="Nenhuma movimentação lançada" texto="Compras, abates, mortes e transferências aparecem aqui assim que forem lançados." url=url_nova acao="Lançar movimentação" %}
+  {% endif %}
+</div>
+{% endblock %}

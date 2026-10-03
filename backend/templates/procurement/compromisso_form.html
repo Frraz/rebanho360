@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if compromisso %}Corrigir {{ compromisso.code }}{% else %}Novo compromisso{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% if compromisso %}{% url 'procurement:compromisso_detalhe' compromisso.pk %}{% else %}{% url 'procurement:compromisso_lista' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if compromisso %}{{ compromisso.code }}{% else %}Compromissos{% endif %}</a>
+    <h1 class="page-title">{% if compromisso %}Corrigir compromisso{% else %}Novo compromisso{% endif %}</h1>
+    <p class="page-subtitle">{% if compromisso %}Corrigir desfaz e reaplica o que depende, com o motivo registrado.{% else %}Aprovar libera viagem, recebimento e acerto. Nada vira compra até o acerto ser aprovado.{% endif %}</p>
+  </div>
+</header>
+
+<form method="post" class="card max-w-4xl pb-24 md:pb-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert-danger mb-5" role="alert">{% icon "circle-x" %}<div>{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div></div>{% endif %}
+
+  <section class="form-section">
+    <header>
+      <h2 class="text-sm font-semibold text-gray-900">Partes</h2>
+      <p class="mt-1 text-sm text-gray-500">Quem vende, onde os animais entram e quem negociou.</p>
+    </header>
+    <div class="fields">
+      {% include "partials/_field.html" with field=form.date %}
+      {% include "partials/_field.html" with field=form.seller %}
+      {% include "partials/_field.html" with field=form.destination_farm %}
+      {% include "partials/_field.html" with field=form.commissioned %}
+      {% include "partials/_field.html" with field=form.second_buyer %}
+      {% include "partials/_field.html" with field=form.origin_property %}
+      {% include "partials/_field.html" with field=form.origin_city %}
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header>
+      <h2 class="text-sm font-semibold text-gray-900">Programação</h2>
+      <p class="mt-1 text-sm text-gray-500">Datas previstas, caminhões e distância. Tudo opcional.</p>
+    </header>
+    <div class="fields">
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.pickup_date %}
+        {% include "partials/_field.html" with field=form.slaughter_date %}
+        {% include "partials/_field.html" with field=form.trucks %}
+        {% include "partials/_field.html" with field=form.distance_km %}
+      </div>
+      {% include "partials/_field.html" with field=form.payment_days %}
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header>
+      <h2 class="text-sm font-semibold text-gray-900">Itens</h2>
+      <p class="mt-1 text-sm text-gray-500">Cada item vira uma compra quando o acerto for aprovado.</p>
+    </header>
+    <div class="fields">
+      {% include "procurement/_linhas.html" with rotulo="Item" %}
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Complemento</h2></header>
+    <div class="fields">
+      {% include "partials/_field.html" with field=form.notes %}
+    </div>
+  </section>
+
+  {% if form.edit_reason and compromisso and compromisso.status == "CONFIRMADA" %}
+  <section class="form-section">
+    <header>
+      <h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2>
+      <p class="mt-1 text-sm text-gray-500">Obrigatório em compromisso aprovado. Fica na auditoria.</p>
+    </header>
+    <div class="fields">{% include "partials/_field.html" with field=form.edit_reason %}</div>
+  </section>
+  {% endif %}
+
+  <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+    {% if compromisso %}
+    <button type="submit" class="btn-primary">Salvar correção</button>
+    {% else %}
+    <button type="submit" name="acao" value="rascunho" class="btn-secondary">Salvar em negociação</button>
+    <button type="submit" name="acao" value="aprovar" class="btn-primary">Aprovar compromisso</button>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

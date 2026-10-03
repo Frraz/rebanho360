@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Unidades · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Unidades</h1>
+      {% info "unidade" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'organizations:unidade_nova' %}" class="btn-primary">{% icon "plus" %} Nova unidade</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if unidades %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Unidade</th><th scope="col">Código</th><th scope="col">Empresa</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for unidade in unidades %}
+      <tr>
+        <td class="cell-title font-medium">{{ unidade.name }}</td>
+        <td data-label="Código"><span class="code">{{ unidade.code }}</span></td>
+        <td data-label="Empresa" class="muted">{{ unidade.company }}</td>
+        <td class="cell-actions num"><a href="{% url 'organizations:unidade_editar' unidade.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'organizations:unidade_nova' as url_nova %}
+  {% include "partials/_empty.html" with icone="package" titulo="Nenhuma unidade cadastrada" texto="Cadastre uma unidade de negócio." url=url_nova acao="Nova unidade" %}
+  {% endif %}
+</div>
+{% endblock %}

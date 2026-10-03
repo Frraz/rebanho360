@@ -1,0 +1,14 @@
+{% load core_tags %}
+{# Fragmento: o próprio HTMX o troca a cada 2 s enquanto o PDF é gerado. #}
+<div id="estado-documento"
+     {% if documento.status == "PENDENTE" %}hx-get="{% url 'documents:detalhe' documento.document_id %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}
+     aria-live="polite">
+  {% if documento.status == "PENDENTE" %}
+  <p class="flex items-center gap-3 text-sm"><span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" aria-hidden="true"></span> Gerando o PDF… Pode continuar usando o sistema; esta tela atualiza sozinha.</p>
+  {% elif documento.status == "PRONTO" %}
+  <p class="mb-4 flex items-center gap-2 text-sm text-sage-800">{% icon "circle-check" "text-sage-600" %} PDF pronto.</p>
+  <a href="{% url 'documents:baixar' documento.document_id %}" class="btn-primary">{% icon "download" %} Baixar PDF</a>
+  {% else %}
+  <p class="flex items-start gap-2 text-sm text-red-800" role="alert">{% icon "circle-x" "mt-0.5 text-red-600" %} <span>{{ documento.error }}</span></p>
+  {% endif %}
+</div>

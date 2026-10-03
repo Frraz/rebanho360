@@ -1,0 +1,21 @@
+{% load core_tags %}
+<div id="resultado-parceiros" class="table-wrap" aria-live="polite">
+  {% if parceiros %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Parceiro</th><th scope="col">Documento</th><th scope="col">Cidade</th></tr>
+    </thead>
+    <tbody>
+      {% for parceiro in parceiros %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'partners:detalhe' parceiro.pk %}" class="row-link">{{ parceiro.name }}</a></td>
+        <td data-label="Documento" class="muted nowrap">{% if parceiro.document %}{{ parceiro.document }}{% else %}sem documento{% endif %}</td>
+        <td data-label="Cidade" class="muted">{% if parceiro.city %}{{ parceiro.city }}{% if parceiro.state %}-{{ parceiro.state }}{% endif %}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% include "partials/_empty.html" with icone="users" titulo="Nenhum parceiro encontrado" texto="Tente outro nome, documento ou cidade." %}
+  {% endif %}
+</div>

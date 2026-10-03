@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load core_tags procurement_tags %}
+{% block title %}Compromissos · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Compromissos{% if season %}<span class="text-lg font-normal text-gray-500">safra {{ season.name }}</span>{% endif %}</h1>
+      {% info "compromisso" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if pode_lancar %}<a href="{% url 'procurement:compromisso_novo' %}" class="btn-primary">{% icon "plus" %} Novo compromisso</a>{% endif %}
+  </div>
+</header>
+
+<form method="get" class="mb-4 flex items-center gap-3">
+  <label class="text-sm font-medium text-gray-700" for="situacao">Situação</label>
+  <select id="situacao" name="situacao" class="field-input !w-auto" onchange="this.form.submit()">
+    <option value="" {% if not situacao %}selected{% endif %}>Todos</option>
+    <option value="RASCUNHO" {% if situacao == "RASCUNHO" %}selected{% endif %}>Em negociação</option>
+    <option value="CONFIRMADA" {% if situacao == "CONFIRMADA" %}selected{% endif %}>Aprovados</option>
+    <option value="EXCLUIDA" {% if situacao == "EXCLUIDA" %}selected{% endif %}>Excluídos</option>
+  </select>
+</form>
+
+<div class="table-wrap">
+  {% if linhas %}
+  <table class="table table-stack">
+    <thead>
+      <tr>
+        <th scope="col">Registro</th><th scope="col">Data</th><th scope="col">Produtor</th>
+        <th scope="col">Destino</th><th scope="col">Retirada</th><th scope="col">Etapa</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for linha in linhas %}
+      {% with c=linha.compromisso %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'procurement:compromisso_detalhe' c.pk %}" class="row-link code">{{ c.code }}</a></td>
+        <td data-label="Data" class="nowrap">{{ c.date|date:"d/m/Y" }}</td>
+        <td data-label="Produtor">{{ c.seller.name }}</td>
+        <td data-label="Destino">{{ c.destination_farm.name }}</td>
+        <td data-label="Retirada" class="nowrap muted cell-hide-mobile">{% if c.pickup_date %}{{ c.pickup_date|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td data-label="Etapa" class="cell-status">{% etapa_selo linha.etapa %}</td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% url 'procurement:compromisso_novo' as url_nova %}
+  {% if pode_lancar %}
+  {% include "partials/_empty.html" with icone="file-text" titulo="Nenhum compromisso encontrado" texto="Ajuste a situação acima ou registre o primeiro compromisso de compra." url=url_nova acao="Novo compromisso" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="file-text" titulo="Nenhum compromisso encontrado" texto="Ajuste a situação acima." %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

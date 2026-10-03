@@ -1,0 +1,8 @@
+{% load core_tags %}
+{# Estado vazio: o que falta + o próximo passo. Parâmetros: icone, titulo, texto, url, acao. #}
+<div class="empty">
+  {% icon icone|default:"file-text" %}
+  <p class="empty-title">{{ titulo }}</p>
+  {% if texto %}<p class="empty-text">{{ texto }}</p>{% endif %}
+  {% if url %}<a href="{{ url }}" class="btn-secondary btn-sm mt-4">{{ acao }}</a>{% endif %}
+</div>

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load core_tags finance_tags %}
+{% block title %}{{ pagamento.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Título {{ titulo.code }}</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ pagamento.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">{% baixa_selo pagamento %}</span>
+    </h1>
+  </div>
+</header>
+
+{% if pagamento.status == "EXCLUIDA" %}
+<div class="alert-warning mb-3" role="status">{% icon "triangle-alert" %}<p>Desfeita por {{ pagamento.deleted_by }}{% if pagamento.delete_reason %}: "{{ pagamento.delete_reason }}"{% endif %}. O sistema não desfaz a transferência no banco — o extrato é a conferência.</p></div>
+{% endif %}
+
+<section class="card" aria-label="Dados da baixa">
+  <dl class="facts">
+    <div><dt>Valor</dt><dd>{{ pagamento.amount|brl }}</dd></div>
+    <div><dt>Data</dt><dd>{{ pagamento.date|date:"d/m/Y" }}</dd></div>
+    <div><dt>Forma</dt><dd>{{ pagamento.get_method_display }}</dd></div>
+    <div><dt>Documento</dt><dd>{{ pagamento.document }}</dd></div>
+    <div><dt>Título</dt><dd><a class="link code" href="{% url 'finance:titulo_detalhe' titulo.pk %}">{{ titulo.code }}</a> <span class="text-gray-500">· {{ titulo.amount|brl }}</span></dd></div>
+    <div><dt>{{ titulo.favorecido_rotulo }}</dt><dd>{{ titulo.payee.name|default:"—" }}</dd></div>
+    <div><dt>Registrado por</dt><dd>{{ pagamento.created_by }} <span class="text-gray-500">· {{ pagamento.created_at|date:"d/m/Y H:i" }}</span></dd></div>
+    {% if pagamento.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ pagamento.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+{% if pode_desfazer or pode_restaurar %}
+<div class="mt-8 border-t border-gray-200 pt-6">
+  {% if pode_desfazer %}
+  <p class="mb-3 max-w-2xl text-sm text-gray-600">Desfazer a baixa devolve o saldo ao título, mas <strong>não desfaz a transferência no banco</strong>. Enquanto ela existir, não é possível excluir nem corrigir a compra ou a venda de origem.</p>
+  <a href="{% url 'finance:pagamento_desfazer' pagamento.pk %}" class="btn-danger-outline">{% icon "rotate-ccw" %} Desfazer baixa</a>
+  {% endif %}
+  {% if pode_restaurar %}
+  <form method="post" action="{% url 'finance:pagamento_restaurar' pagamento.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar baixa</button></form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

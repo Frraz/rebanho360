@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Safras · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Safras</h1>
+      {% info "safra" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'organizations:safra_nova' %}" class="btn-primary">{% icon "plus" %} Nova safra</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if safras %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Safra</th><th scope="col">Período</th><th scope="col">Empresa</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+    </thead>
+    <tbody>
+      {% for safra in safras %}
+      <tr>
+        <td class="cell-title font-medium">{{ safra.name }}</td>
+        <td data-label="Período" class="nowrap">{{ safra.start_date|date:"d/m/Y" }} a {{ safra.end_date|date:"d/m/Y" }}</td>
+        <td data-label="Empresa" class="muted">{{ safra.company }}</td>
+        <td data-label="Situação" class="cell-status">
+          <span class="inline-flex flex-wrap items-center justify-end gap-1.5">
+            {% if safra.is_current %}<span class="badge-confirmada">Corrente</span>{% endif %}
+            {% if safra.status == "ENCERRADA" %}<span class="badge-excluida">Encerrada</span>{% else %}<span class="badge-rascunho">Aberta</span>{% endif %}
+          </span>
+        </td>
+        <td class="cell-actions num">
+          <div class="inline-flex flex-wrap items-center justify-end gap-1.5">
+            <a href="{% url 'organizations:safra_editar' safra.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a>
+            {% if not safra.is_current %}
+            <form method="post" action="{% url 'organizations:safra_tornar_corrente' safra.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-secondary btn-sm">Tornar corrente</button>
+            </form>
+            {% endif %}
+            {% if safra.status == "ABERTA" %}
+            <form method="post" action="{% url 'organizations:safra_encerrar' safra.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-secondary btn-sm">Encerrar</button>
+            </form>
+            {% elif pode_reabrir %}
+            <form method="post" action="{% url 'organizations:safra_reabrir' safra.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-secondary btn-sm">Reabrir</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'organizations:safra_nova' as url_nova %}
+  {% include "partials/_empty.html" with icone="calendar" titulo="Nenhuma safra cadastrada" texto="Sem safra, compras e vendas não têm período de apuração." url=url_nova acao="Nova safra" %}
+  {% endif %}
+</div>
+{% endblock %}

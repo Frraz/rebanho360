@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if object %}Editar parceiro{% else %}Novo parceiro{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+{% url 'partners:lista' as voltar %}
+{% if object %}{% include "partials/_form_page.html" with titulo="Editar parceiro" voltar=voltar voltar_rotulo="Parceiros" %}{% else %}{% include "partials/_form_page.html" with titulo="Novo parceiro" voltar=voltar voltar_rotulo="Parceiros" %}{% endif %}
+{% endblock %}

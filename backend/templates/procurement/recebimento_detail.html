@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load core_tags procurement_tags %}
+{% block title %}{{ recebimento.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'procurement:viagem_detalhe' viagem.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ viagem.code }}</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ recebimento.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% status_badge recebimento.status %}
+        {% if recebimento.version > 1 %}<span class="badge-editada">Editado (v{{ recebimento.version }})</span>{% endif %}
+        {% if quebra.acima_do_limite %}<span class="badge-erro">Quebra acima do limite</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if pode_editar %}<a href="{% url 'procurement:recebimento_editar' recebimento.pk %}" class="btn-secondary">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}
+  </div>
+</header>
+
+{% if recebimento.status == "EXCLUIDA" %}
+<div class="alert-warning mb-6" role="status">{% icon "triangle-alert" %}<p>Excluído por {{ recebimento.deleted_by }}{% if recebimento.delete_reason %}: "{{ recebimento.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+
+<section class="card" aria-label="Dados do recebimento">
+  <dl class="facts">
+    <div><dt>Data</dt><dd>{{ recebimento.date|date:"d/m/Y" }}</dd></div>
+    <div><dt>Viagem</dt><dd><a class="link code" href="{% url 'procurement:viagem_detalhe' viagem.pk %}">{{ viagem.code }}</a></dd></div>
+    <div><dt>Compromisso</dt><dd><a class="link code" href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}">{{ compromisso.code }}</a></dd></div>
+    <div><dt>Cabeças recebidas</dt><dd>{{ cabecas }}</dd></div>
+    {% if recebimento.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Ocorrências</dt><dd>{{ recebimento.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-linhas">
+    <h2 id="titulo-linhas" class="card-title mb-3">O que chegou</h2>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th scope="col">Item</th><th scope="col" class="num">Embarcadas</th><th scope="col" class="num">Recebidas</th><th scope="col" class="num">Diferença</th><th scope="col" class="num">Peso</th></tr></thead>
+        <tbody>
+          {% for l in linhas %}
+          <tr>
+            <td class="cell-title font-medium">{{ l.linha.load.item.number }} · {{ l.linha.load.item.category.name }}{% if l.linha.received_category %}<span class="block text-xs font-normal text-amber-800">chegou como {{ l.linha.received_category.name }}</span>{% endif %}{% if l.linha.occurrence %}<span class="block text-xs font-normal text-gray-500">{{ l.linha.occurrence }}</span>{% endif %}</td>
+            <td data-label="Embarcadas" class="num">{{ l.linha.load.shipped_qty|default_if_none:"—" }}</td>
+            <td data-label="Recebidas" class="num">{{ l.linha.received_qty }}</td>
+            <td data-label="Diferença" class="num">{% if l.diferenca is None %}—{% elif l.diferenca == 0 %}0{% else %}{{ l.diferenca }}{% endif %}</td>
+            <td data-label="Peso" class="num nowrap">{% if l.linha.received_weight_kg %}{{ l.linha.received_weight_kg|numero:0 }} kg{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="titulo-quebra">
+    <h2 id="titulo-quebra" class="card-title mb-2">Quebra de viagem</h2>
+    {% if quebra %}
+    <div class="rows">
+      <div><span>Peso de origem</span> <span>{{ quebra.peso_origem_kg|numero:0 }} kg</span></div>
+      <div><span>Peso recebido</span> <span>{{ quebra.peso_recebido_kg|numero:0 }} kg</span></div>
+      <div><span>Quebra</span> <span>{{ quebra.quebra_kg|numero:0 }} kg</span></div>
+      <div class="total"><span>Percentual</span> <span>{{ quebra.quebra_percentual|quebra_percentual }}</span></div>
+    </div>
+    {% if quebra.acima_do_limite %}<p class="alert-warning mt-3">{% icon "triangle-alert" %} Acima do limite de alerta. Confira o peso na origem e na chegada.</p>{% endif %}
+    {% if quebra.parcial %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Só as cargas com peso de origem e peso recebido entram na conta.</p>{% endif %}
+    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} A quebra só mede: não desconta nada do valor dos animais (pendência #23).</p>
+    {% else %}
+    <p class="text-sm text-gray-600">— Falta o peso de origem ou o peso recebido para calcular a quebra.</p>
+    {% endif %}
+  </section>
+</div>
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'procurement:recebimento_excluir' recebimento.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir recebimento</a>{% endif %}
+  {% if pode_restaurar %}<form method="post" action="{% url 'procurement:recebimento_restaurar' recebimento.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar recebimento</button></form>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

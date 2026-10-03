@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Tributos e taxas · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Tributos, taxas e descontos</h1>
+      {% info "tributo" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if pode_gerenciar %}<a href="{% url 'commercial:tributo_novo' %}" class="btn-primary">{% icon "plus" %} Novo tipo</a>{% endif %}
+  </div>
+</header>
+
+<div class="alert-info mb-4" role="note">
+  {% icon "info" %}
+  <div>As naturezas abaixo são <strong>provisórias</strong>: quem arca com cada tributo ainda não foi confirmado com o contador (pendência #21).</div>
+</div>
+
+<div class="table-wrap">
+  {% if tipos %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Tipo</th><th scope="col">Natureza</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for tipo in tipos %}
+      <tr>
+        <td class="cell-title font-medium">{{ tipo.name }}</td>
+        <td data-label="Natureza">{{ tipo.get_nature_display }}</td>
+        <td data-label="Situação" class="cell-status">{% if tipo.is_active %}<span class="badge-confirmada">Ativo</span>{% else %}<span class="badge-excluida">Inativo</span>{% endif %}</td>
+        <td class="cell-actions num">{% if pode_gerenciar %}<a href="{% url 'commercial:tributo_editar' tipo.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'commercial:tributo_novo' as url_nova %}
+  {% if pode_gerenciar %}
+  {% include "partials/_empty.html" with icone="receipt" titulo="Nenhum tipo cadastrado" texto="Cadastre os tributos e taxas que aparecem no acerto." url=url_nova acao="Novo tipo" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="receipt" titulo="Nenhum tipo cadastrado" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

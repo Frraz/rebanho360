@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ movimento.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'herd:movimento_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Movimentações</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ movimento.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% status_badge movimento.status %}
+        {% if movimento.version > 1 %}<span class="badge-editada">Editada (v{{ movimento.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if movimento.status == "CONFIRMADA" and pode_editar and not movimento.origin_purchase_id and not movimento.origin_sale_id %}
+    <a href="{% url 'herd:movimento_editar' movimento.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>
+    {% endif %}
+  </div>
+</header>
+
+{% if movimento.origin_sale_id %}
+<div class="alert-info mb-4">
+  {% icon "info" %}
+  <p>Esta movimentação pertence à venda <strong>{{ movimento.origin_sale.code }}</strong>. Para corrigir ou excluir, vá até a venda — a movimentação acompanha.
+    <a class="link whitespace-nowrap" href="{% url 'sales:detalhe' movimento.origin_sale_id %}">Abrir a venda</a></p>
+</div>
+{% endif %}
+{% if movimento.origin_purchase_id %}
+<div class="alert-info mb-4">
+  {% icon "info" %}
+  <p>Esta movimentação foi gerada pela compra <strong>{{ movimento.origin_purchase.code }}</strong>. Para corrigir ou excluir, vá até a compra — a movimentação acompanha.
+    <a class="link whitespace-nowrap" href="{% url 'purchases:detalhe' movimento.origin_purchase_id %}">Abrir a compra</a></p>
+</div>
+{% endif %}
+{% if movimento.status == "EXCLUIDA" %}
+<div class="alert-warning mb-4" role="status">{% icon "triangle-alert" %}<p>Excluída por {{ movimento.deleted_by }}{% if movimento.delete_reason %}: "{{ movimento.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+
+<section class="card" aria-label="Dados da movimentação">
+  <dl class="facts">
+    <div><dt>Tipo</dt><dd>{{ movimento.get_type_display }}</dd></div>
+    <div><dt>Data</dt><dd>{{ movimento.date|date:"d/m/Y" }}</dd></div>
+    <div><dt>Quantidade</dt><dd>{{ movimento.quantity }} cabeças</dd></div>
+    {% if movimento.total_weight_kg %}<div><dt>Peso total</dt><dd>{{ movimento.total_weight_kg }} kg</dd></div>{% endif %}
+    {% if movimento.origin_farm %}<div class="col-span-2"><dt>Origem</dt><dd>{{ movimento.origin_farm.name }} <span class="text-gray-500">· {{ movimento.origin_lot }} · {{ movimento.origin_category }}</span></dd></div>{% endif %}
+    {% if movimento.destination_farm %}<div class="col-span-2"><dt>Destino</dt><dd>{{ movimento.destination_farm.name }} <span class="text-gray-500">· {{ movimento.destination_lot }} · {{ movimento.destination_category }}</span></dd></div>{% endif %}
+    {% if movimento.reason %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Motivo</dt><dd>"{{ movimento.reason }}"</dd></div>{% endif %}
+  </dl>
+</section>
+
+<section class="mt-8" aria-labelledby="titulo-razao">
+  <h2 id="titulo-razao" class="section-title">Linhas do razão geradas</h2>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead>
+        <tr><th scope="col">Data</th><th scope="col">Fazenda</th><th scope="col">Lote</th><th scope="col">Categoria</th><th scope="col" class="num">Qtd.</th></tr>
+      </thead>
+      <tbody>
+        {% for linha in linhas %}
+        <tr class="{% if linha.reverses_entry_id or linha.reversed_by.exists %}text-gray-400{% endif %}">
+          <td data-label="Data" class="nowrap">{{ linha.date|date:"d/m/Y" }}</td>
+          <td data-label="Fazenda">{{ linha.farm.name }}</td>
+          <td data-label="Lote"><span class="code">{{ linha.lot.code }}</span></td>
+          <td data-label="Categoria">{{ linha.category.name }}</td>
+          <td data-label="Qtd." class="num font-medium">{{ linha.quantity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if movimento.origin_purchase_id or movimento.origin_sale_id %}
+{% elif movimento.status == "CONFIRMADA" and pode_excluir %}
+<div class="mt-8 border-t border-gray-200 pt-6" x-data="{ aberto: false }">
+  <button type="button" class="btn-danger-outline" @click="aberto = !aberto" :aria-expanded="aberto">{% icon "trash-2" %} Excluir movimentação</button>
+  <div x-show="aberto" x-cloak class="card mt-4 max-w-2xl space-y-3">
+    <p class="text-sm text-gray-600">
+      Isto vai desfazer {{ linhas|length }} linha{{ linhas|length|pluralize }} do razão,
+      escrevendo a compensação na data do fato original.
+    </p>
+    <form method="post" action="{% url 'herd:movimento_excluir' movimento.pk %}">
+      {% csrf_token %}
+      <label class="field-label" for="motivo-exclusao">Motivo<span class="text-red-600" aria-hidden="true"> *</span></label>
+      <textarea id="motivo-exclusao" name="motivo" class="field-input" rows="2" required></textarea>
+      <button type="submit" class="btn-danger mt-3">Confirmar exclusão</button>
+    </form>
+  </div>
+</div>
+{% elif movimento.status == "EXCLUIDA" and pode_excluir %}
+<form method="post" action="{% url 'herd:movimento_restaurar' movimento.pk %}" class="mt-8 border-t border-gray-200 pt-6">
+  {% csrf_token %}
+  <button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar</button>
+</form>
+{% endif %}
+{% endblock %}

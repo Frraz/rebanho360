@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Linha do tempo · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'audit:console' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Auditoria</a>
+    <h1 class="page-title">{{ entity_type }} <span class="code !text-xl">#{{ entity_id }}</span></h1>
+    <p class="page-subtitle">Tudo o que aconteceu com este registro, do mais antigo ao mais recente.</p>
+  </div>
+</header>
+
+<ol class="relative ml-2 max-w-2xl space-y-6 border-l border-gray-300">
+  {% for e in events %}
+  <li class="ml-6">
+    <span class="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-600" aria-hidden="true"></span>
+    <p class="text-xs font-medium uppercase tracking-wider text-gray-500">{{ e.timestamp|date:"d/m/Y H:i" }}</p>
+    <p class="mt-0.5 font-medium">{{ e.actor|default:"Sistema" }} <span class="font-normal text-gray-600">{{ e.get_action_display|lower }}</span></p>
+    {% if e.reason %}<p class="mt-0.5 text-sm text-gray-600">Motivo: "{{ e.reason }}"</p>{% endif %}
+  </li>
+  {% empty %}
+  <li class="ml-6 text-gray-500">Nenhum evento para este registro.</li>
+  {% endfor %}
+</ol>
+{% endblock %}

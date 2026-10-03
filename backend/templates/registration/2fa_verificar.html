@@ -1,0 +1,27 @@
+{% extends "registration/_auth.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Segundo fator · Rebanho360{% endblock %}
+{% block auth_body %}
+<h1 class="text-2xl font-semibold tracking-tight">Confirme que é você</h1>
+<p class="mt-1 text-sm text-gray-500">Digite o código de 6 dígitos que o aplicativo autenticador mostra agora. Perdeu o celular? Use um dos códigos de recuperação.</p>
+
+{% if erro %}
+<div class="alert-danger mt-6" role="alert">{% icon "circle-x" %}<p>{{ erro }}</p></div>
+{% endif %}
+
+<form method="post" class="mt-6 space-y-4">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <div>
+    <label class="field-label" for="codigo">Código</label>
+    <input type="text" id="codigo" name="codigo" class="field-input text-lg tracking-widest" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" autofocus required aria-describedby="ajuda-codigo">
+    <p class="field-help" id="ajuda-codigo">6 dígitos do aplicativo, ou um código de recuperação (ex.: ABCDE-FGHJK).</p>
+  </div>
+  <button type="submit" class="btn-primary w-full">{% icon "shield-check" %} Confirmar</button>
+</form>
+
+<form method="post" action="{% url 'accounts:logout' %}" class="mt-5 text-center">
+  {% csrf_token %}
+  <button type="submit" class="link text-sm">Sair</button>
+</form>
+{% endblock %}

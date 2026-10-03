@@ -1,0 +1,975 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design system do Rebanho360 — a descrição das decisões está em docs/ux/02-design-system.md.
+   Camadas: tokens (tailwind.config.js) → base → componentes (.btn, .card,
+   .table…) → padrões nas páginas. Compilar: bin/build_css.sh. */
+
+/* Fontes locais: sem CDN, sem pedido externo — o sistema abre rápido mesmo
+   com sinal ruim no curral. Só o subconjunto latino (cobre todo o pt-BR). */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-latin-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-latin-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-latin-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono-latin-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono-latin-500.woff2") format("woff2");
+}
+
+/* Alpine.js não é plugin do Tailwind: sem esta regra, [x-cloak] não
+   esconde nada antes do Alpine inicializar, e o elemento pisca visível
+   (achado ao construir a F1-11 — o mesmo valia, sem teste, para o menu
+   mobile da F0-12). */
+[x-cloak] {
+  display: none !important;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 5rem;
+    /* Deixa o navegador animar altura de/para `auto` (menu lateral). Sem suporte, ignora. */
+    interpolate-size: allow-keywords;
+  }
+  /* Barra de rolagem fina e discreta em todo o sistema (página, tabelas,
+     painéis): trilho invisível, só o polegar, que escurece ao passar o mouse.
+     Sobre fundo escuro (menu lateral) a variante é clara e translúcida. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.gray.300") transparent;
+  }
+  *:hover {
+    scrollbar-color: theme("colors.gray.400") transparent;
+  }
+  .on-dark,
+  .on-dark * {
+    scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  }
+  .on-dark:hover,
+  .on-dark *:hover {
+    scrollbar-color: rgb(255 255 255 / 0.30) transparent;
+  }
+  /* Navegadores que ainda usam a API antiga (Safari). */
+  @supports not (scrollbar-width: thin) {
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 9999px;
+      background-clip: content-box;
+      background-color: theme("colors.gray.300");
+    }
+    .on-dark ::-webkit-scrollbar-thumb {
+      background-color: rgb(255 255 255 / 0.18);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: theme("colors.gray.400");
+    }
+  }
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-gray-900;
+    letter-spacing: -0.011em;
+  }
+  a {
+    @apply transition-colors;
+  }
+  /* Foco visível e consistente em tudo que é interativo (teclado). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
+  }
+  .on-dark :focus-visible {
+    @apply ring-offset-brand-950;
+  }
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
+  hr {
+    @apply border-gray-200;
+  }
+  /* O csrf_token (input hidden) é o primeiro filho do form e fazia o
+     `space-y-*` empurrar o primeiro campo visível para baixo. */
+  form > input[type="hidden"]:first-child + :not(input[type="hidden"]),
+  form > input[type="hidden"]:first-child + input[type="hidden"] + :not(input[type="hidden"]),
+  form > input[type="hidden"]:first-child + input[type="hidden"] + input[type="hidden"] + :not(input[type="hidden"]) {
+    margin-top: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* ---------- Ícones (sprite em static/img/icons.svg) ---------- */
+  .icon {
+    @apply inline-block shrink-0 align-[-0.15em];
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+  .icon-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+  .icon-lg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  /* ---------- Botões ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 min-h-touch px-4 py-2 rounded-md font-medium text-sm
+      leading-5 whitespace-nowrap select-none transition-colors duration-150 border border-transparent
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  @media (min-width: 768px) {
+    .btn {
+      min-height: 2.5rem;
+    }
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white border-brand-700 hover:bg-brand-700 active:bg-brand-800;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-gray-800 border-gray-300 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100;
+  }
+  .btn-ghost {
+    @apply btn text-gray-700 hover:bg-gray-100 active:bg-gray-200;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white border-red-700 hover:bg-red-700 active:bg-red-800;
+  }
+  .btn-danger-outline {
+    @apply btn bg-white text-red-700 border-red-200 hover:bg-red-50 hover:border-red-300;
+  }
+  .btn-sm {
+    @apply px-3 text-sm;
+    min-height: 2.25rem;
+  }
+  .btn-icon {
+    @apply inline-flex items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900
+      min-h-touch min-w-touch transition-colors;
+  }
+  @media (min-width: 768px) {
+    .btn-icon {
+      min-height: 2.25rem;
+      min-width: 2.25rem;
+    }
+  }
+
+  /* ---------- Formulários ---------- */
+  .field-label {
+    @apply block text-sm font-medium text-gray-800 mb-1.5;
+  }
+  .field-input {
+    @apply block w-full min-h-touch rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900
+      placeholder:text-gray-400 shadow-none transition-colors hover:border-gray-400
+      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus-visible:ring-offset-0
+      disabled:bg-gray-100 disabled:text-gray-500;
+    /* 16px no celular: abaixo disso o iOS dá zoom ao focar o campo. */
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+  @media (min-width: 768px) {
+    .field-input {
+      min-height: 2.5rem;
+      font-size: 0.9375rem;
+    }
+  }
+  select.field-input {
+    @apply appearance-none pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366727b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 1.125rem;
+  }
+  textarea.field-input {
+    @apply min-h-[5.5rem] resize-y;
+  }
+  .field-input[aria-invalid="true"],
+  .field-input.is-invalid {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500/25;
+  }
+  .field-help {
+    @apply mt-1.5 text-xs text-gray-500;
+  }
+  .field-error {
+    @apply mt-1.5 text-sm text-red-700 flex items-start gap-1.5;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply h-4 w-4 shrink-0 cursor-pointer border-gray-300 text-brand-600;
+    accent-color: theme("colors.brand.600");
+  }
+  input[type="file"].field-input {
+    @apply py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm
+      file:font-medium file:text-gray-700 hover:file:bg-gray-200;
+  }
+
+  /* Seção de formulário: título + descrição à esquerda, campos à direita
+     no desktop; empilhado no celular. */
+  .form-section {
+    @apply py-6 first-of-type:pt-0 border-t border-gray-200 first-of-type:border-0 grid gap-x-8 gap-y-4 lg:grid-cols-3;
+  }
+  .form-section > header {
+    @apply lg:col-span-1;
+  }
+  .form-section > .fields {
+    @apply lg:col-span-2 space-y-4;
+  }
+  /* Ação principal fixa no rodapé no celular (docs/ux: "ação principal fixa"). */
+  .form-actions {
+    @apply fixed inset-x-0 bottom-0 z-20 flex gap-2 justify-end border-t border-gray-200 bg-white/95 p-3
+      backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .form-actions > * {
+    @apply flex-1 md:flex-none;
+  }
+
+  /* ---------- Superfícies ---------- */
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 p-4 sm:p-5;
+  }
+  .card-flush {
+    @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
+  }
+  .card-title {
+    @apply text-sm font-semibold text-gray-900;
+  }
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-wider text-gray-500;
+  }
+  .section-title {
+    @apply text-base font-semibold text-gray-900 mb-3 mt-8 first:mt-0;
+  }
+
+  /* Cabeçalho de página: título + contexto à esquerda, ações à direita. */
+  .page-header {
+    @apply mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3;
+  }
+  .page-title {
+    @apply text-2xl font-semibold leading-tight tracking-tight text-gray-900 flex flex-wrap items-center gap-x-3 gap-y-1;
+  }
+  .page-subtitle {
+    @apply mt-1 text-sm text-gray-500;
+  }
+  .page-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .crumb {
+    @apply mb-2 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900;
+  }
+
+  /* Botão de informação ("i") ao lado do título: discreto em repouso, abre o
+     painel de ajuda da tela (partials/_info.html). O ::after amplia a área de
+     toque para 44 px sem aumentar o ícone nem empurrar o título. */
+  .page-title-row {
+    @apply flex items-center gap-1;
+  }
+  .info-btn {
+    @apply relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-500
+      transition-colors hover:bg-brand-50 hover:text-brand-700;
+  }
+  .info-btn::after {
+    content: "";
+    @apply absolute -inset-2.5;
+  }
+  .info-btn .icon {
+    @apply h-[1.125rem] w-[1.125rem];
+  }
+  /* Texto do painel de ajuda. */
+  .info-section-title {
+    @apply mb-2 mt-6 text-xs font-medium uppercase tracking-wider text-gray-500 first:mt-0;
+  }
+  .info-faq {
+    @apply border-t border-gray-100 first:border-t-0;
+  }
+  .info-faq > summary {
+    @apply flex min-h-touch cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-medium text-gray-900
+      md:min-h-0 md:py-2.5;
+  }
+  .info-faq > summary::-webkit-details-marker {
+    display: none;
+  }
+  .info-faq > summary .icon {
+    @apply shrink-0 text-gray-400 transition-transform;
+  }
+  .info-faq[open] > summary .icon {
+    @apply rotate-180;
+  }
+
+  /* ---------- Status ----------
+     Cor nunca sozinha: todo badge tem texto e um marcador de forma. */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium leading-5 whitespace-nowrap;
+  }
+  .badge::before {
+    content: "";
+    @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80;
+  }
+  .badge-rascunho {
+    @apply badge bg-gray-100 text-gray-700;
+  }
+  .badge-rascunho::before {
+    @apply rounded-none bg-transparent border border-current;
+  }
+  .badge-confirmada {
+    @apply badge bg-sage-100 text-sage-800;
+  }
+  .badge-excluida {
+    @apply badge bg-amber-100 text-amber-800 line-through;
+  }
+  .badge-excluida::before {
+    @apply rounded-none rotate-45;
+  }
+  .badge-editada {
+    @apply badge bg-brand-100 text-brand-800;
+  }
+  .badge-editada::before {
+    @apply rounded-sm;
+  }
+  .badge-pendencia {
+    @apply badge bg-amber-100 text-amber-900;
+  }
+  .badge-pendencia::before {
+    @apply rounded-none rotate-45;
+  }
+  .badge-erro {
+    @apply badge bg-red-100 text-red-800;
+  }
+  .badge-erro::before {
+    @apply rounded-none rotate-45;
+  }
+
+  /* ---------- Alertas ---------- */
+  .alert {
+    @apply flex items-start gap-3 rounded-lg border px-4 py-3 text-sm;
+  }
+  .alert > .icon {
+    @apply mt-0.5;
+  }
+  .alert-info {
+    @apply alert bg-brand-50 border-brand-200 text-brand-900;
+  }
+  .alert-success {
+    @apply alert bg-sage-50 border-sage-200 text-sage-900;
+  }
+  .alert-warning {
+    @apply alert bg-amber-50 border-amber-200 text-amber-900;
+  }
+  .alert-danger {
+    @apply alert bg-red-50 border-red-200 text-red-900;
+  }
+
+  /* ---------- Tabelas ----------
+     Desktop: tabela de verdade. Celular: cada linha vira um cartão
+     (docs/ux/01) — o rótulo da coluna vem de data-label. */
+  .table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .table thead th {
+    @apply whitespace-nowrap border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-medium uppercase
+      tracking-wider text-gray-500;
+  }
+  .table tbody td {
+    @apply border-b border-gray-100 px-4 py-3 align-middle text-gray-800;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table tbody tr {
+    @apply transition-colors;
+  }
+  .table tbody tr:hover {
+    @apply bg-gray-50;
+  }
+  .table tfoot td {
+    @apply border-t border-gray-300 bg-gray-50 px-4 py-2.5 font-semibold text-gray-900;
+  }
+  .table .num {
+    @apply text-right;
+    font-variant-numeric: tabular-nums;
+  }
+  .table .nowrap {
+    @apply whitespace-nowrap;
+  }
+  .table .muted {
+    @apply text-gray-500;
+  }
+  .table-wrap {
+    @apply card-flush;
+    overflow-x: auto;
+  }
+  /* Linha inteira clicável, mas só o link do título recebe foco/leitura. */
+  .table .row-link {
+    @apply font-medium text-gray-900 hover:text-brand-700 focus-visible:ring-offset-0;
+  }
+  .table .row-link::after {
+    content: "";
+    @apply absolute inset-0;
+  }
+  .table tbody tr.is-link {
+    @apply relative cursor-pointer;
+  }
+
+  @media (max-width: 767px) {
+    .table-stack thead {
+      @apply absolute h-px w-px overflow-hidden whitespace-nowrap;
+      clip: rect(0 0 0 0);
+    }
+    .table-stack,
+    .table-stack tbody,
+    .table-stack tfoot,
+    .table-stack td {
+      @apply block w-full;
+    }
+    /* Linha vira cartão: título e status na primeira linha, o resto
+       empilhado abaixo com o rótulo da coluna (data-label). */
+    .table-stack tr {
+      @apply flex w-full flex-wrap items-center border-b border-gray-200 px-4 py-3;
+    }
+    .table-stack tbody tr:last-child {
+      @apply border-b-0;
+    }
+    .table-stack tbody td,
+    .table-stack tfoot td {
+      @apply order-2 flex w-full items-baseline justify-between gap-4 border-0 bg-transparent px-0 py-1 text-right;
+    }
+    .table-stack tbody td::before,
+    .table-stack tfoot td::before {
+      content: attr(data-label);
+      @apply shrink-0 text-left text-xs text-gray-500;
+    }
+    .table-stack td:not([data-label])::before,
+    .table-stack td[data-label=""]::before {
+      display: none;
+    }
+    .table-stack td.cell-title {
+      @apply order-none flex-1 justify-start pb-2 text-left text-base;
+      flex-shrink: 0;
+      width: auto;
+    }
+    .table-stack td.cell-title::before {
+      display: none;
+    }
+    .table-stack td.cell-status {
+      @apply order-1 w-auto flex-none justify-end pb-2;
+    }
+    .table-stack td.cell-status::before {
+      display: none;
+    }
+    .table-stack td.cell-actions {
+      @apply justify-start pt-2;
+    }
+    .table-stack td.cell-actions::before {
+      display: none;
+    }
+    .table-stack td.cell-hide-mobile {
+      display: none;
+    }
+  }
+
+  /* ---------- Lista de definições (detalhe de registro) ---------- */
+  .dl {
+    @apply divide-y divide-gray-100 text-sm;
+  }
+  .dl > div {
+    @apply flex items-baseline justify-between gap-6 py-2;
+  }
+  .dl dt {
+    @apply text-gray-600;
+  }
+  .dl dd {
+    @apply text-right font-medium text-gray-900;
+    font-variant-numeric: tabular-nums;
+  }
+  .dl > div.total {
+    @apply border-t border-gray-300;
+  }
+  .dl > div.total dt {
+    @apply font-semibold text-gray-900;
+  }
+  .dl > div.total dd {
+    @apply font-semibold;
+  }
+  /* Mesma ideia do .dl, com <span> (linhas montadas à mão). */
+  .rows {
+    @apply divide-y divide-gray-100 text-sm;
+    font-variant-numeric: tabular-nums;
+  }
+  .rows > div {
+    @apply flex items-baseline justify-between gap-6 py-2;
+  }
+  .rows > div > span:first-child {
+    @apply text-gray-600;
+  }
+  .rows > div > span:last-child {
+    @apply text-right font-medium text-gray-900;
+  }
+  .rows > div.total {
+    @apply border-t border-gray-300 font-semibold;
+  }
+  .rows > div.total > span:first-child {
+    @apply font-semibold text-gray-900;
+  }
+  /* Pares campo/valor em grade (cabeçalho do registro). */
+  .facts {
+    @apply grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3 lg:grid-cols-4;
+  }
+  .facts dt {
+    @apply mb-0.5 text-xs font-medium uppercase tracking-wider text-gray-500;
+  }
+  .facts dd {
+    @apply text-gray-900;
+  }
+
+  /* ---------- Indicadores ---------- */
+  /* Faixa de indicadores. Cada célula desenha a própria borda direita e
+     inferior e a margem negativa empurra a última para fora do contêiner
+     (overflow hidden), então qualquer quantidade de itens fecha limpa. */
+  .stats {
+    @apply flex flex-wrap overflow-hidden rounded-lg border border-gray-200 bg-white;
+  }
+  .stat {
+    @apply flex flex-col border-b border-r border-gray-200 p-4 sm:p-5;
+    flex: 1 1 9.5rem;
+    margin: 0 -1px -1px 0;
+  }
+  .stat-label {
+    @apply text-xs font-medium uppercase tracking-wider text-gray-500;
+  }
+  .stat-value {
+    @apply mt-auto whitespace-nowrap pt-1.5 text-lg font-semibold leading-none tracking-tight text-gray-900 sm:text-2xl;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value small {
+    @apply ml-1 text-sm font-normal tracking-normal text-gray-500;
+  }
+  .stat-note {
+    @apply mt-2 text-xs text-gray-500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Controle segmentado (filtro por link) ---------- */
+  .seg {
+    @apply inline-flex flex-wrap gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5 text-sm;
+  }
+  .seg a {
+    @apply inline-flex min-h-touch items-center rounded px-3 py-1.5 text-gray-600 hover:text-gray-900 md:min-h-0;
+  }
+  .seg a[aria-current] {
+    @apply bg-white font-medium text-gray-900 shadow-sm;
+  }
+
+  /* ---------- Vazio ---------- */
+  .empty {
+    @apply flex flex-col items-center px-6 py-12 text-center;
+  }
+  .empty > .icon {
+    @apply mb-3 h-8 w-8 text-gray-400;
+  }
+  .empty-title {
+    @apply text-sm font-medium text-gray-900;
+  }
+  .empty-text {
+    @apply mt-1 max-w-sm text-sm text-gray-500;
+  }
+
+  /* ---------- Paginação ---------- */
+  .pager {
+    @apply flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600;
+  }
+
+  /* ---------- Código de registro (rastreabilidade) ---------- */
+  .code {
+    @apply whitespace-nowrap font-mono text-[0.8125rem] font-medium tracking-tight;
+  }
+
+  /* ---------- Links no corpo do texto ---------- */
+  .link {
+    @apply font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 hover:text-brand-800
+      hover:decoration-brand-600;
+  }
+
+  /* ---------- Shell: menu lateral ---------- */
+  /* Rolagem do menu lateral. O espaço da barra fica SEMPRE reservado, dos dois
+     lados (`scrollbar-gutter`), então abrir um bloco e a barra aparecer não
+     muda a largura dos itens. O polegar só aparece com o mouse em cima: troca
+     de cor, que não causa reflow. */
+  .nav-scroll {
+    --nav-inset: 0.25rem;
+    overflow-y: auto;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s ease;
+  }
+  .nav-scroll:hover,
+  .nav-scroll:focus-within {
+    scrollbar-color: rgb(255 255 255 / 0.22) transparent;
+  }
+  /* Celular e tablet usam barra por cima do conteúdo (sem espaço reservado):
+     devolve o recuo que a barra ocuparia. */
+  @media (pointer: coarse) {
+    .nav-scroll {
+      --nav-inset: 0.5rem;
+    }
+  }
+  .nav-section,
+  .nav-item {
+    margin-inline: var(--nav-inset, 0.5rem);
+  }
+  @supports not (scrollbar-width: thin) {
+    .nav-scroll::-webkit-scrollbar-thumb {
+      background-color: transparent;
+    }
+    .nav-scroll:hover::-webkit-scrollbar-thumb {
+      background-color: rgb(255 255 255 / 0.22);
+    }
+  }
+  /* Bloco recolhível do menu: <details> nativo, o <summary> é o título. */
+  .nav-block {
+    @apply mt-2 border-t border-white/10 pb-1;
+  }
+  .nav-section {
+    @apply mt-2 flex min-h-touch cursor-pointer list-none items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium
+      uppercase tracking-[0.08em] text-brand-100/70 transition-colors hover:bg-white/[0.06] hover:text-white;
+  }
+  .nav-section::-webkit-details-marker {
+    display: none;
+  }
+  .nav-section .icon {
+    @apply text-brand-300/70;
+  }
+  .nav-chevron {
+    @apply shrink-0 text-brand-300/70 transition-transform duration-150;
+  }
+  .nav-block[open] > .nav-section .nav-chevron {
+    @apply rotate-180;
+  }
+  /* Abrir e fechar um bloco desliza em vez de pular. Melhoria progressiva:
+     sem `::details-content` o bloco abre na hora, como o <details> nativo. */
+  @media (prefers-reduced-motion: no-preference) {
+    .nav-block::details-content {
+      block-size: 0;
+      overflow: hidden;
+      transition: block-size 0.2s ease, content-visibility 0.2s allow-discrete;
+    }
+    .nav-block[open]::details-content {
+      block-size: auto;
+    }
+  }
+  /* Subtítulo de grupo dentro de um bloco do menu. */
+  .nav-group {
+    @apply px-3 pb-1 pt-3 text-xs font-medium text-brand-100/50;
+  }
+  .nav-item {
+    @apply relative flex min-h-touch items-center gap-3 rounded-md px-3 py-1.5 text-sm text-brand-100/80
+      transition-colors hover:bg-white/[0.06] hover:text-white;
+  }
+  @media (min-width: 768px) {
+    .nav-item {
+      min-height: 2.25rem;
+    }
+  }
+  .nav-item .icon {
+    @apply text-brand-300/70 transition-colors;
+  }
+  .nav-item:hover .icon {
+    @apply text-brand-100;
+  }
+  .nav-item[aria-current="page"] {
+    @apply bg-white/10 font-medium text-white;
+  }
+  .nav-item[aria-current="page"] .icon {
+    @apply text-sage-300;
+  }
+  .nav-item[aria-current="page"]::before {
+    content: "";
+    @apply absolute left-1 top-2 bottom-2 w-[3px] rounded-full bg-sage-400;
+  }
+
+  /* Contagem ao lado do item do menu (pedidos de acesso pendentes). Âmbar com
+     número: a cor reforça, o número e o texto para leitor de tela dizem. */
+  .nav-count {
+    @apply ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-2xs font-semibold leading-5 text-amber-900;
+  }
+
+  /* ---------- Shell: contexto (Empresa · Safra · Fazenda) ---------- */
+  /* Uma barra só, em células separadas por divisores finos. Cada célula ganha
+     fundo branco ao passar o mouse e anel de foco por dentro. */
+  .ctx-bar {
+    @apply flex min-w-0 items-stretch divide-x divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-gray-50;
+  }
+  .ctx-bar-stack {
+    @apply w-full flex-col divide-x-0 divide-y bg-white;
+  }
+  .ctx-cell {
+    @apply relative flex min-w-0 flex-col justify-center px-3 py-1 transition-colors duration-150
+      hover:bg-white focus-within:bg-white focus-within:shadow-[inset_0_0_0_2px_theme(colors.brand.500/0.35)];
+  }
+  .ctx-bar-stack .ctx-cell {
+    @apply min-h-touch py-2;
+  }
+  .ctx-label {
+    @apply text-2xs font-medium uppercase leading-4 tracking-wider text-gray-500;
+  }
+  /* <select> nativo: só aparece sem JavaScript. Com JS vira .cb-trigger.cb-ctx. */
+  .ctx-select {
+    @apply w-full min-w-0 cursor-pointer appearance-none truncate border-0 bg-transparent p-0 pr-5 text-sm font-medium
+      text-gray-900 focus:outline-none focus:ring-0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366727b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0 center;
+    background-size: 1rem;
+  }
+  .ctx-static {
+    @apply max-w-[14rem];
+  }
+  .ctx-bar-stack .ctx-static {
+    @apply max-w-none;
+  }
+  .ctx-static > span:last-child {
+    @apply truncate text-sm font-medium text-gray-900;
+  }
+
+  /* Cabeçalho: sólido, com um fio de destaque quase invisível na base. */
+  .app-header {
+    @apply sticky top-0 z-30 border-b border-gray-200 bg-white;
+  }
+  .app-header::after {
+    content: "";
+    @apply pointer-events-none absolute inset-x-0 -bottom-px h-px;
+    background: linear-gradient(90deg, transparent, theme("colors.brand.500 / 0.35") 50%, transparent);
+  }
+
+  /* ---------- Seletor com busca (static/js/combobox.js) ---------- */
+  /* O <select> real fica no DOM, invisível mas focável (validação `required`),
+     e o botão .cb-trigger toma o lugar dele na tela. */
+  select[data-cb-native] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .cb-trigger.field-input {
+    @apply flex cursor-pointer items-center justify-between gap-2 text-left;
+  }
+  .cb-trigger:disabled {
+    @apply cursor-not-allowed;
+  }
+  .cb-value {
+    @apply min-w-0 flex-1 truncate;
+  }
+  .cb-placeholder {
+    @apply text-gray-400;
+  }
+  .cb-chevron {
+    @apply shrink-0 text-gray-500 transition-transform duration-150;
+  }
+  .cb-trigger[aria-expanded="true"] .cb-chevron {
+    @apply rotate-180;
+  }
+  .cb-trigger.field-input[aria-expanded="true"] {
+    @apply border-brand-500 ring-2 ring-brand-500/25;
+  }
+  /* Variante do cabeçalho: sem borda própria, a célula da .ctx-bar é a moldura. */
+  .cb-ctx {
+    @apply flex w-full min-w-0 cursor-pointer items-center justify-between gap-1 border-0 bg-transparent p-0 text-left
+      text-sm font-medium text-gray-900;
+  }
+  .cb-ctx:focus,
+  .cb-ctx:focus-visible {
+    @apply outline-none;
+    box-shadow: none;
+  }
+  .cb-ctx .cb-chevron {
+    @apply h-4 w-4;
+  }
+
+  .cb-panel {
+    @apply fixed z-[70] flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-float;
+    outline: none;
+    animation: cb-in 0.1s ease-out;
+  }
+  .cb-search-wrap {
+    @apply flex shrink-0 items-center gap-2 border-b border-gray-200 px-3;
+  }
+  .cb-search-icon {
+    @apply shrink-0 text-gray-400;
+  }
+  .cb-search {
+    @apply min-w-0 flex-1 border-0 bg-transparent py-2.5 text-gray-900 placeholder:text-gray-400;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    outline: none;
+    box-shadow: none;
+  }
+  .cb-search:focus,
+  .cb-search:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .cb-count {
+    @apply shrink-0 text-2xs tabular-nums text-gray-500;
+  }
+  .cb-list {
+    @apply min-h-0 flex-1 overflow-y-auto p-1;
+    overscroll-behavior: contain;
+  }
+  .cb-option {
+    @apply flex min-h-[2.25rem] cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-gray-800;
+    font-size: 0.9375rem;
+    /* Lista de 500+ itens: só desenha o que está à vista. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 2.25rem;
+  }
+  .cb-option[hidden] {
+    display: none;
+  }
+  .cb-option.is-active {
+    @apply bg-gray-100 text-gray-900;
+  }
+  .cb-option[aria-selected="true"] {
+    @apply font-medium text-gray-900;
+  }
+  .cb-option[aria-disabled="true"] {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .cb-option-text {
+    @apply min-w-0 flex-1;
+    overflow-wrap: anywhere;
+  }
+  .cb-check {
+    @apply invisible shrink-0 text-brand-600;
+  }
+  .cb-option[aria-selected="true"] .cb-check {
+    @apply visible;
+  }
+  /* Trecho achado: negrito e fundo, para não depender só da cor. */
+  .cb-mark {
+    @apply rounded-sm bg-brand-100 font-semibold text-inherit;
+  }
+  .cb-empty {
+    @apply px-4 py-3 text-sm text-gray-500;
+  }
+  .cb-empty[hidden] {
+    display: none;
+  }
+
+  /* Celular: vira folha inferior, com alvos de toque de 44 px. */
+  .cb-sheet {
+    @apply inset-x-0 bottom-0 w-auto rounded-b-none rounded-t-xl border-x-0 border-b-0;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: cb-sheet-in 0.18s ease-out;
+  }
+  .cb-sheet-head {
+    @apply flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 py-1 pl-4 pr-2;
+  }
+  .cb-sheet-title {
+    @apply truncate text-base font-semibold text-gray-900;
+  }
+  .cb-sheet-close {
+    @apply inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-gray-600 hover:bg-gray-100;
+  }
+  .cb-sheet .cb-option {
+    @apply min-h-touch;
+    font-size: 1rem;
+  }
+  .cb-backdrop {
+    @apply fixed inset-0 z-[65] bg-brand-950/60;
+    touch-action: none;
+  }
+  @keyframes cb-in {
+    from {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+  }
+  @keyframes cb-sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cb-panel,
+    .cb-sheet {
+      animation: none;
+    }
+  }
+
+  /* ---------- Menus flutuantes e avisos ---------- */
+  .menu {
+    @apply absolute z-50 mt-2 min-w-[14rem] rounded-lg border border-gray-200 bg-white p-1.5 shadow-float;
+  }
+  .menu-item {
+    @apply flex w-full min-h-touch items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-gray-800
+      hover:bg-gray-100 md:min-h-[2.25rem];
+  }
+  .toast {
+    @apply pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border bg-white p-3.5 text-sm
+      text-gray-800 shadow-float;
+  }
+
+  /* HTMX: o que está sendo recalculado fica discreto, sem pular de lugar. */
+  .htmx-request {
+    @apply opacity-60 transition-opacity;
+  }
+
+  /* ---------- Autenticação ---------- */
+  .auth-aside {
+    background-image: radial-gradient(120% 90% at 0% 0%, theme("colors.brand.800") 0%, theme("colors.brand.950") 70%);
+  }
+}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Corrigir {{ venda.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'sales:detalhe' venda.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ venda.code }}</a>
+    <h1 class="page-title">Corrigir venda</h1>
+    {% if venda.status == "CONFIRMADA" %}
+    <p class="page-subtitle">Corrigir desfaz a saída da versão atual (as cabeças voltam ao lote, na data original) e aplica a da nova, na mesma operação. O motivo fica registrado.</p>
+    {% endif %}
+  </div>
+</header>
+<form method="post" id="form-venda" class="card max-w-4xl">
+  {% csrf_token %}
+  {% include "sales/_campos.html" %}
+  <div class="mt-2 flex flex-col-reverse gap-2 border-t border-gray-200 pt-5 sm:flex-row sm:justify-end">
+    <a href="{% url 'sales:detalhe' venda.pk %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Salvar correção</button>
+  </div>
+</form>
+{% endblock %}

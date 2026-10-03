@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Aprovar {{ compromisso.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ compromisso.code }}</a>
+    <h1 class="page-title">Aprovar compromisso</h1>
+  </div>
+</header>
+<section class="card max-w-2xl">
+  <h2 class="card-title mb-3">Aprovar este compromisso vai:</h2>
+  <ul class="space-y-2 text-sm">
+    {% for e in efeitos %}<li class="flex items-start gap-2.5">{% icon "check" "mt-0.5 text-sage-600" %}<span>{{ e }}</span></li>{% endfor %}
+  </ul>
+  <p class="mt-4 text-sm text-gray-600">Aprovado, ele continua editável: a correção pede motivo e fica na auditoria.</p>
+  <form method="post" class="mt-5 flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+    {% csrf_token %}
+    <a href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}" class="btn-secondary">Voltar</a>
+    <button type="submit" class="btn-primary">Aprovar compromisso</button>
+  </form>
+</section>
+{% endblock %}

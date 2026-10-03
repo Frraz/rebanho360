@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Corrigir {{ movimento.code }} · Rebanho360{% endblock %}
+{% block content %}
+<div
+  x-data="{
+    tipo: document.getElementById('id_type').value,
+    duasLinhas: ['TRANSFERENCIA', 'EVOLUCAO', 'RECLASSIFICACAO'],
+    entrada: ['SALDO_INICIAL', 'COMPRA', 'NASCIMENTO'],
+    saida: ['ABATE', 'VENDA', 'MORTE', 'CONSUMO_DOACAO'],
+    get mostraOrigem() { return this.duasLinhas.includes(this.tipo) || this.saida.includes(this.tipo) || this.tipo === 'AJUSTE_INVENTARIO' },
+    get motivoObrigatorio() { return this.tipo === 'MORTE' || this.tipo === 'AJUSTE_INVENTARIO' },
+    get mostraDestino() { return this.duasLinhas.includes(this.tipo) || this.entrada.includes(this.tipo) || this.tipo === 'AJUSTE_INVENTARIO' },
+  }"
+  class="max-w-4xl"
+>
+  <header class="page-header">
+    <div>
+      <a href="{% url 'herd:movimento_detalhe' movimento.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ movimento.code }}</a>
+      <h1 class="page-title">Corrigir movimentação</h1>
+      <p class="page-subtitle">A correção desfaz os efeitos da versão atual e aplica os da nova, com o motivo registrado.</p>
+    </div>
+  </header>
+
+  {% if form.non_field_errors %}
+  <div class="alert-danger mb-4" role="alert">
+    {% icon "circle-x" %}
+    <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+  </div>
+  {% endif %}
+
+  <form method="post" class="card">
+    {% csrf_token %}
+    {% include "herd/_campos_movimento.html" %}
+    <section class="form-section">
+      <header>
+        <h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2>
+        <p class="mt-1 text-sm text-gray-500">Obrigatório. Fica na auditoria.</p>
+      </header>
+      <div class="fields">
+        <div>
+          <label class="field-label" for="id_edit_reason">{{ form.edit_reason.label }}<span class="text-red-600" aria-hidden="true"> *</span></label>
+          {{ form.edit_reason|add_class:"field-input" }}
+          <p class="field-help">{{ form.edit_reason.help_text }}</p>
+          {% include "partials/_errors.html" with field=form.edit_reason %}
+        </div>
+      </div>
+    </section>
+    <div class="mt-2 flex flex-col-reverse gap-2 border-t border-gray-200 pt-5 sm:flex-row sm:justify-end">
+      <a href="{% url 'herd:movimento_detalhe' movimento.pk %}" class="btn-secondary">Cancelar</a>
+      <button type="submit" class="btn-primary">Salvar correção</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}{{ lote.get_kind_display }} · Importação · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div class="min-w-0">
+    <a href="{% url 'imports:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Importações</a>
+    <h1 class="page-title">
+      {{ lote.get_kind_display }}
+      <span class="text-base">
+        {% if lote.status == "IMPORTADO" %}<span class="badge-confirmada">Importada</span>
+        {% elif lote.status == "CANCELADO" %}<span class="badge-excluida">Cancelada</span>
+        {% else %}<span class="badge-pendencia">Em prévia</span>{% endif %}
+      </span>
+    </h1>
+    <p class="page-subtitle break-words">{{ lote.original_name }} · enviada por {{ lote.created_by }} em {{ lote.created_at|date:"d/m/Y H:i" }}{% if lote.duplicate_confirmed %} · reimportação confirmada{% endif %}</p>
+  </div>
+</header>
+
+{% if lote.failure_message %}
+<div class="alert-danger mb-6" role="alert">
+  {% icon "circle-x" %}
+  <div><p class="font-medium">A última tentativa de importar falhou — nada entrou.</p><p class="mt-1">{{ lote.failure_message }}</p></div>
+</div>
+{% endif %}
+
+<!-- Prévia: o que a leitura encontrou -->
+<section aria-labelledby="t-previa" class="mb-6">
+  <h2 id="t-previa" class="section-title">Prévia</h2>
+  <dl class="stats lg:grid-cols-4">
+    {% if resumo.lidas is not None %}<div class="stat"><dt class="stat-label">Linhas lidas</dt><dd class="stat-value">{{ resumo.lidas }}</dd></div>{% endif %}
+    {% if resumo.em_branco is not None %}<div class="stat"><dt class="stat-label">Em branco (ignoradas)</dt><dd class="stat-value">{{ resumo.em_branco }}</dd></div>{% endif %}
+    <div class="stat"><dt class="stat-label">Prontas</dt><dd class="stat-value text-sage-700">{{ resumo.prontas }}</dd></div>
+    <div class="stat"><dt class="stat-label">Pendentes</dt><dd class="stat-value text-amber-700">{{ resumo.pendentes }}</dd></div>
+    <div class="stat"><dt class="stat-label">Com erro</dt><dd class="stat-value text-red-700">{{ resumo.erros }}</dd></div>
+    <div class="stat"><dt class="stat-label">Ignoradas</dt><dd class="stat-value">{{ resumo.ignoradas }}</dd></div>
+    <div class="stat"><dt class="stat-label">Importadas</dt><dd class="stat-value">{{ resumo.importadas }}</dd></div>
+  </dl>
+  <div class="mt-3 space-y-2">
+    {% for p in resumo.problemas %}<div class="alert-danger" role="alert">{% icon "circle-x" %}<p>{{ p }}</p></div>{% endfor %}
+    {% for a in resumo.avisos %}<div class="alert-warning">{% icon "triangle-alert" %}<p>{{ a }}</p></div>{% endfor %}
+  </div>
+</section>
+
+{% if lote.status == "IMPORTADO" and proximo_passo %}
+<div class="alert-success mb-6 flex-wrap justify-between !items-center">
+  <span class="flex items-center gap-3">{% icon "circle-check" %} Importação concluída. Próximo passo sugerido:</span>
+  <a class="btn-primary" href="{% url proximo_passo.0 %}">{{ proximo_passo.1 }}</a>
+</div>
+{% endif %}
+
+{% if aberto %}
+<!-- Opções: o que a planilha não traz -->
+<form method="post" class="card mb-6 max-w-2xl space-y-5">
+  {% csrf_token %}
+  <input type="hidden" name="acao" value="opcoes">
+  <h2 class="card-title">Opções da importação</h2>
+  {% for field in form_opcoes %}{% include "partials/_field.html" %}{% endfor %}
+  {% for error in form_opcoes.non_field_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  <button type="submit" class="btn-secondary w-full sm:w-auto">Salvar opções e revalidar</button>
+</form>
+
+<!-- Decisões: sugestões em grupo e linhas pendentes -->
+{% if grupos or linhas %}
+<form method="post" class="mb-6 space-y-6">
+  {% csrf_token %}
+  <input type="hidden" name="acao" value="decisoes">
+
+  {% if grupos %}
+  <section class="card">
+    <h2 class="card-title">Sugestões do sistema</h2>
+    <p class="mb-4 mt-1 text-sm text-gray-500">Classificação assistida por padrão de texto. Nada é aplicado sem você marcar.</p>
+    <div class="space-y-2">
+      {% for g in grupos %}
+      <label class="flex min-h-touch cursor-pointer items-start gap-3 rounded-md border border-gray-200 p-3 hover:border-gray-300 hover:bg-gray-50">
+        <input type="checkbox" name="grupo" value="{{ g.chave }}" class="mt-1">
+        <span class="text-sm">
+          <strong>{{ g.linhas }} linha{{ g.linhas|pluralize }}</strong> → {{ g.rotulo }}
+          {% if g.total %}<span class="text-gray-500">({{ g.total|brl }})</span>{% endif %}<br>
+          <span class="text-gray-500">{{ g.motivo }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="card-title">Linhas</h2>
+      <nav class="seg" aria-label="Filtrar linhas">
+        <a href="?ver=abertas" {% if filtro == "abertas" %}aria-current="true"{% endif %}>Pendentes e com erro</a>
+        <a href="?ver=VALIDA" {% if filtro == "VALIDA" %}aria-current="true"{% endif %}>Prontas</a>
+        <a href="?ver=IGNORADA" {% if filtro == "IGNORADA" %}aria-current="true"{% endif %}>Ignoradas</a>
+        <a href="?ver=todas" {% if filtro == "todas" %}aria-current="true"{% endif %}>Todas</a>
+      </nav>
+    </div>
+
+    <div class="space-y-3">
+      {% for item in linhas %}
+      <div class="space-y-2 rounded-lg border border-gray-200 p-4">
+        <p class="flex flex-wrap items-center gap-2 text-sm font-medium">
+          <span>Linha {{ item.row.row_number }} · aba {{ item.row.sheet }}</span>
+          {% if item.row.status == "ERRO" %}<span class="badge-erro">Erro</span>
+          {% elif item.row.status == "PENDENTE" %}<span class="badge-pendencia">Pendente</span>
+          {% elif item.row.status == "IGNORADA" %}<span class="badge-excluida">Ignorada</span>
+          {% else %}<span class="badge-confirmada">Pronta</span>{% endif %}
+        </p>
+        <p class="break-words text-sm text-gray-600">{{ item.descricao }}</p>
+        {% for m in item.row.messages %}
+        <p class="flex items-start gap-2 text-sm {% if m.nivel == 'erro' %}text-red-700{% elif m.nivel == 'pendencia' %}text-amber-800{% else %}text-gray-500{% endif %}">
+          {% if m.nivel == "erro" %}{% icon "circle-x" "icon-sm mt-0.5" %}{% elif m.nivel == "pendencia" %}{% icon "triangle-alert" "icon-sm mt-0.5" %}{% else %}{% icon "info" "icon-sm mt-0.5" %}{% endif %}
+          <span>{{ m.texto }}</span>
+        </p>
+        {% endfor %}
+        {% if item.campos %}
+        <div class="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
+          {% for campo in item.campos %}{% include "imports/_campo.html" with row=item.row campo=campo %}{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% empty %}
+      <p class="py-6 text-center text-sm text-gray-500">Nenhuma linha neste filtro.</p>
+      {% endfor %}
+    </div>
+
+    {% if pagina.has_other_pages %}
+    <div class="mt-4 flex items-center justify-center gap-3">
+      {% if pagina.has_previous %}<a class="btn-secondary btn-sm" href="?ver={{ filtro }}&pagina={{ pagina.previous_page_number }}">{% icon "chevron-left" "icon-sm" %} Anterior</a>{% endif %}
+      <span class="text-sm text-gray-500">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+      {% if pagina.has_next %}<a class="btn-secondary btn-sm" href="?ver={{ filtro }}&pagina={{ pagina.next_page_number }}">Próxima {% icon "chevron-right" "icon-sm" %}</a>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <div class="form-actions md:justify-end">
+    <button type="submit" class="btn-primary">Salvar decisões e revalidar</button>
+  </div>
+</form>
+{% endif %}
+
+<!-- Confirmação -->
+<section class="card mb-24 max-w-2xl md:mb-4">
+  <h2 class="card-title mb-3">Confirmar</h2>
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="importar">
+    <p class="text-sm text-gray-600">
+      Vai importar <strong>{{ resumo.prontas }}</strong> linha{{ resumo.prontas|pluralize }} pronta{{ resumo.prontas|pluralize }}.
+      {% if resumo.pendentes or resumo.erros %}As <strong>{{ resumo.pendentes|add:resumo.erros }}</strong> pendentes ou com erro ficam de fora, neste lote, para você resolver depois.{% endif %}
+      Se qualquer linha falhar na hora de gravar, <strong>nada entra</strong>.
+    </p>
+    <label class="flex min-h-touch items-start gap-3 text-sm">
+      <input type="checkbox" name="confirmo" value="1" class="mt-1" required>
+      <span>Revisei a prévia e quero importar.</span>
+    </label>
+    <button type="submit" class="btn-primary" {% if not pode_importar %}disabled{% endif %}>Importar {{ resumo.prontas }} linha{{ resumo.prontas|pluralize }}</button>
+  </form>
+  <form method="post" class="mt-3 border-t border-gray-100 pt-4" onsubmit="return confirm('Cancelar esta importação? Nada será importado.')">
+    {% csrf_token %}
+    <input type="hidden" name="acao" value="cancelar">
+    <button type="submit" class="btn-danger-outline">Cancelar importação</button>
+  </form>
+</section>
+{% else %}
+<!-- Lote encerrado: só consulta -->
+<section class="card">
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h2 class="card-title">Linhas</h2>
+    <nav class="seg" aria-label="Filtrar linhas">
+      <a href="?ver=IMPORTADA" {% if filtro == "IMPORTADA" %}aria-current="true"{% endif %}>Importadas</a>
+      <a href="?ver=abertas" {% if filtro == "abertas" %}aria-current="true"{% endif %}>Pendentes e com erro</a>
+      <a href="?ver=todas" {% if filtro == "todas" %}aria-current="true"{% endif %}>Todas</a>
+    </nav>
+  </div>
+  <div class="divide-y divide-gray-100">
+    {% for item in linhas %}
+    <div class="py-3 text-sm">
+      <p class="break-words font-medium">Linha {{ item.row.row_number }} · {{ item.row.sheet }} · {{ status_rotulos|get_item:item.row.status }}</p>
+      <p class="break-words text-gray-600">{{ item.descricao }}</p>
+      {% for m in item.row.messages %}<p class="text-gray-500">{{ m.texto }}</p>{% endfor %}
+    </div>
+    {% empty %}<p class="py-6 text-center text-sm text-gray-500">Nenhuma linha neste filtro.</p>{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

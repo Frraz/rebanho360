@@ -1,0 +1,23 @@
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = "migrations/"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.coverage.run]
+source = ["apps"]
+omit = ["*/migrations/*", "*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "raise NotImplementedError"]

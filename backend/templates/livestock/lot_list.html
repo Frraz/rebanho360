@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Lotes · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Lotes</h1>
+      {% info "lote" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'livestock:lote_novo' %}" class="btn-primary">{% icon "plus" %} Novo lote</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if lotes %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Lote</th><th scope="col">Fazenda</th><th scope="col">Entrada</th><th scope="col">Raça</th><th scope="col">Situação</th></tr>
+    </thead>
+    <tbody>
+      {% for lote in lotes %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'livestock:lote_detalhe' lote.pk %}" class="row-link code">{{ lote.code }}</a></td>
+        <td data-label="Fazenda">{{ lote.farm.name }}</td>
+        <td data-label="Entrada" class="nowrap">{{ lote.entry_date|date:"d/m/Y" }}</td>
+        <td data-label="Raça" class="cell-hide-mobile">{{ lote.breed.name|default:"—" }}</td>
+        <td data-label="Situação" class="cell-status">{% if lote.status == "ABERTO" %}<span class="badge-confirmada">Aberto</span>{% elif lote.status == "ENCERRADO" %}<span class="badge-rascunho">Encerrado</span>{% else %}<span class="badge-excluida">Excluído</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'livestock:lote_novo' as url_nova %}
+  {% include "partials/_empty.html" with icone="tag" titulo="Nenhum lote cadastrado" texto="O lote nasce da primeira compra ou pode ser criado aqui." url=url_nova acao="Novo lote" %}
+  {% endif %}
+</div>
+{% endblock %}

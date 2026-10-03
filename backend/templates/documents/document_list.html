@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Documentos gerados · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Documentos gerados</h1>
+      {% info "documentos" %}
+    </div>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if documentos %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Documento</th><th scope="col">Gerado em</th><th scope="col">Por</th><th scope="col">Filtros</th><th scope="col">Situação</th></tr>
+    </thead>
+    <tbody>
+      {% for d in documentos %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'documents:detalhe' d.document_id %}" class="row-link">{{ d.title }}</a></td>
+        <td data-label="Gerado em" class="nowrap">{{ d.generated_at|date:"d/m/Y H:i" }}</td>
+        <td data-label="Por" class="muted">{{ d.generated_by }}</td>
+        <td data-label="Filtros" class="muted cell-hide-mobile max-w-xs break-words text-xs">{% for f in d.filters %}{{ f }}{% if not forloop.last %} · {% endif %}{% endfor %}</td>
+        <td data-label="Situação" class="cell-status">
+          {% if d.status == "PRONTO" %}<span class="badge-confirmada">Pronto</span>
+          {% elif d.status == "PENDENTE" %}<span class="badge-pendencia">Gerando</span>
+          {% else %}<span class="badge-erro">Erro</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">
+    {% icon "file-down" %}
+    <p class="empty-title">Nenhum documento gerado ainda</p>
+    <p class="empty-text">Abra um <a class="link" href="{% url 'reports:indice' %}">relatório</a> e escolha PDF.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if recebimento %}Corrigir {{ recebimento.code }}{% else %}Registrar recebimento{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% if recebimento %}{% url 'procurement:recebimento_detalhe' recebimento.pk %}{% else %}{% url 'procurement:viagem_detalhe' viagem.pk %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if recebimento %}{{ recebimento.code }}{% else %}{{ viagem.code }}{% endif %}</a>
+    <h1 class="page-title">{% if recebimento %}Corrigir recebimento{% else %}Registrar recebimento{% endif %}</h1>
+    <p class="page-subtitle">Cabeças e peso que chegaram. A quebra de viagem é calculada e só alerta: não desconta nada.</p>
+  </div>
+</header>
+
+<form method="post" class="card max-w-4xl pb-24 md:pb-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert-danger mb-5" role="alert">{% icon "circle-x" %}<div>{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div></div>{% endif %}
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Chegada</h2></header>
+    <div class="fields">
+      {% include "partials/_field.html" with field=form.date %}
+      {% include "partials/_field.html" with field=form.notes %}
+    </div>
+  </section>
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">O que chegou</h2><p class="mt-1 text-sm text-gray-500">Uma linha por item da viagem.</p></header>
+    <div class="fields">{% include "procurement/_linhas.html" with rotulo="Item recebido" %}</div>
+  </section>
+  {% if recebimento %}
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2><p class="mt-1 text-sm text-gray-500">Obrigatório. Fica na auditoria.</p></header>
+    <div class="fields">{% include "partials/_field.html" with field=form.edit_reason %}</div>
+  </section>
+  {% endif %}
+  <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+    <button type="submit" class="btn-primary">{% if recebimento %}Salvar correção{% else %}Registrar recebimento{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

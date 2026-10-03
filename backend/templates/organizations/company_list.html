@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Empresas · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Empresas</h1>
+      {% info "empresa" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'organizations:empresa_nova' %}" class="btn-primary">{% icon "plus" %} Nova empresa</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if empresas %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Empresa</th><th scope="col">Cidade</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for empresa in empresas %}
+      <tr>
+        <td class="cell-title font-medium">{{ empresa.name }}</td>
+        <td data-label="Cidade" class="muted">{% if empresa.city %}{{ empresa.city }}{% if empresa.state %}-{{ empresa.state }}{% endif %}{% else %}—{% endif %}</td>
+        <td class="cell-actions num"><a href="{% url 'organizations:empresa_editar' empresa.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'organizations:empresa_nova' as url_nova %}
+  {% include "partials/_empty.html" with icone="building-2" titulo="Nenhuma empresa cadastrada" texto="Cadastre a empresa para começar a organizar safras e fazendas." url=url_nova acao="Nova empresa" %}
+  {% endif %}
+</div>
+{% endblock %}

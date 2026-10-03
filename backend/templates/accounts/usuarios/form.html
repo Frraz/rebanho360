@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if modo == "editar" %}Editar {{ u.username }}{% else %}Novo usuário{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% if modo == 'editar' %}{% url 'accounts:usuario_detalhe' u.pk %}{% else %}{% url 'accounts:usuarios' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if modo == "editar" %}{{ u.username }}{% else %}Usuários{% endif %}</a>
+    <h1 class="page-title">{% if modo == "editar" %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
+    {% if modo == "editar" %}<p class="page-subtitle">Usuário <span class="code">{{ u.username }}</span>. Toda alteração fica registrada na auditoria, com o motivo.</p>{% endif %}
+  </div>
+</header>
+
+{% if form.non_field_errors %}
+<div class="alert-danger mb-4 max-w-2xl" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" class="card max-w-2xl space-y-5" x-data="{ papel: '{{ form.role.value|default:'' }}'{% if modo == 'criar' %}, modo: '{{ form.senha_modo.value|default:'convite' }}'{% endif %} }">
+  {% csrf_token %}
+  {% if modo == "criar" %}{% include "partials/_field.html" with field=form.username %}{% endif %}
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    {% include "partials/_field.html" with field=form.first_name %}
+    {% include "partials/_field.html" with field=form.last_name %}
+  </div>
+  {% include "partials/_field.html" with field=form.email %}
+  {% include "partials/_field.html" with field=form.phone %}
+
+  <div>
+    <label class="field-label" for="{{ form.role.id_for_label }}">Papel<span class="text-red-600" aria-hidden="true"> *</span></label>
+    <select name="role" id="{{ form.role.id_for_label }}" class="field-input" x-model="papel" required {% if eu %}disabled{% endif %}>
+      <option value="">Escolha…</option>
+      {% for valor, rotulo in form.fields.role.choices %}{% if valor %}<option value="{{ valor }}">{{ rotulo }}</option>{% endif %}{% endfor %}
+    </select>
+    {% if eu %}<input type="hidden" name="role" value="{{ u.role }}"><p class="field-help">Você não muda o seu próprio papel: peça a outro administrador.</p>{% endif %}
+    {% for error in form.role.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    {% include "accounts/_papeis.html" %}
+  </div>
+
+  {% if eu %}
+  <p class="field-help">Suas fazendas não mudam por aqui: Administrador vê todas.</p>
+  {% else %}
+  {% include "accounts/usuarios/_acessos.html" %}
+  {% endif %}
+
+  {% if modo == "criar" %}
+  <fieldset class="space-y-3">
+    <legend class="field-label">Primeiro acesso</legend>
+    {% for radio in form.senha_modo %}
+    <label class="flex min-h-touch items-start gap-3 text-sm text-gray-800">
+      <input type="radio" name="senha_modo" value="{{ radio.data.value }}" x-model="modo" class="mt-1" {% if radio.data.selected %}checked{% endif %}>
+      <span>{{ radio.choice_label }}</span>
+    </label>
+    {% endfor %}
+    <div x-show="modo === 'temporaria'" x-cloak class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {% include "partials/_field.html" with field=form.senha %}
+      {% include "partials/_field.html" with field=form.senha2 %}
+    </div>
+    <p class="field-help" x-show="modo === 'temporaria'" x-cloak>Passe a senha por um canal seguro. A pessoa é obrigada a trocá-la no primeiro acesso; a senha não fica gravada em lugar nenhum.</p>
+    <p class="field-help" x-show="modo === 'convite'">O e-mail leva o usuário e um link (válido por 3 dias) para a pessoa criar a própria senha. Senha nunca vai por e-mail.</p>
+  </fieldset>
+  {% else %}
+  {% include "partials/_field.html" with field=form.motivo %}
+  {% endif %}
+
+  <div class="flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+    <a href="{% if modo == 'editar' %}{% url 'accounts:usuario_detalhe' u.pk %}{% else %}{% url 'accounts:usuarios' %}{% endif %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">{% if modo == "editar" %}Salvar alterações{% else %}Criar usuário{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

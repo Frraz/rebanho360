@@ -1,0 +1,12 @@
+# O contexto de build do Docker é ./backend. Nada disto precisa entrar na imagem.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+media/
+staticfiles/
+celerybeat-schedule*
+*.sqlite3
+.coverage
+htmlcov/

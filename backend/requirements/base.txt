@@ -1,0 +1,18 @@
+Django==5.0.9
+psycopg[binary]==3.2.10
+dj-database-url==2.3.0
+django-redis==5.4.0
+django-htmx==1.19.0
+celery==5.4.0
+redis==5.1.1
+WeasyPrint==62.3
+# WeasyPrint 62.x quebra com pydyf >= 0.11 ("super object has no attribute
+# 'transform'"): sem este pin o PDF não gera. Soltar junto com o upgrade do WeasyPrint.
+pydyf==0.10.0
+openpyxl==3.1.5
+argon2-cffi==23.1.0
+python-decouple==3.8
+django-widget-tweaks==1.5.0
+# QR code do 2FA (F4-09): Python puro, sem dependências. O TOTP em si (RFC 6238)
+# é código nosso, com os vetores de teste da RFC — não há biblioteca de OTP.
+segno==1.6.1

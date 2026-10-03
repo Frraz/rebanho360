@@ -1,0 +1,1 @@
+"""Leitura. Consultas e agregações."""

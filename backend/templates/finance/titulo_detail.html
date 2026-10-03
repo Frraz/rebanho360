@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load core_tags finance_tags %}
+{% block title %}{{ titulo.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% if titulo.a_receber %}{% url 'finance:contas_a_receber' %}{% else %}{% url 'finance:contas_a_pagar' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if titulo.a_receber %}Contas a receber{% else %}Contas a pagar{% endif %}</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ titulo.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% titulo_selos titulo hoje %}
+        {% if titulo.version > 1 %}<span class="badge-editada">Editado (v{{ titulo.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if pode_aprovar %}<a href="{% url 'finance:titulo_aprovar' titulo.pk %}" class="btn-primary">{% icon "check" %} Aprovar pagamento</a>{% endif %}
+    {% if pode_baixar %}<a href="{% url 'finance:titulo_baixar' titulo.pk %}" class="{% if pode_aprovar %}btn-secondary{% else %}btn-primary{% endif %}">{% icon "wallet" %} {% if titulo.a_receber %}Registrar recebimento{% else %}Dar baixa{% endif %}</a>{% endif %}
+    {% if pode_programar %}<a href="{% url 'finance:titulo_programar' titulo.pk %}" class="{% if pode_aprovar or pode_baixar %}btn-secondary{% else %}btn-primary{% endif %}">{% icon "calendar" %} {% if titulo.payment_status == "PROGRAMADO" %}Mudar a programação{% else %}Programar pagamento{% endif %}</a>{% endif %}
+    {% if pode_editar %}<a href="{% url 'finance:titulo_editar' titulo.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
+    {% if pode_devolver %}<a href="{% url 'finance:titulo_devolver' titulo.pk %}" class="btn-secondary">{% icon "rotate-ccw" %} Devolver</a>{% endif %}
+  </div>
+</header>
+
+{% for alerta in alertas %}<div class="alert-warning mb-3">{% icon "triangle-alert" %}<p>{{ alerta }}</p></div>{% endfor %}
+{% if titulo.status == "EXCLUIDA" %}
+<div class="alert-warning mb-3" role="status">{% icon "triangle-alert" %}<p>Cancelado por {{ titulo.deleted_by }}{% if titulo.delete_reason %}: "{{ titulo.delete_reason }}"{% endif %}{% if operacao_cancelada %} — a operação de origem também está excluída; restaure-a e o título volta junto.{% endif %}</p></div>
+{% endif %}
+
+<section class="card mt-3" aria-label="Dados do título">
+  <dl class="facts">
+    <div><dt>{{ titulo.favorecido_rotulo }}</dt><dd>{% if titulo.payee %}<a class="link" href="{% url 'partners:detalhe' titulo.payee.pk %}">{{ titulo.payee.name }}</a>{% else %}<span class="text-amber-800">A definir</span>{% endif %}</dd></div>
+    <div><dt>Origem</dt><dd>{{ titulo.get_component_display }}{% if titulo.origin_purchase %} · <a class="link code" href="{% url 'purchases:detalhe' titulo.origin_purchase.pk %}">{{ titulo.origin_purchase.code }}</a>{% elif titulo.origin_sale %} · <a class="link code" href="{% url 'sales:detalhe' titulo.origin_sale.pk %}">{{ titulo.origin_sale.code }}</a>{% else %} <span class="text-gray-500">· avulso</span>{% endif %}</dd></div>
+    <div><dt>Fazenda</dt><dd>{{ titulo.farm.name }} <span class="text-gray-500">· safra {{ titulo.season.name }}</span></dd></div>
+    <div><dt>Emissão</dt><dd>{{ titulo.issue_date|date:"d/m/Y" }}</dd></div>
+    <div><dt>Vencimento</dt><dd>{{ titulo.due_date|date:"d/m/Y" }}</dd></div>
+    {% if titulo.document %}<div><dt>Documento</dt><dd>{{ titulo.document }}</dd></div>{% endif %}
+    {% if titulo.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ titulo.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-valores">
+    <h2 id="titulo-valores" class="card-title mb-2">{% if titulo.a_receber %}Recebimento{% else %}Pagamento{% endif %}</h2>
+    <dl class="dl">
+      <div class="total"><dt>Valor do título</dt><dd>{{ titulo.amount|brl }}</dd></div>
+      <div><dt>{% if titulo.a_receber %}Recebido{% else %}Pago{% endif %}</dt><dd>{{ titulo.paid_total|brl }}</dd></div>
+      <div><dt>Falta</dt><dd>{{ titulo.balance|brl }}</dd></div>
+      {% if not titulo.a_receber %}
+      <div><dt>Programado para</dt><dd>{{ titulo.scheduled_date|date:"d/m/Y"|default:"—" }}{% if titulo.scheduled_by %} <span class="text-gray-500">· {{ titulo.scheduled_by }}</span>{% endif %}</dd></div>
+      <div><dt>Aprovado por</dt><dd>{% if titulo.approved_by %}{{ titulo.approved_by }} <span class="text-gray-500">· {{ titulo.approved_at|date:"d/m/Y H:i" }}</span>{% else %}—{% endif %}</dd></div>
+      {% endif %}
+    </dl>
+  </section>
+
+  {% if not titulo.a_receber %}
+  <section class="card" aria-labelledby="titulo-conta">
+    <h2 id="titulo-conta" class="card-title mb-2">Conta bancária</h2>
+    {% if conta %}
+    <dl class="dl">
+      <div><dt>Banco</dt><dd>{{ conta.bank_name|default:conta.bank_code|default:"—" }}</dd></div>
+      <div><dt>Agência</dt><dd>{{ conta.branch|default:"—" }}</dd></div>
+      <div><dt>Conta</dt><dd>{{ conta.account|default:"—" }} <span class="text-gray-500">· {{ conta.get_account_type_display }}</span></dd></div>
+      {% if conta.pix_key %}<div><dt>Chave Pix</dt><dd class="break-all">{{ conta.pix_key }}</dd></div>{% endif %}
+    </dl>
+    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "lock" "icon-sm mt-px" %} Dado do cadastro do parceiro, nunca digitado aqui. Quem consulta fica registrado na auditoria.</p>
+    {% elif titulo.bank_account_id %}
+    <p class="text-sm text-gray-600">Há uma conta escolhida. Os dados bancários só aparecem para financeiro, gestor e administrador.</p>
+    {% else %}
+    <p class="text-sm text-gray-600">Nenhuma conta escolhida. {% if titulo.payee %}Cadastre a conta em <a class="link" href="{% url 'partners:detalhe' titulo.payee.pk %}">{{ titulo.payee.name }}</a> ou escolha uma ao programar.{% endif %}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+
+<section class="mt-6" aria-labelledby="titulo-baixas">
+  <h2 id="titulo-baixas" class="section-title mb-3">{% if titulo.a_receber %}Recebimentos{% else %}Pagamentos{% endif %} baixados</h2>
+  <div class="table-wrap">
+    {% if baixas %}
+    <table class="table table-stack">
+      <thead><tr><th scope="col">Baixa</th><th scope="col">Data</th><th scope="col">Forma</th><th scope="col">Documento</th><th scope="col" class="num">Valor</th><th scope="col">Situação</th></tr></thead>
+      <tbody>
+        {% for b in baixas %}
+        <tr class="is-link">
+          <td class="cell-title"><a href="{% url 'finance:pagamento_detalhe' b.pk %}" class="row-link code">{{ b.code }}</a></td>
+          <td data-label="Data" class="nowrap">{{ b.date|date:"d/m/Y" }}</td>
+          <td data-label="Forma" class="cell-hide-mobile">{{ b.get_method_display }}</td>
+          <td data-label="Documento" class="muted">{{ b.document }}</td>
+          <td data-label="Valor" class="num nowrap font-medium">{{ b.amount|brl }}</td>
+          <td data-label="Situação" class="cell-status">{% baixa_selo b %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    {% include "partials/_empty.html" with icone="wallet" titulo="Nenhuma baixa registrada" texto="O dinheiro ainda não saiu por este título." %}
+    {% endif %}
+  </div>
+</section>
+
+<section class="mt-6" aria-labelledby="titulo-historico">
+  <h2 id="titulo-historico" class="section-title mb-3">Histórico</h2>
+  <ol class="relative ml-2 max-w-2xl space-y-5 border-l border-gray-300">
+    {% for e in eventos %}
+    <li class="ml-6">
+      <span class="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-600" aria-hidden="true"></span>
+      <p class="text-xs font-medium uppercase tracking-wider text-gray-500">{{ e.timestamp|date:"d/m/Y H:i" }}</p>
+      <p class="mt-0.5 text-sm font-medium">{{ e.title }} <span class="font-normal text-gray-600">· {{ e.actor|default:"Sistema" }}</span></p>
+      {% if e.description %}<p class="text-sm text-gray-600">{{ e.description }}</p>{% endif %}
+    </li>
+    {% empty %}
+    <li class="ml-6 text-sm text-gray-500">Nada registrado ainda.</li>
+    {% endfor %}
+  </ol>
+  <p class="mt-3 text-sm"><a class="link" href="{% url 'audit:timeline' 'Invoice' titulo.pk %}">Ver na auditoria</a></p>
+</section>
+
+{% if bloqueios and pode_excluir %}
+<div class="alert-info mt-6">{% icon "info" %}<div><p class="font-medium">Para cancelar este título, antes:</p><ul class="mt-1 list-disc space-y-1 pl-5">{% for b in bloqueios %}<li>{{ b }}{% if b.url %} <a class="link whitespace-nowrap font-medium" href="{{ b.url }}">{{ b.rotulo_url }}</a>{% endif %}</li>{% endfor %}</ul></div></div>
+{% endif %}
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'finance:titulo_excluir' titulo.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Cancelar título</a>{% endif %}
+  {% if pode_restaurar %}
+  <form method="post" action="{% url 'finance:titulo_restaurar' titulo.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar título</button></form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

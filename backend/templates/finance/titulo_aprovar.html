@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Aprovar {{ titulo.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ titulo.code }}</a>
+    <h1 class="page-title">Aprovar o pagamento</h1>
+    <p class="page-subtitle">Quem aprova não é quem paga: depois de aprovado, a baixa é feita pelo financeiro.</p>
+  </div>
+</header>
+{% include "finance/_resumo_titulo.html" %}
+<section class="card max-w-2xl">
+  <h2 class="card-title mb-3">Confira antes de aprovar</h2>
+  <dl class="dl">
+    <div><dt>Pagar a</dt><dd>{{ titulo.payee.name|default:"—" }}</dd></div>
+    {% if conta %}
+    <div><dt>Banco</dt><dd>{{ conta.bank_name|default:conta.bank_code|default:"—" }}</dd></div>
+    <div><dt>Agência / conta</dt><dd>{{ conta.branch|default:"—" }} / {{ conta.account|default:"—" }}</dd></div>
+    {% if conta.pix_key %}<div><dt>Chave Pix</dt><dd class="break-all">{{ conta.pix_key }}</dd></div>{% endif %}
+    {% elif titulo.bank_account_id %}
+    <div><dt>Conta bancária</dt><dd class="text-gray-500">Escolhida (visível a quem tem acesso a dados bancários)</dd></div>
+    {% else %}
+    <div><dt>Conta bancária</dt><dd class="text-amber-800">Nenhuma escolhida</dd></div>
+    {% endif %}
+  </dl>
+  <form method="post" class="mt-5 flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+    {% csrf_token %}
+    <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="btn-secondary">Voltar</a>
+    {% if pode_aprovar and titulo.payment_status == "PROGRAMADO" %}<button type="submit" class="btn-primary">{% icon "check" %} Aprovar pagamento</button>{% endif %}
+  </form>
+</section>
+{% endblock %}

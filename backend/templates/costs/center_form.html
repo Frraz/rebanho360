@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Editar centro{% else %}Novo centro{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+{% url 'costs:centro_lista' as voltar %}
+{% include "partials/_form_page.html" with titulo=object.name|default:"Novo centro de custo" subtitulo="Para detalhar um centro (ex.: PARQUE DE MÁQUINAS → Combustível), crie um subcentro escolhendo o centro pai." voltar=voltar voltar_rotulo="Centros de custo" %}
+{% endblock %}

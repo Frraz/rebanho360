@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ u.username }} · Usuários · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'accounts:usuarios' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Usuários</a>
+    <h1 class="page-title">{{ u.get_full_name|default:u.username }}</h1>
+    <p class="mt-2 flex flex-wrap items-center gap-1.5">
+      <span class="code">{{ u.username }}</span>
+      <span class="badge-editada">{{ u.get_role_display }}</span>
+      {% if u.deleted_at %}<span class="badge-excluida">Excluído</span>
+      {% elif not u.is_active %}<span class="badge-rascunho">Desativado</span>
+      {% else %}<span class="badge-confirmada">Ativo</span>{% endif %}
+      {% if u.must_change_password %}<span class="badge-pendencia">Troca de senha pendente</span>
+      {% elif not u.has_usable_password %}<span class="badge-pendencia">Aguardando a senha</span>{% endif %}
+      {% if eu %}<span class="badge-rascunho">Você</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    {% if not u.deleted_at %}<a href="{% url 'accounts:usuario_editar' u.pk %}" class="btn-primary">{% icon "pencil" %} Editar</a>{% endif %}
+  </div>
+</header>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="t-dados">
+    <h2 id="t-dados" class="card-title mb-3">Dados</h2>
+    <dl class="dl">
+      <div><dt>E-mail</dt><dd class="break-all">{{ u.email|default:"—" }}</dd></div>
+      <div><dt>Telefone</dt><dd>{{ u.phone|default:"—" }}</dd></div>
+      <div><dt>Último acesso</dt><dd>{% if u.last_login %}{{ u.last_login|date:"d/m/Y H:i" }}{% else %}Nunca entrou{% endif %}</dd></div>
+      <div><dt>Último IP</dt><dd class="code">{{ u.last_login_ip|default:"—" }}</dd></div>
+      <div><dt>Conta criada em</dt><dd>{{ u.date_joined|date:"d/m/Y" }}</dd></div>
+      <div>
+        <dt>Segundo fator</dt>
+        <dd>{% if segundo_fator %}Ativo{% else %}Não usa (recomendado){% endif %}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="card" aria-labelledby="t-fazendas">
+    <h2 id="t-fazendas" class="card-title mb-3">Fazendas</h2>
+    {% if u.has_broad_access %}
+    <p class="text-sm text-gray-600">Vê todas as fazendas, por definição do papel {{ u.get_role_display }}.</p>
+    {% elif acessos %}
+    <ul class="divide-y divide-gray-100 text-sm">
+      {% for a in acessos %}
+      <li class="flex items-center justify-between gap-3 py-2">
+        <span class="font-medium text-gray-900">{{ a.farm.name }} <span class="code text-gray-500">{{ a.farm.code }}</span></span>
+        <span class="{% if a.can_write %}badge-confirmada{% else %}badge-rascunho{% endif %}">{% if a.can_write %}Consulta e lançamento{% else %}Só consulta{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="alert-warning">{% icon "triangle-alert" %}<span>Nenhuma fazenda marcada: com este papel, ele entra e não enxerga nada. <a class="link font-medium" href="{% url 'accounts:usuario_editar' u.pk %}">Marcar fazendas</a></span></div>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card mt-6" aria-labelledby="t-acoes">
+  <h2 id="t-acoes" class="card-title mb-1">Ações</h2>
+  <p class="mb-4 text-sm text-gray-600">Cada ação mostra o que vai acontecer antes de você confirmar e pede o motivo.</p>
+  <div class="flex flex-wrap gap-2">
+    {% if not u.deleted_at %}
+      <a href="{% url 'accounts:usuario_senha' u.pk %}" class="btn-secondary btn-sm">{% icon "lock" "icon-sm" %} Redefinir senha</a>
+      <a href="{% url 'accounts:usuario_sessoes' u.pk %}" class="btn-secondary btn-sm">{% icon "log-out" "icon-sm" %} Encerrar sessões</a>
+      {% if segundo_fator %}<a href="{% url 'accounts:usuario_2fa' u.pk %}" class="btn-secondary btn-sm">{% icon "shield-check" "icon-sm" %} Redefinir segundo fator</a>{% endif %}
+      {% if u.is_active %}
+        <a href="{% url 'accounts:usuario_desativar' u.pk %}" class="btn-danger-outline btn-sm">{% icon "lock" "icon-sm" %} Desativar</a>
+      {% else %}
+        <a href="{% url 'accounts:usuario_reativar' u.pk %}" class="btn-secondary btn-sm">{% icon "check" "icon-sm" %} Reativar</a>
+      {% endif %}
+      <a href="{% url 'accounts:usuario_excluir' u.pk %}" class="btn-danger-outline btn-sm">{% icon "trash-2" "icon-sm" %} Excluir</a>
+    {% else %}
+      <a href="{% url 'accounts:usuario_restaurar' u.pk %}" class="btn-secondary btn-sm">{% icon "rotate-ccw" "icon-sm" %} Restaurar</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="mt-8" aria-labelledby="t-hist">
+  <h2 id="t-hist" class="mb-3 text-base font-semibold">Histórico desta conta</h2>
+  {% if historico %}
+  <div class="card-flush divide-y divide-gray-100">
+    {% for e in historico %}
+    <div class="flex flex-col gap-0.5 p-4 sm:flex-row sm:items-baseline sm:justify-between sm:px-5">
+      <p class="text-sm"><span class="font-medium">{{ e.get_action_display }}</span>{% if e.reason %} — {{ e.reason }}{% endif %}</p>
+      <p class="shrink-0 text-xs text-gray-500">{{ e.actor|default:"Sistema" }} · {{ e.timestamp|date:"d/m/Y H:i" }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="mt-2 text-sm"><a href="{% url 'audit:console' %}?entity_type=User" class="link">Ver tudo na auditoria</a></p>
+  {% else %}
+  <p class="text-sm text-gray-500">Nenhum evento registrado para esta conta.</p>
+  {% endif %}
+</section>
+{% endblock %}

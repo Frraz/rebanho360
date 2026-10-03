@@ -1,0 +1,113 @@
+"""Validação de entrada vinda da web. As regras de negócio moram no
+serviço (`apps.purchases.services`); o form garante tipos e formatos."""
+
+from decimal import Decimal
+
+from django import forms
+
+from apps.core import context as ctx
+from apps.livestock.models import AnimalCategory, Lot
+from apps.partners.models import Partner, PartnerRoleChoice
+from apps.properties.models import Farm
+
+
+def _dinheiro(label, *, obrigatorio=False):
+    return forms.DecimalField(
+        label=label,
+        required=obrigatorio,
+        min_value=Decimal("0"),
+        max_digits=14,
+        decimal_places=2,
+        widget=forms.NumberInput(
+            attrs={"inputmode": "decimal", "step": "0.01", "data-previa": "1"}
+        ),
+    )
+
+
+class PurchaseForm(forms.Form):
+    date = forms.DateField(
+        label="Data",
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    seller = forms.ModelChoiceField(
+        label="Vendedor", queryset=Partner.objects.none(), required=False
+    )
+    destination_farm = forms.ModelChoiceField(
+        label="Fazenda de destino", queryset=Farm.objects.none()
+    )
+    category = forms.ModelChoiceField(
+        label="Categoria", queryset=AnimalCategory.objects.filter(is_active=True)
+    )
+    head_count = forms.IntegerField(
+        label="Cabeças",
+        min_value=1,
+        widget=forms.NumberInput(attrs={"inputmode": "numeric", "data-previa": "1"}),
+    )
+    total_weight_kg = forms.DecimalField(
+        label="Peso total (kg) — opcional",
+        required=False,
+        min_value=Decimal("0.001"),
+        widget=forms.NumberInput(
+            attrs={"inputmode": "decimal", "step": "0.001", "data-previa": "1"}
+        ),
+    )
+    animal_value = _dinheiro("Valor dos animais (R$)", obrigatorio=True)
+    freight_value = _dinheiro("Frete (R$)")
+    commission_value = _dinheiro("Comissão (R$)")
+    tax_value = _dinheiro("Impostos (R$)")
+    lot = forms.ModelChoiceField(
+        label="Lote",
+        queryset=Lot.objects.none(),
+        required=False,
+        empty_label="Criar um lote novo para esta compra",
+        help_text="Ou adicione a compra a um lote que já existe.",
+    )
+    payment_days = forms.IntegerField(
+        label="Prazo de pagamento (dias)",
+        required=False,
+        min_value=0,
+        max_value=3650,
+        widget=forms.NumberInput(attrs={"inputmode": "numeric"}),
+        help_text=(
+            "Dá o vencimento do título a pagar gerado ao confirmar. Vazio = vence "
+            "na data da compra; depois o vencimento se ajusta no próprio título."
+        ),
+    )
+    partnership = forms.CharField(label="Parceria", max_length=100, required=False)
+    notes = forms.CharField(
+        label="Observações", required=False, widget=forms.Textarea(attrs={"rows": 2})
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["destination_farm"].queryset = (
+            ctx.available_farms(user) if user else Farm.objects.none()
+        )
+        self.fields["lot"].queryset = (
+            Lot.objects.for_user(user).filter(status="ABERTO")
+            if user
+            else Lot.objects.none()
+        )
+        self.fields["seller"].queryset = Partner.objects.filter(
+            is_active=True,
+            roles__role__in=[PartnerRoleChoice.FORNECEDOR, PartnerRoleChoice.PRODUTOR],
+        ).distinct()
+
+    def dados_limpos(self) -> dict:
+        dados = dict(self.cleaned_data)
+        for campo in ("freight_value", "commission_value", "tax_value"):
+            dados[campo] = dados.get(campo) or Decimal("0")
+        dados["partnership"] = dados.get("partnership") or ""
+        dados["notes"] = dados.get("notes") or ""
+        return dados
+
+
+class PurchaseEditForm(PurchaseForm):
+    # Obrigatório só em compra confirmada — a view decide (rascunho não tem).
+    edit_reason = forms.CharField(
+        label="Motivo da correção",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Por que esta compra está sendo corrigida.",
+    )

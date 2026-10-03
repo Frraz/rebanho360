@@ -1,0 +1,50 @@
+# Ambiente — segredos nunca entram no repositório (use .env.example como modelo)
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Django
+backend/staticfiles/
+backend/media/
+backend/static/css/output.css
+*.sqlite3
+*.sqlite3-journal
+# Agenda do Celery beat — gerada pelo processo, muda a cada execução
+celerybeat-schedule*
+
+# Testes / cobertura / linters
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Node (se vier a existir)
+node_modules/
+
+# Editor / SO
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Backups locais (nunca versionar dump de banco)
+*.dump
+*.sql.gz
+backups/
+
+# Material de origem do projeto: planilhas reais da fazenda, relatórios do
+# frigorífico e transcrição de áudio. Fica só no disco local. Só o README
+# da pasta é versionado, para explicar o que ela guarda.
+docs/fontes/*
+!docs/fontes/README.md

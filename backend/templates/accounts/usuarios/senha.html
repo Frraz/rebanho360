@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Redefinir senha · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'accounts:usuario_detalhe' u.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ u.username }}</a>
+    <h1 class="page-title">Redefinir senha</h1>
+    <p class="mt-1 text-base font-medium text-gray-700">{{ u.get_full_name|default:u.username }} <span class="code text-gray-500">{{ u.username }}</span></p>
+  </div>
+</header>
+
+<div class="max-w-2xl space-y-4">
+  {% if form.non_field_errors %}
+  <div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div></div>
+  {% endif %}
+  {% if bloqueios %}
+  <div class="alert-danger" role="alert">
+    {% icon "circle-x" %}
+    <div><p class="font-medium">Não dá para fazer isto agora:</p><ul class="mt-1 list-disc pl-5">{% for b in bloqueios %}<li>{{ b }}</li>{% endfor %}</ul></div>
+  </div>
+  <a href="{% url 'accounts:usuario_detalhe' u.pk %}" class="btn-secondary">Voltar</a>
+  {% else %}
+  <form method="post" class="card space-y-5" x-data="{ modo: '{{ form.modo.value|default:'link' }}' }">
+    {% csrf_token %}
+    <fieldset class="space-y-3">
+      <legend class="field-label">Como redefinir</legend>
+      {% for radio in form.modo %}
+      <label class="flex min-h-touch items-start gap-3 text-sm text-gray-800">
+        <input type="radio" name="modo" value="{{ radio.data.value }}" x-model="modo" class="mt-1" {% if radio.data.selected %}checked{% endif %}>
+        <span>{{ radio.choice_label }}</span>
+      </label>
+      {% endfor %}
+      {% for error in form.modo.errors %}<p class="field-error">{% icon "circle-x" "icon-sm mt-0.5" %}<span>{{ error }}</span></p>{% endfor %}
+    </fieldset>
+
+    <div x-show="modo === 'link'" class="text-sm text-gray-600">
+      <p>O link vai para <strong class="break-all">{{ u.email|default:"— (sem e-mail)" }}</strong>, vale por 3 dias e só funciona uma vez. A senha atual continua valendo até a pessoa usar o link.</p>
+    </div>
+    <div x-show="modo === 'temporaria'" x-cloak class="space-y-5">
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.senha %}
+        {% include "partials/_field.html" with field=form.senha2 %}
+      </div>
+      <div class="alert-warning">{% icon "triangle-alert" %}<span>As sessões abertas dele serão encerradas. Passe a senha por um canal seguro: ele é obrigado a trocá-la no primeiro acesso.</span></div>
+    </div>
+
+    {% include "partials/_field.html" with field=form.motivo %}
+    <div class="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+      <a href="{% url 'accounts:usuario_detalhe' u.pk %}" class="btn-secondary">Cancelar</a>
+      <button type="submit" class="btn-primary">{% icon "lock" %} Redefinir senha</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

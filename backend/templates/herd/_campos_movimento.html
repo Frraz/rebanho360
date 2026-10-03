@@ -1,0 +1,102 @@
+{% load widget_tweaks %}
+{# Campos da movimentação (lançar e corrigir). Espera o x-data do tipo no elemento pai. #}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">O que aconteceu</h2>
+    <p class="mt-1 text-sm text-gray-500">O tipo define quais campos aparecem abaixo.</p>
+  </header>
+  <div class="fields">
+    <div>
+      <label class="field-label" for="id_type">{{ form.type.label }}</label>
+      {{ form.type|add_class:"field-input"|attr:"x-model:tipo" }}
+      {% include "partials/_errors.html" with field=form.type %}
+    </div>
+    <div>
+      <label class="field-label" for="id_date">{{ form.date.label }}</label>
+      {{ form.date|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.date %}
+    </div>
+    <div>
+      <label class="field-label" for="id_quantity">{{ form.quantity.label }}</label>
+      {{ form.quantity|add_class:"field-input"|attr:"inputmode:numeric" }}
+      {% include "partials/_errors.html" with field=form.quantity %}
+    </div>
+  </div>
+</section>
+
+<section class="form-section" x-show="mostraOrigem" x-cloak>
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Origem</h2>
+    <p class="mt-1 text-sm text-gray-500">De onde os animais saem.</p>
+  </header>
+  <div class="fields">
+    <div>
+      <label class="field-label" for="id_origin_farm">{{ form.origin_farm.label }}</label>
+      {{ form.origin_farm|add_class:"field-input"|attr:"hx-get:/rebanho/movimentacoes/lotes-da-fazenda/?campo=origin_lot"|attr:"hx-target:#id_origin_lot"|attr:"hx-swap:outerHTML"|attr:"hx-trigger:change" }}
+      {% include "partials/_errors.html" with field=form.origin_farm %}
+    </div>
+    <div>
+      <label class="field-label" for="id_origin_lot">{{ form.origin_lot.label }}</label>
+      {{ form.origin_lot|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.origin_lot %}
+    </div>
+    <div>
+      <label class="field-label" for="id_origin_category">{{ form.origin_category.label }}</label>
+      {{ form.origin_category|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.origin_category %}
+    </div>
+  </div>
+</section>
+
+<section class="form-section" x-show="mostraDestino" x-cloak>
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Destino</h2>
+    <p class="mt-1 text-sm text-gray-500">Para onde os animais vão.</p>
+  </header>
+  <div class="fields">
+    <div>
+      <label class="field-label" for="id_destination_farm">{{ form.destination_farm.label }}</label>
+      {{ form.destination_farm|add_class:"field-input"|attr:"hx-get:/rebanho/movimentacoes/lotes-da-fazenda/?campo=destination_lot"|attr:"hx-target:#id_destination_lot"|attr:"hx-swap:outerHTML"|attr:"hx-trigger:change" }}
+      {% include "partials/_errors.html" with field=form.destination_farm %}
+    </div>
+    <div>
+      <label class="field-label" for="id_destination_lot">{{ form.destination_lot.label }}</label>
+      {{ form.destination_lot|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.destination_lot %}
+    </div>
+    <div>
+      <label class="field-label" for="id_destination_category">{{ form.destination_category.label }}</label>
+      {{ form.destination_category|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.destination_category %}
+    </div>
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Detalhes</h2>
+    <p class="mt-1 text-sm text-gray-500">Peso, parceiro e justificativa.</p>
+  </header>
+  <div class="fields">
+    <div>
+      <label class="field-label" for="id_total_weight_kg">{{ form.total_weight_kg.label }} <span class="font-normal text-gray-500">(opcional)</span></label>
+      {{ form.total_weight_kg|add_class:"field-input"|attr:"inputmode:decimal" }}
+      {% include "partials/_errors.html" with field=form.total_weight_kg %}
+    </div>
+    <div>
+      <label class="field-label" for="id_partner">{{ form.partner.label }} <span class="font-normal text-gray-500">(opcional)</span></label>
+      {{ form.partner|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.partner %}
+    </div>
+    <div>
+      <label class="field-label" for="id_reason">{{ form.reason.label }}<span x-show="motivoObrigatorio" class="text-red-600" aria-hidden="true"> *</span></label>
+      {{ form.reason|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.reason %}
+    </div>
+    <div>
+      <label class="field-label" for="id_notes">{{ form.notes.label }} <span class="font-normal text-gray-500">(opcional)</span></label>
+      {{ form.notes|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.notes %}
+    </div>
+  </div>
+</section>

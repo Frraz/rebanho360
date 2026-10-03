@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Custos · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Custos{% if season %}<span class="text-lg font-normal text-gray-500">safra {{ season.name }}</span>{% endif %}</h1>
+      {% info "custo" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if pode_lancar %}<a href="{% url 'costs:novo' %}" class="btn-primary">{% icon "plus" %} Lançar custo</a>{% endif %}
+  </div>
+</header>
+
+<form method="get" class="card mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
+  <div class="lg:col-span-2">
+    <label class="field-label" for="{{ filtro.q.id_for_label }}">Buscar</label>
+    {{ filtro.q|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.farm.id_for_label }}">Fazenda</label>
+    {{ filtro.farm|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.cost_center.id_for_label }}">Centro</label>
+    {{ filtro.cost_center|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.cost_class.id_for_label }}">Classe</label>
+    {{ filtro.cost_class|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.situacao.id_for_label }}">Situação</label>
+    {{ filtro.situacao|add_class:"field-input" }}
+  </div>
+  <div class="sm:col-span-2 lg:col-span-6 flex justify-end">
+    <button type="submit" class="btn-secondary w-full sm:w-auto">{% icon "search" %} Filtrar</button>
+  </div>
+</form>
+
+<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2 text-sm text-gray-600">
+  <p>{{ page_obj.paginator.count }} lançamento{{ page_obj.paginator.count|pluralize:"s" }}</p>
+  <p>Total <strong class="text-base font-semibold text-gray-900 tabular-nums">{{ total|brl }}</strong></p>
+</div>
+
+<div class="table-wrap">
+  {% if custos %}
+  <table class="table table-stack">
+    <thead>
+      <tr>
+        <th scope="col">Descrição</th><th scope="col">Data</th><th scope="col">Centro</th><th scope="col">Fazenda</th>
+        <th scope="col">Vínculo</th><th scope="col" class="num">Valor</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for custo in custos %}
+      <tr class="is-link">
+        <td class="cell-title">
+          <a href="{% url 'costs:detalhe' custo.pk %}" class="row-link">{{ custo.description }}</a>
+          {% if custo.status == "EXCLUIDA" %}<span class="ml-1.5">{% status_badge custo.status %}</span>{% endif %}
+          {% if custo.version > 1 %}<span class="badge-editada ml-1.5">Editada (v{{ custo.version }})</span>{% endif %}
+        </td>
+        <td data-label="Data" class="nowrap">{{ custo.date|date:"d/m/Y" }}</td>
+        <td data-label="Centro">{{ custo.cost_center.name }}</td>
+        <td data-label="Fazenda" class="muted">{{ custo.farm.name }}</td>
+        <td data-label="Vínculo" class="muted">
+          {% if custo.lot %}Lote {{ custo.lot.code }}{% endif %}{% if custo.lot and custo.source_purchase %} · {% endif %}{% if custo.source_purchase %}Compra {{ custo.source_purchase.code }}{% endif %}{% if not custo.lot and not custo.source_purchase %}—{% endif %}
+        </td>
+        <td data-label="Valor" class="num nowrap font-medium">{{ custo.amount|brl }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="wallet" titulo="Nenhum custo encontrado" texto="Nenhum lançamento corresponde a estes filtros." %}
+  {% endif %}
+</div>
+{% endblock %}

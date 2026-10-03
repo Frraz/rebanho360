@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags finance_tags %}
+{% block title %}{% if a_receber %}Contas a receber{% else %}Contas a pagar{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if a_receber %}Contas a receber{% else %}Contas a pagar{% endif %}</h1>
+      {% if a_receber %}{% info "contas_receber" %}{% else %}{% info "contas_pagar" %}{% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if sem_titulo %}<a href="{% url 'finance:sem_titulo' %}" class="btn-secondary">{% icon "file-text" %} Operações sem título ({{ sem_titulo }})</a>{% endif %}
+    {% if pode_lancar %}<a href="{% url 'finance:titulo_novo' %}?direcao={% if a_receber %}RECEBER{% else %}PAGAR{% endif %}" class="btn-primary">{% icon "plus" %} Novo título</a>{% endif %}
+  </div>
+</header>
+
+<nav class="seg mb-4" aria-label="Tipo de conta">
+  <a href="{% url 'finance:contas_a_pagar' %}" {% if not a_receber %}aria-current="page"{% endif %}>A pagar</a>
+  <a href="{% url 'finance:contas_a_receber' %}" {% if a_receber %}aria-current="page"{% endif %}>A receber</a>
+</nav>
+
+<dl class="stats mb-5" aria-label="Resumo de vencimentos">
+  <div class="stat"><dt class="stat-label">Vencidos</dt><dd class="stat-value {% if resumo.vencidos.quantidade %}text-red-700{% endif %}">{{ resumo.vencidos.valor|brl }}</dd><dd class="stat-note">{{ resumo.vencidos.quantidade }} título{{ resumo.vencidos.quantidade|pluralize }}</dd></div>
+  <div class="stat"><dt class="stat-label">Vencem hoje</dt><dd class="stat-value">{{ resumo.hoje.valor|brl }}</dd><dd class="stat-note">{{ resumo.hoje.quantidade }} título{{ resumo.hoje.quantidade|pluralize }}</dd></div>
+  <div class="stat"><dt class="stat-label">Próximos 7 dias</dt><dd class="stat-value">{{ resumo.proximos_7_dias.valor|brl }}</dd><dd class="stat-note">{{ resumo.proximos_7_dias.quantidade }} título{{ resumo.proximos_7_dias.quantidade|pluralize }} · sem contar hoje</dd></div>
+  <div class="stat"><dt class="stat-label">Depois disso</dt><dd class="stat-value">{{ resumo.depois.valor|brl }}</dd><dd class="stat-note">{{ resumo.depois.quantidade }} título{{ resumo.depois.quantidade|pluralize }}</dd></div>
+  <div class="stat"><dt class="stat-label">Total em aberto</dt><dd class="stat-value">{{ resumo.em_aberto.valor|brl }}</dd><dd class="stat-note">{{ resumo.em_aberto.quantidade }} título{{ resumo.em_aberto.quantidade|pluralize }}</dd></div>
+</dl>
+
+<form method="get" class="card mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+  <div class="lg:col-span-2">
+    <label class="field-label" for="{{ filtro.payee.id_for_label }}">{% if a_receber %}Cliente{% else %}Favorecido{% endif %}</label>
+    {{ filtro.payee|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.situacao.id_for_label }}">Situação</label>
+    {{ filtro.situacao|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.de.id_for_label }}">Vence de</label>
+    {{ filtro.de|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.ate.id_for_label }}">até</label>
+    {{ filtro.ate|add_class:"field-input" }}
+  </div>
+  <div class="sm:col-span-2 lg:col-span-5 flex justify-end">
+    <button type="submit" class="btn-secondary w-full sm:w-auto">{% icon "search" %} Filtrar</button>
+  </div>
+</form>
+
+<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2 text-sm text-gray-600">
+  <p>{{ page_obj.paginator.count }} título{{ page_obj.paginator.count|pluralize }}</p>
+  <p>Saldo listado <strong class="text-base font-semibold text-gray-900 tabular-nums">{{ total_listado|brl }}</strong></p>
+</div>
+
+<div class="table-wrap">
+  {% if titulos %}
+  <table class="table table-stack">
+    <thead>
+      <tr>
+        <th scope="col">Título</th><th scope="col">Vencimento</th><th scope="col">{% if a_receber %}Cliente{% else %}Favorecido{% endif %}</th>
+        <th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col" class="num">Saldo</th><th scope="col">Situação</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for titulo, vencido in titulos %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="row-link code">{{ titulo.code }}</a></td>
+        <td data-label="Vencimento" class="nowrap">{{ titulo.due_date|date:"d/m/Y" }}</td>
+        <td data-label="{% if a_receber %}Cliente{% else %}Favorecido{% endif %}" class="muted">{{ titulo.payee.name|default:"A definir" }}</td>
+        <td data-label="Origem" class="cell-hide-mobile">{{ titulo.get_component_display }}{% if titulo.origem %} <span class="code text-gray-500">{{ titulo.origem }}</span>{% endif %}</td>
+        <td data-label="Valor" class="num nowrap cell-hide-mobile">{{ titulo.amount|brl }}</td>
+        <td data-label="Saldo" class="num nowrap font-medium">{{ titulo.balance|brl }}</td>
+        <td data-label="Situação" class="cell-status"><span class="inline-flex flex-wrap items-center justify-end gap-1.5">{% titulo_selos titulo %}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="wallet" titulo="Nenhum título encontrado" texto="Compras e vendas confirmadas geram os títulos sozinhas. Ajuste os filtros acima ou lance um título avulso." %}
+  {% endif %}
+</div>
+{% endblock %}

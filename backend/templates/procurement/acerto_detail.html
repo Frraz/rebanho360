@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load core_tags procurement_tags %}
+{% block title %}{{ acerto.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ compromisso.code }}</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ acerto.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% if acerto.status == "CONFIRMADA" %}<span class="badge-confirmada">Aprovado</span>{% elif acerto.status == "RASCUNHO" %}<span class="badge-pendencia">Em andamento</span>{% else %}<span class="badge-excluida">Excluído</span>{% endif %}
+      </span>
+    </h1>
+    <p class="page-subtitle">{{ compromisso.seller.name }} · {{ compromisso.destination_farm.name }} · {{ acerto.date|date:"d/m/Y" }}</p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'reports:relatorio' 'conferencia-do-acerto' %}?acerto={{ acerto.pk }}" class="btn-secondary">{% icon "file-bar-chart" %} Conferência</a>
+    {% if pode_aprovar %}<a href="{% url 'procurement:acerto_aprovar' acerto.pk %}" class="btn-primary">{% icon "check" %} Aprovar acerto</a>{% endif %}
+    {% if pode_reabrir %}<a href="{% url 'procurement:acerto_reabrir' acerto.pk %}" class="btn-secondary">{% icon "rotate-ccw" %} Reabrir acerto</a>{% endif %}
+  </div>
+</header>
+
+{% if acerto.status == "EXCLUIDA" %}
+<div class="alert-warning mb-6" role="status">{% icon "triangle-alert" %}<p>Excluído por {{ acerto.deleted_by }}{% if acerto.delete_reason %}: "{{ acerto.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+
+{% if acerto.status == "CONFIRMADA" %}
+<div class="alert-info mb-6" role="status">
+  {% icon "lock" %}
+  <p>Acerto aprovado em {{ acerto.approved_at|date:"d/m/Y H:i" }} por {{ acerto.approved_by }}. Os valores estão travados: para corrigir, reabra o acerto (com motivo).</p>
+</div>
+{% elif acerto.status == "RASCUNHO" and calculo.pendencias %}
+<div class="alert-danger mb-6" role="alert">
+  {% icon "circle-x" %}
+  <div><p class="font-medium">Ainda não dá para aprovar:</p>
+    <ul class="mt-1 list-disc space-y-1 pl-5">{% for p in calculo.pendencias %}<li>{{ p }}</li>{% endfor %}</ul></div>
+</div>
+{% endif %}
+{% for a in calculo.avisos %}<div class="alert-warning mb-3" role="status">{% icon "triangle-alert" %}<p>{{ a }}</p></div>{% endfor %}
+
+<section class="card" aria-labelledby="titulo-comparativo">
+  <h2 id="titulo-comparativo" class="card-title mb-3">Previsto × realizado</h2>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th scope="col">Item</th><th scope="col" class="num">Previsto</th><th scope="col" class="num">Realizado</th></tr></thead>
+      <tbody>
+        {% for c in calculo.comparacoes %}
+        <tr>
+          <td class="cell-title font-medium">{{ c.rotulo }}</td>
+          <td data-label="Previsto" class="{% if c.tipo == 'texto' %}break-words{% else %}num nowrap{% endif %}">{{ c.previsto|comparado:c.tipo }}</td>
+          <td data-label="Realizado" class="font-medium {% if c.tipo == 'texto' %}break-words{% else %}num nowrap{% endif %}">{{ c.realizado|comparado:c.tipo }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} "—" quer dizer que falta o dado (sem previsão informada, ou sem recebimento ainda), não que o valor seja zero.</p>
+</section>
+
+<section class="card mt-6" aria-labelledby="titulo-itens">
+  <h2 id="titulo-itens" class="card-title mb-3">Por item</h2>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th scope="col">Item</th><th scope="col" class="num">Recebidas</th><th scope="col" class="num">Preço previsto</th><th scope="col" class="num">Preço realizado</th><th scope="col" class="num">Valor dos animais</th></tr></thead>
+      <tbody>
+        {% for d in calculo.itens %}
+        <tr>
+          <td class="cell-title font-medium">{{ d.item.number }} · {{ d.item.category.name }}<span class="block text-xs font-normal text-gray-500">{% if d.base == "ARROBA" %}por @ de carcaça{% else %}por cabeça{% endif %}</span></td>
+          <td data-label="Recebidas" class="num">{% if d.recebido %}{{ d.cabecas_recebidas }}{% else %}—{% endif %}</td>
+          <td data-label="Preço previsto" class="num nowrap">{{ d.preco_previsto|brl }}</td>
+          <td data-label="Preço realizado" class="num nowrap">{{ d.preco_realizado|brl }}</td>
+          <td data-label="Valor dos animais" class="num nowrap font-medium">{{ d.valor_do_item|brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-consolidado">
+    <h2 id="titulo-consolidado" class="card-title mb-2">Do bruto ao líquido</h2>
+    <div class="rows">
+      <div><span>Animais (romaneio e cabeças)</span> <span>{{ calculo.valor_dos_itens|brl }}</span></div>
+      <div><span>Descontos</span> <span>{{ calculo.descontos|brl }}</span></div>
+      <div><span>Valor dos animais</span> <span>{{ calculo.valor_dos_animais|brl }}</span></div>
+      <div><span>Frete</span> <span>{{ calculo.frete|brl }}</span></div>
+      <div><span>Tributos e taxas</span> <span>{{ calculo.tributos|brl }}</span></div>
+      <div><span>Comissão{% if calculo.comissao_extra %} (com extra){% endif %}</span> <span>{{ calculo.comissao_total|brl }}</span></div>
+      <div class="total"><span>Custo de aquisição</span> <span>{{ calculo.custo_aquisicao|brl }}</span></div>
+      <div><span>Adiantamentos</span> <span>{{ calculo.adiantamentos|brl }}</span></div>
+      <div><span>Créditos</span> <span>{{ calculo.creditos|brl }}</span></div>
+      <div class="total"><span>Líquido a pagar ao vendedor</span> <span>{{ calculo.liquido_ao_produtor|brl }}</span></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="titulo-linhas">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 id="titulo-linhas" class="card-title">Tributos, taxas e descontos</h2>
+      {% if pode_editar %}<a href="{% url 'procurement:acerto_linhas' acerto.pk %}" class="btn-secondary btn-sm">{% icon "pencil" "icon-sm" %} Lançar</a>{% endif %}
+    </div>
+    {% if linhas %}
+    <div class="rows">
+      {% for l in linhas %}<div><span>{{ l.tax_type.name }} <span class="text-xs text-gray-500">({{ l.tax_type.get_nature_display|lower }}){% if l.reference %} · {{ l.reference }}{% endif %}</span></span> <span>{{ l.amount|brl }}</span></div>{% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-600">Nenhum lançamento. Os valores são digitados: não há alíquota nem fórmula (pendência #21).</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card mt-6" id="notas-fiscais" aria-labelledby="titulo-notas">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="titulo-notas" class="card-title">Notas fiscais</h2>
+    {% if pode_lancar %}<a href="{% url 'procurement:acerto_notas' acerto.pk %}" class="btn-secondary btn-sm">{% icon "pencil" "icon-sm" %} Registrar</a>{% endif %}
+  </div>
+  {% if notas %}
+  <div class="rows">
+    {% for n in notas %}<div><span>NF <span class="code">{{ n.number }}</span>{% if n.series %}/{{ n.series }}{% endif %} <span class="text-xs text-gray-500">· {{ n.issue_date|date:"d/m/Y" }}</span></span> <span>{{ n.amount|brl }}</span></div>{% endfor %}
+  </div>
+  <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Com nota registrada, reabrir o acerto fica bloqueado até a nota ser retirada.</p>
+  {% else %}
+  <p class="text-sm text-gray-600">Nenhuma nota registrada. O sistema só guarda o número: não emite nota.</p>
+  {% endif %}
+</section>
+
+{% if compras %}
+<section class="card mt-6" aria-labelledby="titulo-compras">
+  <h2 id="titulo-compras" class="card-title mb-2">O que este acerto gerou</h2>
+  <ul class="divide-y divide-gray-100 text-sm">
+    {% for c in compras %}
+    <li class="py-2.5">Compra <a class="link code" href="{% url 'purchases:detalhe' c.pk %}">{{ c.code }}</a> <span class="text-gray-600">· {{ c.head_count }} cabeças no lote <a class="link code" href="{% url 'livestock:lote_detalhe' c.lot.pk %}">{{ c.lot.code }}</a> · animais {{ c.animal_value|brl }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'procurement:acerto_excluir' acerto.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir acerto</a>{% endif %}
+  {% if pode_restaurar %}<form method="post" action="{% url 'procurement:acerto_restaurar' acerto.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar acerto</button></form>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

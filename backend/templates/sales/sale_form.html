@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Nova venda · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'sales:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Vendas e abates</a>
+    <h1 class="page-title">Nova venda ou abate</h1>
+    <p class="page-subtitle">Confirmar dá saída no rebanho. Se o lote ficar sem animais, ele é encerrado.</p>
+  </div>
+</header>
+
+<form method="post" id="form-venda" class="card max-w-4xl pb-24 md:pb-5" data-rascunho="venda">
+  {% csrf_token %}
+  {% include "sales/_campos.html" %}
+  <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+    <button type="submit" name="acao" value="rascunho" class="btn-secondary">Salvar rascunho</button>
+    <button type="submit" name="acao" value="confirmar" class="btn-primary">Confirmar venda</button>
+  </div>
+</form>
+
+<script>
+/* Rascunho em localStorage: sinal ruim não apaga o que foi digitado. */
+(function () {
+  var form = document.getElementById('form-venda');
+  var chave = 'rascunho:' + form.dataset.rascunho;
+  try {
+    var salvo = JSON.parse(localStorage.getItem(chave) || '{}');
+    Object.keys(salvo).forEach(function (nome) {
+      var campo = form.elements[nome];
+      if (campo && !campo.value) { campo.value = salvo[nome]; if (campo._cb) campo._cb.sync(); }
+    });
+  } catch (e) {}
+  form.addEventListener('input', function () {
+    var dados = {};
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (campo.name && ['csrfmiddlewaretoken', 'acao'].indexOf(campo.name) < 0) dados[campo.name] = campo.value;
+    });
+    try { localStorage.setItem(chave, JSON.stringify(dados)); } catch (e) {}
+  });
+})();
+</script>
+{% endblock %}

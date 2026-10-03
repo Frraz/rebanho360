@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Exportação · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'exports:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Exportações</a>
+    <h1 class="page-title">Exportação de {{ job.created_at|date:"d/m/Y H:i" }}</h1>
+    <p class="page-subtitle">Pedida por {{ job.requested_by }}. Pode sair desta tela: a exportação continua rodando e fica em <a class="link" href="{% url 'exports:lista' %}">Exportações</a>.</p>
+  </div>
+</header>
+
+{% include "exports/_estado.html" %}
+
+<section class="card max-w-3xl" aria-label="O que foi pedido">
+  <h2 class="card-title mb-3">O que foi pedido</h2>
+  <dl class="dl">
+    <div><dt>Filtros</dt><dd class="!font-normal">{% for f in job.filters %}{{ f }}{% if not forloop.last %} · {% endif %}{% endfor %}</dd></div>
+    <div><dt>Formatos</dt><dd class="uppercase">{{ job.params.formatos|join:", "|default:"—" }}</dd></div>
+    {% if job.params.opcoes.incluir_arquivos %}<div><dt>Anexos</dt><dd>Planilhas importadas e PDFs gerados</dd></div>{% endif %}
+    <div><dt>Código</dt><dd class="code !whitespace-normal break-all">{{ job.job_id }}</dd></div>
+    {% if job.file_hash %}<div><dt>SHA-256 do arquivo</dt><dd class="code !whitespace-normal break-all">{{ job.file_hash }}</dd></div>{% endif %}
+  </dl>
+  {% if job.status != "PENDENTE" and job.status != "PROCESSANDO" %}
+  <form method="post" action="{% url 'exports:repetir' job.job_id %}" class="mt-4 border-t border-gray-100 pt-4">
+    {% csrf_token %}
+    <button type="submit" class="btn-secondary btn-sm">{% icon "rotate-ccw" "icon-sm" %} Pedir de novo, com os mesmos parâmetros</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

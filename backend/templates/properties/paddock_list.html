@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Áreas / Pastos · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Áreas / Pastos</h1>
+      {% info "pasto" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'properties:pasto_novo' %}" class="btn-primary">{% icon "plus" %} Nova área</a>
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if pastos %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Área</th><th scope="col">Fazenda</th><th scope="col">Tipo</th><th scope="col">Hectares</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for pasto in pastos %}
+      <tr>
+        <td class="cell-title font-medium">{{ pasto.name }}</td>
+        <td data-label="Fazenda">{{ pasto.farm.name }}</td>
+        <td data-label="Tipo" class="muted">{{ pasto.get_type_display }}</td>
+        <td data-label="Hectares" class="num">{% if pasto.area_ha %}{{ pasto.area_ha }} ha{% else %}—{% endif %}</td>
+        <td data-label="Situação" class="cell-status">{% if pasto.is_active %}<span class="badge-confirmada">Ativa</span>{% else %}<span class="badge-excluida">Inativa</span>{% endif %}</td>
+        <td class="cell-actions num"><a href="{% url 'properties:pasto_editar' pasto.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'properties:pasto_novo' as url_nova %}
+  {% include "partials/_empty.html" with icone="map-pin" titulo="Nenhuma área cadastrada" texto="Cadastre os pastos e áreas de cada fazenda." url=url_nova acao="Nova área" %}
+  {% endif %}
+</div>
+{% endblock %}

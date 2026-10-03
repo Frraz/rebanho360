@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ relatorio.titulo }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div class="min-w-0">
+    <a href="{% url 'reports:indice' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Todos os relatórios</a>
+    <h1 class="page-title">{{ relatorio.titulo }}</h1>
+    <p class="page-subtitle max-w-3xl">{{ relatorio.descricao }}</p>
+  </div>
+  <div class="page-actions">
+    <a href="?{% for k, v in request.GET.items %}{% if k != 'formato' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}formato=csv" class="btn-secondary">{% icon "download" %} CSV</a>
+    <a href="?{% for k, v in request.GET.items %}{% if k != 'formato' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}formato=xlsx" class="btn-secondary">{% icon "download" %} Excel</a>
+    <form method="post" action="{% url 'documents:gerar' slug %}">
+      {% csrf_token %}
+      {% for k, v in request.GET.items %}{% if k != 'formato' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+      <button type="submit" class="btn-secondary">{% icon "file-down" %} PDF</button>
+    </form>
+  </div>
+</header>
+
+<div class="mb-5 space-y-1">
+  <p class="text-sm text-gray-700"><span class="text-gray-500">Filtros:</span> {% for f in relatorio.filtros %}{{ f }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+  {% for nota in relatorio.notas %}<p class="text-xs text-gray-500">{{ nota }}</p>{% endfor %}
+</div>
+
+{% if tem_filtros %}
+<form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
+  {% if aceita_periodo %}
+  <div>
+    <label class="field-label" for="de">De</label>
+    <input type="date" id="de" name="de" value="{{ de }}" class="field-input">
+  </div>
+  <div>
+    <label class="field-label" for="ate">Até</label>
+    <input type="date" id="ate" name="ate" value="{{ ate }}" class="field-input">
+  </div>
+  {% endif %}
+  {% if aceita_lote %}
+  <div class="sm:col-span-2">
+    <label class="field-label" for="lote">Lote</label>
+    <select id="lote" name="lote" class="field-input">
+      <option value="">Todos os lotes</option>
+      {% for l in lotes %}<option value="{{ l.pk }}" {% if lote_escolhido == l.pk|stringformat:"s" %}selected{% endif %}>{{ l.code }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% if aceita_rendimento %}
+  <div class="sm:col-span-2">
+    <label class="field-label" for="rendimento_entrada">Rendimento de carcaça de entrada estimado (%) — para a @ produzida</label>
+    <input type="text" inputmode="decimal" id="rendimento_entrada" name="rendimento_entrada" value="{{ rendimento_entrada }}" class="field-input" placeholder="ex.: 48">
+  </div>
+  {% endif %}
+  <div class="flex justify-end sm:col-span-2">
+    <button type="submit" class="btn-primary w-full sm:w-auto">Aplicar filtros</button>
+  </div>
+</form>
+{% endif %}
+
+{% include "reports/_tabela.html" with tabela=tabela %}
+
+{% for secao, tabela_da_secao in secoes %}
+<h2 class="section-title">{{ secao.titulo }}</h2>
+{% include "reports/_tabela.html" with tabela=tabela_da_secao %}
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Acertos · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Acertos</h1>
+      {% info "acerto" %}
+    </div>
+  </div>
+</header>
+
+<form method="get" class="mb-4 flex items-center gap-3">
+  <label class="text-sm font-medium text-gray-700" for="situacao">Situação</label>
+  <select id="situacao" name="situacao" class="field-input !w-auto" onchange="this.form.submit()">
+    <option value="" {% if not situacao %}selected{% endif %}>Todos</option>
+    <option value="RASCUNHO" {% if situacao == "RASCUNHO" %}selected{% endif %}>Em andamento</option>
+    <option value="CONFIRMADA" {% if situacao == "CONFIRMADA" %}selected{% endif %}>Aprovados</option>
+    <option value="EXCLUIDA" {% if situacao == "EXCLUIDA" %}selected{% endif %}>Excluídos</option>
+  </select>
+</form>
+
+<div class="table-wrap">
+  {% if acertos %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Acerto</th><th scope="col">Data</th><th scope="col">Compromisso</th><th scope="col">Produtor</th><th scope="col">Destino</th><th scope="col">Situação</th></tr></thead>
+    <tbody>
+      {% for a in acertos %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'procurement:acerto_detalhe' a.pk %}" class="row-link code">{{ a.code }}</a></td>
+        <td data-label="Data" class="nowrap">{{ a.date|date:"d/m/Y" }}</td>
+        <td data-label="Compromisso"><span class="code">{{ a.commitment.code }}</span></td>
+        <td data-label="Produtor">{{ a.commitment.seller.name }}</td>
+        <td data-label="Destino" class="cell-hide-mobile">{{ a.commitment.destination_farm.name }}</td>
+        <td data-label="Situação" class="cell-status">{% if a.status == "CONFIRMADA" %}<span class="badge-confirmada">Aprovado</span>{% elif a.status == "RASCUNHO" %}<span class="badge-pendencia">Em andamento</span>{% else %}<span class="badge-excluida">Excluído</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="scale" titulo="Nenhum acerto encontrado" texto="O acerto se abre dentro do compromisso, depois do primeiro recebimento." %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+{# Documento para imprimir. CSS próprio e inline: o WeasyPrint não carrega o Tailwind. #}
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>{{ relatorio.titulo }} · Rebanho360</title>
+<style>
+  @page {
+    size: {% if paisagem %}A4 landscape{% else %}A4{% endif %};
+    margin: 30mm 12mm 16mm 12mm;
+    /* Cabeçalho em TODA página, com o sistema, o relatório, a emissão e os
+       filtros aplicados — sem eles, papel na mesa não diz a que se refere. */
+    @top-left { content: element(cabecalho); width: 100%; vertical-align: top; }
+    @bottom-left { content: element(rodape); font-size: 8pt; color: #555; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8pt; color: #555; }
+  }
+  html { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #1a1a1a; }
+  #rodape { position: running(rodape); font-size: 8pt; color: #555; }
+  #cabecalho { position: running(cabecalho); border-bottom: 1.5pt solid #194659; padding-bottom: 3mm; }
+  #cabecalho .sistema { font-size: 8pt; color: #194659; font-weight: bold; letter-spacing: .05em; text-transform: uppercase; }
+  #cabecalho .titulo { font-size: 14pt; font-weight: bold; margin: 1mm 0; }
+  #cabecalho .meta { font-size: 8pt; color: #333; }
+  h2 { font-size: 11pt; margin: 8mm 0 2mm; }
+  p.nota { font-size: 8pt; color: #444; margin: 1mm 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 3mm; }
+  thead { display: table-header-group; }
+  th { text-align: left; font-size: 8pt; border-bottom: 1pt solid #666; padding: 1.5mm 2mm; background: #eef5f7; }
+  th.num, td.num { text-align: right; }
+  td { text-align: left; padding: 1.2mm 2mm; border-bottom: .4pt solid #ddd; font-size: 8.5pt; }
+  td.num { white-space: nowrap; }
+  tr { page-break-inside: avoid; }
+  tr.total td { font-weight: bold; border-top: 1pt solid #666; background: #fafafa; }
+  .vazio { color: #666; text-align: center; padding: 6mm; }
+</style>
+</head>
+<body>
+<div id="rodape">Emitido por {{ emitido_por }} · layout {{ versao }}</div>
+<div id="cabecalho">
+  <div class="sistema">Rebanho360</div>
+  <div class="titulo">{{ relatorio.titulo }}</div>
+  <div class="meta">Emitido em {{ emitido_em|date:"d/m/Y H:i" }} por {{ emitido_por }}</div>
+  <div class="meta"><strong>Filtros aplicados:</strong> {% for f in relatorio.filtros %}{{ f }}{% if not forloop.last %} · {% endif %}{% empty %}nenhum{% endfor %}</div>
+</div>
+
+{% if relatorio.descricao %}<p class="nota">{{ relatorio.descricao }}</p>{% endif %}
+{% for nota in relatorio.notas %}<p class="nota">{{ nota }}</p>{% endfor %}
+
+{% for titulo, tabela in tabelas %}
+{% if titulo %}<h2>{{ titulo }}</h2>{% endif %}
+<table>
+  <thead><tr>{% for rotulo in tabela.cabecalho %}<th{% if forloop.counter0 in tabela.indices_numericos %} class="num"{% endif %}>{{ rotulo }}</th>{% endfor %}</tr></thead>
+  <tbody>
+    {% for linha in tabela.celulas %}
+    <tr{% if forloop.last and tabela.tem_totais %} class="total"{% endif %}>{% for valor, numerica in linha %}<td{% if numerica %} class="num"{% endif %}>{{ valor }}</td>{% endfor %}</tr>
+    {% empty %}
+    <tr><td class="vazio" colspan="{{ tabela.cabecalho|length }}">Sem dados neste filtro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+</body>
+</html>

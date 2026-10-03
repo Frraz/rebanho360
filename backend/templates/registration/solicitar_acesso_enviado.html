@@ -1,0 +1,12 @@
+{% extends "registration/_auth.html" %}
+{% load core_tags %}
+{% block title %}Solicitação enviada · Rebanho360{% endblock %}
+{% block auth_body %}
+<h1 class="text-2xl font-semibold tracking-tight">Solicitação enviada</h1>
+<div class="alert-success mt-6">
+  {% icon "circle-check" %}
+  <p>Recebemos o seu pedido. Os administradores foram avisados e vão analisar. Se for aprovado, você recebe um e-mail com o link para definir a sua senha.</p>
+</div>
+<p class="mt-4 text-sm text-gray-600">Não chegou nada depois de alguns dias? Fale com quem administra o sistema na sua fazenda — confira também a caixa de spam.</p>
+<p class="mt-5 text-center text-sm"><a href="{% url 'accounts:login' %}" class="link">Voltar para o login</a></p>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% load core_tags %}
+<div id="previa-indicadores" class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm" aria-live="polite">
+  <p class="eyebrow mb-2">Prévia dos indicadores</p>
+  <div class="dl">
+    <div><dt>Peso médio vivo</dt><dd>{{ previa.peso_medio_vivo|kg:1 }}</dd></div>
+    <div><dt>Valor por cabeça</dt><dd>{{ previa.valor_por_cabeca|brl }}</dd></div>
+    {% if e_venda_viva %}
+    <div><dt>Valor por kg vivo</dt><dd>{{ previa.valor_por_kg_vivo|brl }}</dd></div>
+    {% else %}
+    <div><dt>Carcaça média</dt><dd>{{ previa.carcaca_media|kg:1 }}</dd></div>
+    <div><dt>Rendimento</dt><dd>{{ previa.rendimento|pct }}</dd></div>
+    <div><dt>@ de carcaça</dt><dd>{{ previa.arrobas_carcaca|arroba }}</dd></div>
+    <div class="total"><dt>Valor por @</dt><dd>{{ previa.valor_por_arroba|brl }}</dd></div>
+    {% endif %}
+  </div>
+  {% if not e_venda_viva and previa.rendimento is None %}<p class="mt-2 text-xs text-gray-500">Rendimento e valor por @ dependem do peso de carcaça, que vem do romaneio do frigorífico.</p>{% endif %}
+</div>

@@ -1,0 +1,11 @@
+{% load core_tags %}
+<div id="previa-custo" class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm" aria-live="polite">
+  <p class="eyebrow mb-2">Prévia do custo</p>
+  <div class="dl">
+    <div class="total"><dt>Custo total</dt><dd>{{ previa.custo_aquisicao|brl }}</dd></div>
+    <div><dt>Média por cabeça (animais)</dt><dd>{{ previa.media_por_cabeca|brl }}</dd></div>
+    <div><dt>Custo de aquisição por cabeça</dt><dd>{{ previa.custo_por_cabeca|brl }}</dd></div>
+    <div><dt>Custo por @ (vivo)</dt><dd>{{ previa.custo_por_arroba|brl }}</dd></div>
+  </div>
+  {% if previa.custo_por_arroba is None %}<p class="mt-2 text-xs text-gray-500">Custo por @ e por kg dependem do peso total da compra.</p>{% endif %}
+</div>

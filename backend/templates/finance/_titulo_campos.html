@@ -1,0 +1,76 @@
+{% load core_tags %}
+{% if form.non_field_errors %}
+<div class="alert-danger mb-5" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+
+{% if form.direction or form.component or form.farm %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Tipo e origem</h2>
+    <p class="mt-1 text-sm text-gray-500">Se é para pagar ou receber, e de onde vem a obrigação.</p>
+  </header>
+  <div class="fields">
+    {% if form.direction %}{% include "partials/_field.html" with field=form.direction %}{% endif %}
+    {% if form.component %}{% include "partials/_field.html" with field=form.component %}{% endif %}
+    {% if form.farm %}{% include "partials/_field.html" with field=form.farm %}{% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if form.payee %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Favorecido</h2>
+    <p class="mt-1 text-sm text-gray-500">A conta bancária vem do cadastro do parceiro — nunca é digitada aqui.</p>
+  </header>
+  <div class="fields">
+    {% include "partials/_field.html" with field=form.payee %}
+    {% if form.bank_account %}{% include "partials/_field.html" with field=form.bank_account %}{% endif %}
+  </div>
+</section>
+{% elif form.bank_account %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Conta bancária</h2>
+    <p class="mt-1 text-sm text-gray-500">Do cadastro do favorecido.</p>
+  </header>
+  <div class="fields">{% include "partials/_field.html" with field=form.bank_account %}</div>
+</section>
+{% endif %}
+
+{% if form.amount or form.issue_date or form.due_date or form.document %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Valor e prazos</h2>
+  </header>
+  <div class="fields">
+    {% if form.amount %}{% include "partials/_field.html" with field=form.amount %}{% endif %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% if form.issue_date %}{% include "partials/_field.html" with field=form.issue_date %}{% endif %}
+      {% if form.due_date %}{% include "partials/_field.html" with field=form.due_date %}{% endif %}
+    </div>
+    {% if form.document %}{% include "partials/_field.html" with field=form.document %}{% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if form.notes %}
+<section class="form-section">
+  <header><h2 class="text-sm font-semibold text-gray-900">Complemento</h2></header>
+  <div class="fields">{% include "partials/_field.html" with field=form.notes %}</div>
+</section>
+{% endif %}
+
+{% if form.edit_reason %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2>
+    <p class="mt-1 text-sm text-gray-500">Obrigatório. Fica na auditoria.</p>
+  </header>
+  <div class="fields">{% include "partials/_field.html" with field=form.edit_reason %}</div>
+</section>
+{% endif %}

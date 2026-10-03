@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ parceiro.name }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'partners:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Parceiros</a>
+    <h1 class="page-title">{{ parceiro.name }}</h1>
+    <p class="mt-2 flex flex-wrap gap-1.5">
+      {% for papel in parceiro.roles.all %}<span class="badge-editada">{{ papel.get_role_display }}</span>{% endfor %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'partners:editar' parceiro.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>
+  </div>
+</header>
+
+<section class="card" aria-label="Dados do parceiro">
+  <dl class="facts">
+    <div><dt>Documento</dt><dd>{{ parceiro.document|default:"Sem documento" }}</dd></div>
+    <div><dt>Cidade</dt><dd>{% if parceiro.city %}{{ parceiro.city }}{% if parceiro.state %}-{{ parceiro.state }}{% endif %}{% else %}—{% endif %}</dd></div>
+    <div><dt>Telefone</dt><dd>{{ parceiro.phone|default:"—" }}</dd></div>
+    <div><dt>E-mail</dt><dd class="break-all">{{ parceiro.email|default:"—" }}</dd></div>
+  </dl>
+</section>
+
+<section class="mt-8" aria-labelledby="titulo-contas">
+  <div class="mb-3 flex items-center justify-between gap-3">
+    <h2 id="titulo-contas" class="text-base font-semibold">Contas bancárias</h2>
+    <a href="{% url 'partners:conta_nova' parceiro.pk %}" class="btn-secondary btn-sm">{% icon "plus" "icon-sm" %} Nova conta</a>
+  </div>
+  <div class="table-wrap">
+    {% with contas=parceiro.bank_accounts.all %}
+    {% if contas %}
+    <table class="table table-stack">
+      <thead>
+        <tr><th scope="col">Banco</th><th scope="col">Agência</th><th scope="col">Conta</th><th scope="col">Tipo</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+      </thead>
+      <tbody>
+        {% for conta in contas %}
+        <tr>
+          <td class="cell-title font-medium">{{ conta.bank_name|default:conta.bank_code }}{% if conta.is_default %} <span class="badge-confirmada ml-1.5">Padrão</span>{% endif %}</td>
+          <td data-label="Agência" class="nowrap">{{ conta.branch }}</td>
+          <td data-label="Conta" class="nowrap">{{ conta.account }}</td>
+          <td data-label="Tipo" class="muted">{{ conta.get_account_type_display }}</td>
+          <td class="cell-actions num"><a href="{% url 'partners:conta_editar' conta.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    {% include "partials/_empty.html" with icone="landmark" titulo="Nenhuma conta bancária cadastrada" %}
+    {% endif %}
+    {% endwith %}
+  </div>
+</section>
+{% endblock %}

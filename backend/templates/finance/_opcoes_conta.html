@@ -1,0 +1,6 @@
+<select name="bank_account" id="id_bank_account" class="field-input">
+  <option value="">{% if contas %}Usar a conta padrão{% else %}Nenhuma conta cadastrada{% endif %}</option>
+  {% for pk, rotulo in contas %}
+  <option value="{{ pk }}">{{ rotulo }}</option>
+  {% endfor %}
+</select>

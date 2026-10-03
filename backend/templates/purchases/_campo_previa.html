@@ -1,0 +1,8 @@
+{% load widget_tweaks core_tags %}
+{# Campo que recalcula a prévia de custo (HTMX) a cada digitação. Parâmetro: field. #}
+<div>
+  <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-red-600" aria-hidden="true"> *</span>{% endif %}</label>
+  {{ field|add_class:"field-input"|attr:"hx-get:/compras/previa-custo/"|attr:"hx-trigger:input changed delay:300ms"|attr:"hx-target:#previa-custo"|attr:"hx-swap:outerHTML"|attr:"hx-include:#form-compra" }}
+  {% if field.help_text %}<p class="field-help">{{ field.help_text }}</p>{% endif %}
+  {% include "partials/_errors.html" %}
+</div>

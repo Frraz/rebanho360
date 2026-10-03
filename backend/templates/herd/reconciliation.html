@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Conciliação de transferências · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Conciliação de transferências</h1>
+      {% info "conciliacao" %}
+    </div>
+  </div>
+</header>
+
+{% if pendencias %}
+<div class="table-wrap">
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Registro</th><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col" class="num">Soma das linhas</th></tr>
+    </thead>
+    <tbody>
+      {% for mov in pendencias %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'herd:movimento_detalhe' mov.pk %}" class="row-link code !text-red-700">{{ mov.code }}</a></td>
+        <td data-label="Tipo">{{ mov.get_type_display }}</td>
+        <td data-label="Data" class="nowrap">{{ mov.date|date:"d/m/Y" }}</td>
+        <td data-label="Soma das linhas" class="num">{{ mov.soma }} <span class="muted">(deveria ser 0)</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card-flush">
+  <div class="empty">
+    {% icon "circle-check" "!text-sage-500" %}
+    <p class="empty-title">Nenhuma pendência</p>
+    <p class="empty-text">Todas as transferências fecham em zero.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

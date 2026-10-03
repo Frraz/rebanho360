@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Início · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Início</h1>
+      {% info "inicio" %}
+    </div>
+    <p class="page-subtitle">{% if season %}Safra {{ season.name }}{% else %}Sem safra escolhida{% endif %} · {% if farm %}{{ farm.name }}{% else %}Todas as fazendas{% endif %}</p>
+  </div>
+</header>
+
+{% if sugerir_segundo_fator %}
+{# Recomendação, não exigência: some por 14 dias ao dispensar (localStorage). #}
+<div class="alert-info mb-6" role="note" x-data="{ visivel: true }" x-init="try { const t = +localStorage.getItem('dica2fa'); if (t && Date.now() - t < 14 * 864e5) visivel = false } catch (e) {}" x-show="visivel" x-cloak>
+  {% icon "shield-check" %}
+  <div class="flex-1">
+    <p class="font-medium">Proteja a sua conta com o segundo fator</p>
+    <p class="mt-0.5 text-sm">Um código do aplicativo autenticador, além da senha. Leva um minuto e é opcional, mas recomendamos para todos.</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <a href="{% url 'accounts:2fa_configurar' %}" class="btn-primary btn-sm">Ativar agora</a>
+      <button type="button" class="btn-secondary btn-sm" @click="visivel = false; try { localStorage.setItem('dica2fa', Date.now()) } catch (e) {}">Agora não</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid gap-6 lg:grid-cols-12">
+  <!-- Pendências primeiro: "o que preciso fazer hoje?" -->
+  <section class="card-flush lg:col-span-8" aria-labelledby="titulo-pendencias">
+    <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
+      <h2 id="titulo-pendencias" class="card-title">Pendências</h2>
+      {% if pendencias %}<span class="badge-pendencia">{{ pendencias|length }} para revisar</span>{% endif %}
+    </div>
+    {% if pendencias %}
+    <ul class="divide-y divide-gray-100">
+      {% for p in pendencias %}
+      <li>
+        <a href="{{ p.url }}" class="flex min-h-touch items-start gap-3 px-5 py-3.5 hover:bg-gray-50">
+          {% icon "triangle-alert" "mt-0.5 text-amber-600" %}
+          <span class="min-w-0 flex-1">
+            <span class="block text-sm font-medium text-gray-900">{{ p.texto }}</span>
+            {% for e in p.exemplos %}<span class="mt-0.5 block break-words text-xs text-gray-500">{{ e }}</span>{% endfor %}
+          </span>
+          {% icon "chevron-right" "mt-0.5 text-gray-400" %}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="flex items-center gap-3 px-5 py-6 text-sm text-sage-800">{% icon "circle-check" "text-sage-600" %} Nada pendente hoje.</p>
+    {% endif %}
+  </section>
+
+  <section class="card lg:col-span-4" aria-labelledby="titulo-rebanho">
+    <h2 id="titulo-rebanho" class="eyebrow">Rebanho</h2>
+    <p class="stat-value mt-2 text-4xl">{{ rebanho.cabecas|numero:0 }}<small>cabeças</small></p>
+    <dl class="dl mt-4">
+      <div><dt>Fazendas com animais</dt><dd>{{ rebanho.fazendas }}</dd></div>
+      <div><dt>Lotes abertos</dt><dd>{{ rebanho.lotes_abertos }}</dd></div>
+      <div><dt>Entradas no mês <span class="text-xs font-normal text-gray-500">(compra, nascimento)</span></dt><dd>{{ rebanho.entradas_do_mes }}</dd></div>
+      <div><dt>Saídas no mês</dt><dd>{{ rebanho.saidas_do_mes }}</dd></div>
+    </dl>
+  </section>
+</div>
+
+<section class="mt-6" aria-labelledby="titulo-safra">
+  <h2 id="titulo-safra" class="section-title">Safra{% if season %} {{ season.name }}{% endif %}</h2>
+  {% if safra %}
+  <dl class="stats lg:grid-cols-5">
+    <div class="stat"><dt class="stat-label">Comprado</dt><dd class="stat-value">{{ safra.comprado_valor|brl }}</dd><dd class="stat-note">{{ safra.comprado_cabecas|numero:0 }} cabeças</dd></div>
+    <div class="stat"><dt class="stat-label">Vendido</dt><dd class="stat-value">{{ safra.vendido_valor|brl }}</dd><dd class="stat-note">{{ safra.vendido_cabecas|numero:0 }} cabeças</dd></div>
+    <div class="stat"><dt class="stat-label">Custos</dt><dd class="stat-value">{{ safra.custos|brl }}</dd><dd class="stat-note">Fora a compra de animais</dd></div>
+    <div class="stat"><dt class="stat-label">Custo/cabeça</dt><dd class="stat-value">{{ safra.custo_por_cabeca|brl }}</dd><dd class="stat-note">Custos ÷ rebanho atual</dd></div>
+    <div class="stat col-span-2 lg:col-span-1"><dt class="stat-label">Custo/@ (lotes encerrados)</dt><dd class="stat-value">{{ safra.custo_por_arroba|brl }}</dd><dd class="stat-note">Por arroba vendida</dd></div>
+  </dl>
+  {% if safra.custo_por_arroba is None and safra.motivo_custo_por_arroba %}
+  <p class="mt-2 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Custo/@ indisponível: {{ safra.motivo_custo_por_arroba }}.</p>
+  {% endif %}
+  {% else %}
+  <div class="card text-sm text-gray-500">Escolha uma safra no topo para ver os números dela.</div>
+  {% endif %}
+</section>
+
+<section class="mt-8" aria-labelledby="titulo-ultimos">
+  <h2 id="titulo-ultimos" class="section-title">Últimos lançamentos</h2>
+  {% if lancamentos %}
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead>
+        <tr><th scope="col">Data</th><th scope="col">Tipo</th><th scope="col">Registro</th><th scope="col">Resumo</th><th scope="col">Por</th></tr>
+      </thead>
+      <tbody>
+        {% for l in lancamentos %}
+        <tr class="is-link">
+          <td data-label="Data" class="nowrap muted">{{ l.data|date:"d/m/Y" }}</td>
+          <td data-label="Tipo">{{ l.tipo }}</td>
+          <td data-label="Registro" class="cell-title"><a href="{{ l.url }}" class="row-link code">{{ l.codigo }}</a></td>
+          <td data-label="Resumo">{{ l.resumo }}</td>
+          <td data-label="Por" class="muted">{{ l.quem }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-flush">
+    <div class="empty">
+      {% icon "file-text" %}
+      <p class="empty-title">Nenhum lançamento ainda</p>
+      <p class="empty-text">Comece <a class="link" href="{% url 'purchases:nova' %}">lançando uma compra</a> ou <a class="link" href="{% url 'herd:lancar_movimento' %}">uma movimentação</a>.</p>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

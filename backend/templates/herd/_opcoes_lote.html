@@ -1,0 +1,6 @@
+<select name="{{ campo }}" id="id_{{ campo }}" class="field-input">
+  <option value="">—</option>
+  {% for lote in lotes %}
+  <option value="{{ lote.pk }}">{{ lote.code }}</option>
+  {% endfor %}
+</select>

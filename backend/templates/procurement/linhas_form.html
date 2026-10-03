@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ titulo }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    {% if voltar %}<a href="{{ voltar }}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ voltar_rotulo }}</a>{% endif %}
+    <h1 class="page-title">{{ titulo }}</h1>
+    {% if subtitulo %}<p class="page-subtitle max-w-3xl">{{ subtitulo }}</p>{% endif %}
+  </div>
+</header>
+{% block topo %}{% endblock %}
+<form method="post" class="card max-w-4xl space-y-5 pb-24 md:pb-5">
+  {% csrf_token %}
+  {% if reason_form.non_field_errors %}<div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for e in reason_form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div></div>{% endif %}
+  {% include "procurement/_linhas.html" %}
+  {% include "partials/_field.html" with field=reason_form.reason %}
+  <div class="form-actions md:border-t md:border-gray-200 md:pt-5">
+    <a href="{{ voltar }}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Salvar</button>
+  </div>
+</form>
+{% endblock %}

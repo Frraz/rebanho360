@@ -1,0 +1,17 @@
+{% load core_tags %}
+{# Linhas repetidas de um documento (itens, cargas, romaneio…). Parâmetros: formset, rotulo. #}
+{# O Alpine clona o modelo vazio e soma 1 ao TOTAL_FORMS; sem JS, as linhas existentes continuam editáveis. #}
+<div x-data="{ total: {{ formset.total_form_count }} }" class="space-y-3">
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}
+  <div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for e in formset.non_form_errors %}<p>{{ e }}</p>{% endfor %}</div></div>
+  {% endif %}
+  <div x-ref="lista" class="space-y-3">
+    {% for form in formset %}{% include "procurement/_linha.html" %}{% endfor %}
+  </div>
+  <template x-ref="modelo">{% include "procurement/_linha.html" with form=formset.empty_form %}</template>
+  <button type="button" class="btn-secondary btn-sm"
+          @click="$refs.lista.insertAdjacentHTML('beforeend', $refs.modelo.innerHTML.replaceAll('__prefix__', total)); total++; $root.querySelector('[name={{ formset.prefix }}-TOTAL_FORMS]').value = total">
+    {% icon "plus" "icon-sm" %} Adicionar {{ rotulo|lower }}
+  </button>
+</div>

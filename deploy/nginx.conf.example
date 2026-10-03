@@ -1,0 +1,67 @@
+# Exemplo de vhost do Rebanho360 para o nginx DO HOST (compartilhado).
+# NÃO é aplicado por nenhum script: copie para o lugar certo, ajuste domínio
+# e certificado, e confira com `nginx -t` antes de recarregar. Não altere os
+# vhosts dos outros sistemas (docs/arquitetura/02-infra-e-deploy.md).
+#
+# Por que existe: o Django em produção não serve /static/ (sem WhiteNoise; o
+# gunicorn não serve arquivo). O deploy.sh copia o collectstatic para
+# STATIC_HOST_DIR e o nginx entrega daqui. Sem este bloco o sistema abre sem
+# CSS, fontes e ícones.
+
+server {
+    listen 80;
+    server_name rebanho360.exemplo.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name rebanho360.exemplo.com;
+
+    ssl_certificate     /etc/letsencrypt/live/rebanho360.exemplo.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/rebanho360.exemplo.com/privkey.pem;
+
+    # Importação de planilhas (.xlsx) e anexos
+    client_max_body_size 20m;
+
+    # Mesmo valor de STATIC_HOST_DIR no .env
+    location /static/ {
+        alias /var/www/rebanho360/static/;
+        # output.css e icons.svg não têm hash no nome: revalidar com frequência,
+        # senão o navegador segue com o visual antigo depois de um deploy.
+        expires 1h;
+        add_header Cache-Control "public";
+        access_log off;
+    }
+
+    # Fontes e logotipo mudam raramente: cache longo.
+    location /static/fonts/ {
+        alias /var/www/rebanho360/static/fonts/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # /health/ e /ready/ ficam fora do log de acesso (uma linha por segundo
+    # de monitoramento polui o log).
+    location ~ ^/(health|ready)/ {
+        proxy_pass http://127.0.0.1:8010;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        access_log off;
+    }
+
+    # Anexos e PDFs NÃO são servidos pelo nginx: passam por view autenticada
+    # (CLAUDE.md: "anexo servido por view autenticada"). Não crie /media/ aqui.
+
+    location / {
+        proxy_pass http://127.0.0.1:8010;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # O Django só enxerga HTTPS por este cabeçalho (SECURE_PROXY_SSL_HEADER);
+        # sem ele entra em laço de redirecionamento.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 90s;   # gunicorn --timeout 60
+    }
+}

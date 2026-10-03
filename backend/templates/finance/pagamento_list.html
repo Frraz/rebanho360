@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags finance_tags %}
+{% block title %}Pagamentos e recebimentos · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Pagamentos e recebimentos</h1>
+      {% info "pagamento" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{% url 'reports:relatorio' 'pagamentos-realizados' %}" class="btn-secondary">{% icon "file-down" %} Relatório e exportação</a>
+  </div>
+</header>
+
+<form method="get" class="card mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+  <div>
+    <label class="field-label" for="direcao">Tipo</label>
+    <select id="direcao" name="direcao" class="field-input">
+      <option value="" {% if not direcao %}selected{% endif %}>Pagamentos e recebimentos</option>
+      <option value="PAGAR" {% if direcao == "PAGAR" %}selected{% endif %}>Só pagamentos</option>
+      <option value="RECEBER" {% if direcao == "RECEBER" %}selected{% endif %}>Só recebimentos</option>
+    </select>
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.de.id_for_label }}">Pago de</label>
+    {{ filtro.de|add_class:"field-input" }}
+  </div>
+  <div>
+    <label class="field-label" for="{{ filtro.ate.id_for_label }}">até</label>
+    {{ filtro.ate|add_class:"field-input" }}
+  </div>
+  <label class="flex min-h-touch items-center gap-2.5 text-sm text-gray-800"><input type="checkbox" name="desfeitos" value="1" {% if desfeitos %}checked{% endif %}> Mostrar baixas desfeitas</label>
+  <div class="flex justify-end"><button type="submit" class="btn-secondary w-full sm:w-auto">{% icon "search" %} Filtrar</button></div>
+</form>
+
+<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2 text-sm text-gray-600">
+  <p>{{ page_obj.paginator.count }} baixa{{ page_obj.paginator.count|pluralize }}</p>
+  <p>Total <strong class="text-base font-semibold text-gray-900 tabular-nums">{{ total|brl }}</strong></p>
+</div>
+
+<div class="table-wrap">
+  {% if pagamentos %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Baixa</th><th scope="col">Data</th><th scope="col">Título</th><th scope="col">Favorecido / cliente</th><th scope="col">Forma</th><th scope="col" class="num">Valor</th><th scope="col">Situação</th></tr></thead>
+    <tbody>
+      {% for p in pagamentos %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'finance:pagamento_detalhe' p.pk %}" class="row-link code">{{ p.code }}</a></td>
+        <td data-label="Data" class="nowrap">{{ p.date|date:"d/m/Y" }}</td>
+        <td data-label="Título" class="code cell-hide-mobile">{{ p.invoice.code }}</td>
+        <td data-label="Favorecido" class="muted">{{ p.invoice.payee.name|default:"—" }}</td>
+        <td data-label="Forma" class="cell-hide-mobile">{{ p.get_method_display }}</td>
+        <td data-label="Valor" class="num nowrap font-medium">{{ p.amount|brl }}</td>
+        <td data-label="Situação" class="cell-status">{% baixa_selo p %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="wallet" titulo="Nenhuma baixa encontrada" texto="Quando o financeiro registrar um pagamento ou recebimento, ele aparece aqui." %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Corrigir {{ compra.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'purchases:detalhe' compra.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ compra.code }}</a>
+    <h1 class="page-title">Corrigir compra</h1>
+    {% if compra.status == "CONFIRMADA" %}
+    <p class="page-subtitle">Corrigir desfaz os efeitos da versão atual (entrada no rebanho e custos) e aplica os da nova, na mesma operação. O motivo fica registrado.</p>
+    {% endif %}
+  </div>
+</header>
+<form method="post" id="form-compra" class="card max-w-4xl">
+  {% csrf_token %}
+  {% include "purchases/_campos.html" %}
+  <div class="mt-2 flex flex-col-reverse gap-2 border-t border-gray-200 pt-5 sm:flex-row sm:justify-end">
+    <a href="{% url 'purchases:detalhe' compra.pk %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Salvar correção</button>
+  </div>
+</form>
+{% endblock %}

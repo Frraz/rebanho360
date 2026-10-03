@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load widget_tweaks core_tags %}
+{% block title %}Importar planilha · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'imports:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Importações</a>
+    <h1 class="page-title">Importar planilha</h1>
+    <p class="page-subtitle max-w-2xl">Nada vai direto para o sistema: a planilha é lida, validada e mostrada numa <strong class="font-medium text-gray-700">prévia</strong>. Só entra depois que você confirmar.</p>
+  </div>
+</header>
+
+{% if form.non_field_errors %}
+<div class="alert-warning mb-4 max-w-2xl" role="alert">
+  {% icon "triangle-alert" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="card max-w-2xl space-y-5">
+  {% csrf_token %}
+  <div>
+    <label class="field-label" for="{{ form.kind.id_for_label }}">{{ form.kind.label }}</label>
+    {{ form.kind|add_class:"field-input" }}
+    <p class="field-help">Ordem recomendada: Custos → Compras → Movimentações → Vendas → Pesagens. As compras entram antes das movimentações, e as movimentações antes das vendas, para o rebanho não contar a mesma saída duas vezes.</p>
+  </div>
+  <div>
+    <label class="field-label" for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+    {{ form.file|add_class:"field-input" }}
+    {% include "partials/_errors.html" with field=form.file %}
+  </div>
+  {% if duplicada or form.confirmar_reimportacao.value %}
+  <label class="flex min-h-touch items-start gap-3 text-sm">
+    {{ form.confirmar_reimportacao }}
+    <span>{{ form.confirmar_reimportacao.label }}</span>
+  </label>
+  {% endif %}
+  <div class="flex flex-col-reverse gap-2 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
+    <a href="{% url 'imports:lista' %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Ler planilha</button>
+  </div>
+</form>
+{% endblock %}

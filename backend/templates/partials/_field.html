@@ -1,0 +1,32 @@
+{% load widget_tweaks core_tags %}
+{# Um campo de formulário: rótulo, controle, ajuda e erro ligados por aria. Parâmetro: field. #}
+{% with eid=field.auto_id|add:"_error" hid=field.auto_id|add:"_help" %}
+{% with desc="aria-describedby:"|add:hid|add:" "|add:eid %}
+<div>
+  {% if field.field.widget.input_type == "checkbox" and field.field.widget.allow_multiple_selected %}
+  <fieldset>
+    <legend class="field-label">{{ field.label }}{% if field.field.required %}<span class="text-red-600" aria-hidden="true"> *</span>{% endif %}</legend>
+    <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+      {% for checkbox in field %}
+      <label class="flex min-h-touch items-center gap-2.5 text-sm text-gray-800">{{ checkbox.tag }} {{ checkbox.choice_label }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% elif field.field.widget.input_type == "checkbox" %}
+  <label class="flex min-h-touch items-start gap-3 py-1.5 text-sm text-gray-800" for="{{ field.id_for_label }}">
+    {{ field|attr:desc }}
+    <span><span class="font-medium">{{ field.label }}</span></span>
+  </label>
+  {% else %}
+  <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-red-600" aria-hidden="true"> *</span>{% endif %}</label>
+  {% if field.errors %}
+    {{ field|add_class:"field-input"|attr:"aria-invalid:true"|attr:desc }}
+  {% else %}
+    {{ field|add_class:"field-input"|attr:desc }}
+  {% endif %}
+  {% endif %}
+  {% if field.help_text %}<p class="field-help" id="{{ hid }}">{{ field.help_text }}</p>{% endif %}
+  {% for error in field.errors %}<p class="field-error" id="{{ eid }}">{% icon "circle-x" "icon-sm mt-0.5" %}<span>{{ error }}</span></p>{% endfor %}
+</div>
+{% endwith %}
+{% endwith %}

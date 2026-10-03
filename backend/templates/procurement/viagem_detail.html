@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load core_tags procurement_tags %}
+{% block title %}{{ viagem.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ compromisso.code }}</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ viagem.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% status_badge viagem.status %}
+        {% if recebimento %}<span class="badge-confirmada">Recebida</span>{% elif viagem.status == "CONFIRMADA" %}<span class="badge-editada">A caminho</span>{% endif %}
+        {% if viagem.version > 1 %}<span class="badge-editada">Editada (v{{ viagem.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if pode_receber %}<a href="{% url 'procurement:recebimento_novo' viagem.pk %}" class="btn-primary">{% icon "check" %} Registrar recebimento</a>{% endif %}
+    {% if pode_editar %}<a href="{% url 'procurement:viagem_editar' viagem.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
+  </div>
+</header>
+
+{% if viagem.status == "EXCLUIDA" %}
+<div class="alert-warning mb-6" role="status">{% icon "triangle-alert" %}<p>Excluída por {{ viagem.deleted_by }}{% if viagem.delete_reason %}: "{{ viagem.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+{% for a in avisos %}<div class="alert-warning mb-4" role="status">{% icon "triangle-alert" %}<p>{{ a }}</p></div>{% endfor %}
+
+<section class="card" aria-label="Dados da viagem">
+  <dl class="facts">
+    <div><dt>Retirada</dt><dd>{{ viagem.pickup_date|date:"d/m/Y" }}</dd></div>
+    <div><dt>Transportador</dt><dd>{{ viagem.carrier.name|default:"—" }}</dd></div>
+    <div><dt>Motorista · placa</dt><dd>{{ viagem.driver_name|default:"—" }}{% if viagem.vehicle_plate %} <span class="code">{{ viagem.vehicle_plate }}</span>{% endif %}</dd></div>
+    <div><dt>Distância</dt><dd>{% if viagem.distance_km %}{{ viagem.distance_km }} km{% else %}—{% endif %}</dd></div>
+    {% if viagem.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ viagem.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-carga">
+    <h2 id="titulo-carga" class="card-title mb-3">Carga</h2>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th scope="col">Item</th><th scope="col" class="num">Programadas</th><th scope="col" class="num">Embarcadas</th><th scope="col" class="num">Peso de origem</th></tr></thead>
+        <tbody>
+          {% for carga in cargas %}
+          <tr>
+            <td class="cell-title font-medium">{{ carga.item.number }} · {{ carga.item.category.name }}</td>
+            <td data-label="Programadas" class="num">{{ carga.planned_qty }}</td>
+            <td data-label="Embarcadas" class="num">{{ carga.shipped_qty|default_if_none:"—" }}</td>
+            <td data-label="Peso de origem" class="num nowrap">{% if carga.origin_weight_kg %}{{ carga.origin_weight_kg|numero:0 }} kg{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="titulo-frete">
+    <h2 id="titulo-frete" class="card-title mb-2">Frete</h2>
+    <div class="rows">
+      <div><span>Critério</span> <span>{{ viagem.get_freight_criterion_display|default:"sem frete" }}{% if viagem.freight_rate is not None %} · R$ {{ viagem.freight_rate|numero:4 }}{% endif %}</span></div>
+      <div><span>Previsto</span> <span>{{ frete.previsto|brl }}</span></div>
+      <div><span>Realizado</span> <span>{{ frete.realizado|brl }}</span></div>
+      <div class="total"><span>Vale no acerto</span> <span>{{ frete.final|brl }}</span></div>
+    </div>
+    {% if frete.origem == "previsto" %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Sem o frete realizado, o acerto usa o previsto.</p>{% endif %}
+  </section>
+</div>
+
+{% if recebimento %}
+<section class="card mt-6" aria-labelledby="titulo-receb">
+  <h2 id="titulo-receb" class="card-title mb-2">Recebimento</h2>
+  <p class="text-sm"><a class="link code" href="{% url 'procurement:recebimento_detalhe' recebimento.pk %}">{{ recebimento.code }}</a> <span class="text-gray-600">· {{ recebimento.date|date:"d/m/Y" }}</span></p>
+</section>
+{% endif %}
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'procurement:viagem_excluir' viagem.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir viagem</a>{% endif %}
+  {% if pode_restaurar %}<form method="post" action="{% url 'procurement:viagem_restaurar' viagem.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar viagem</button></form>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

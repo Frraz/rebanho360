@@ -1,0 +1,23 @@
+{% load core_tags %}
+{# Fazendas do usuário: um seletor por fazenda. Parâmetro: form. Alpine: `papel` vem do formulário pai. #}
+<fieldset x-show="!['ADMIN','GESTOR'].includes(papel)" x-cloak>
+  <legend class="field-label">Fazendas que ele pode acessar</legend>
+  {% if form.farm_rows %}
+  <div class="divide-y divide-gray-100 rounded-md border border-gray-200">
+    {% for linha in form.farm_rows %}
+    <div class="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <label for="id_{{ linha.name }}" class="text-sm font-medium text-gray-900">{{ linha.farm.name }} <span class="code text-gray-500">{{ linha.farm.code }}</span></label>
+      <select name="{{ linha.name }}" id="id_{{ linha.name }}" class="field-input sm:w-60">
+        {% for valor, rotulo in linha.levels %}<option value="{{ valor }}" {% if linha.value == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="field-help">Fora das fazendas marcadas ele não vê nada — nem sabe que existem.</p>
+  {% else %}
+  <p class="text-sm text-gray-500">Nenhuma fazenda ativa cadastrada ainda.</p>
+  {% endif %}
+</fieldset>
+<p x-show="['ADMIN','GESTOR'].includes(papel)" x-cloak class="alert-info">
+  {% icon "info" %}<span>Administrador e Gestor veem todas as fazendas por definição do papel; não é preciso marcar nenhuma.</span>
+</p>

@@ -1,0 +1,82 @@
+# Desenvolvimento. Código em bind mount — editar local, ver efeito no ar.
+# Produção usa docker-compose.prod.yml (imagem fixa, sem bind mount).
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: ../docker/web/Dockerfile
+      target: dev
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+      - ./backend:/app
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/web/Dockerfile
+      target: dev
+    command: celery -A config worker -l info
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: ../docker/web/Dockerfile
+      target: dev
+    command: celery -A config beat -l info
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rebanho360}
+      POSTGRES_USER: ${POSTGRES_USER:-rebanho360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rebanho360}
+    volumes:
+      - rebanho360_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rebanho360}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - rebanho360_redis_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rebanho360_pgdata:
+  rebanho360_redis_dev:

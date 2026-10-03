@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Posição do rebanho · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Posição do rebanho</h1>
+      {% info "posicao" %}
+    </div>
+  </div>
+</header>
+
+<form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end">
+  <div>
+    <label class="field-label" for="filtro-fazenda">Fazenda</label>
+    <select name="farm" id="filtro-fazenda" class="field-input" onchange="this.form.submit()">
+      <option value="">Todas (consolidado)</option>
+      {% for fazenda in fazendas %}
+      <option value="{{ fazenda.pk }}" {% if farm_selecionada and farm_selecionada.pk == fazenda.pk %}selected{% endif %}>
+        {{ fazenda.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="field-label" for="filtro-ate">Até a data</label>
+    <input type="date" name="until" id="filtro-ate" value="{{ until }}" class="field-input" onchange="this.form.submit()">
+  </div>
+  <p class="text-sm text-gray-500 sm:pb-2.5">Safra {{ season.name|default:"—" }}</p>
+</form>
+
+<div class="table-wrap">
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Categoria</th><th scope="col" class="num">Entradas</th><th scope="col" class="num">Saídas</th><th scope="col" class="num">Posição</th></tr>
+    </thead>
+    <tbody>
+      {% for linha in linhas %}
+      <tr>
+        <td class="cell-title">{{ linha.categoria.name }}</td>
+        <td data-label="Entradas" class="num">{{ linha.entradas }}</td>
+        <td data-label="Saídas" class="num">{{ linha.saidas }}</td>
+        <td data-label="Posição" class="num font-semibold">{{ linha.posicao }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">{% include "partials/_empty.html" with icone="layers" titulo="Sem animais na posição" texto="Nenhuma movimentação até esta data." %}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="cell-title">Total</td>
+        <td data-label="Entradas" class="num">{{ total.entradas }}</td>
+        <td data-label="Saídas" class="num">{{ total.saidas }}</td>
+        <td data-label="Posição" class="num">{{ total.posicao }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% endblock %}

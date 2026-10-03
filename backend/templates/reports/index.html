@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Relatórios · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Relatórios</h1>
+      {% info "relatorios" %}
+    </div>
+  </div>
+</header>
+<ul class="card-flush divide-y divide-gray-100">
+  {% for slug, titulo, descricao in catalogo %}
+  <li>
+    <a href="{% url 'reports:relatorio' slug %}" class="flex min-h-touch items-center gap-4 px-5 py-4 hover:bg-gray-50">
+      {% icon "file-text" "icon-lg shrink-0 text-gray-400" %}
+      <span class="min-w-0 flex-1">
+        <span class="block font-medium text-gray-900">{{ titulo }}</span>
+        <span class="mt-0.5 block text-sm text-gray-500">{{ descricao }}</span>
+      </span>
+      {% icon "chevron-right" "text-gray-400" %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

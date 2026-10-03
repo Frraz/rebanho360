@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load core_tags procurement_tags %}
+{% block title %}{{ compromisso.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'procurement:compromisso_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Compromissos</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ compromisso.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% etapa_selo etapa %}
+        {% if compromisso.version > 1 and compromisso.status != "RASCUNHO" %}<span class="badge-editada">Editado (v{{ compromisso.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if pode_aprovar %}<a href="{% url 'procurement:compromisso_aprovar' compromisso.pk %}" class="btn-primary">{% icon "check" %} Aprovar compromisso</a>{% endif %}
+    {% if pode_abrir_acerto and calculo.cabecas_recebidas %}
+    <form method="post" action="{% url 'procurement:acerto_novo' compromisso.pk %}">{% csrf_token %}<button type="submit" class="btn-primary">{% icon "scale" %} Abrir acerto</button></form>
+    {% endif %}
+    {% if pode_editar %}<a href="{% url 'procurement:compromisso_editar' compromisso.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
+  </div>
+</header>
+
+{% if compromisso.status == "EXCLUIDA" %}
+<div class="alert-warning mb-6" role="status">{% icon "triangle-alert" %}<p>Excluído por {{ compromisso.deleted_by }}{% if compromisso.delete_reason %}: "{{ compromisso.delete_reason }}"{% endif %}</p></div>
+{% else %}
+<div class="mb-6">{% include "procurement/_progresso.html" %}</div>
+{% endif %}
+
+<section class="card" aria-label="Dados do compromisso">
+  <dl class="facts">
+    <div><dt>Data do movimento</dt><dd>{{ compromisso.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ compromisso.season.name }}</span></dd></div>
+    <div><dt>Produtor</dt><dd>{{ compromisso.seller.name }}</dd></div>
+    <div><dt>Destino</dt><dd>{{ compromisso.destination_farm.name }}</dd></div>
+    <div><dt>Comprador</dt><dd>{{ compromisso.commissioned.name|default:"—" }}{% if compromisso.second_buyer %} <span class="text-gray-500">+ {{ compromisso.second_buyer.name }}</span>{% endif %}</dd></div>
+    {% if compromisso.origin_property or compromisso.origin_city %}<div><dt>Origem</dt><dd>{{ compromisso.origin_property|default:"—" }}{% if compromisso.origin_city %} <span class="text-gray-500">· {{ compromisso.origin_city }}</span>{% endif %}</dd></div>{% endif %}
+    <div><dt>Retirada</dt><dd>{% if compromisso.pickup_date %}{{ compromisso.pickup_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
+    <div><dt>Abate previsto</dt><dd>{% if compromisso.slaughter_date %}{{ compromisso.slaughter_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
+    <div><dt>Caminhões · distância</dt><dd>{{ compromisso.trucks|default_if_none:"—" }} · {% if compromisso.distance_km %}{{ compromisso.distance_km }} km{% else %}—{% endif %}</dd></div>
+    <div><dt>Prazo de pagamento</dt><dd>{% if compromisso.payment_days is not None %}{{ compromisso.payment_days }} dias{% else %}na data{% endif %}</dd></div>
+    {% if compromisso.approved_at %}<div><dt>Aprovado</dt><dd>{{ compromisso.approved_at|date:"d/m/Y H:i" }} <span class="text-gray-500">· {{ compromisso.approved_by }}</span></dd></div>{% endif %}
+    {% if compromisso.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ compromisso.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<section class="card mt-6" aria-labelledby="titulo-itens">
+  <h2 id="titulo-itens" class="card-title mb-3">Itens: previsto × realizado</h2>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead>
+        <tr>
+          <th scope="col">Item</th><th scope="col" class="num">Previstas</th><th scope="col" class="num">Embarcadas</th>
+          <th scope="col" class="num">Recebidas</th><th scope="col" class="num">Preço previsto</th>
+          <th scope="col" class="num">Valor dos animais</th><th scope="col"><span class="sr-only">Romaneio</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for dados in itens %}
+        {% with item=dados.item %}
+        <tr>
+          <td class="cell-title font-medium">{{ item.number }} · {{ item.category.name }}<span class="block text-xs font-normal text-gray-500">{% if dados.base == "ARROBA" %}por @ de carcaça{% else %}por cabeça{% endif %}{% if item.purchase %} · compra <a class="link code" href="{% url 'purchases:detalhe' item.purchase.pk %}">{{ item.purchase.code }}</a>{% endif %}</span></td>
+          <td data-label="Previstas" class="num">{{ dados.cabecas_previstas }}</td>
+          <td data-label="Embarcadas" class="num">{{ dados.cabecas_embarcadas|default_if_none:"—" }}</td>
+          <td data-label="Recebidas" class="num">{% if dados.recebido %}{{ dados.cabecas_recebidas }}{% else %}—{% endif %}</td>
+          <td data-label="Preço previsto" class="num nowrap">{{ dados.preco_previsto|brl }}</td>
+          <td data-label="Valor dos animais" class="num nowrap font-medium">{{ dados.valor_do_item|brl }}</td>
+          <td class="cell-actions num">{% if dados.base == "ARROBA" and compromisso.status == "CONFIRMADA" %}<a href="{% url 'procurement:romaneio' item.pk %}" class="btn-ghost btn-sm">{% icon "list-checks" "icon-sm" %} Romaneio</a>{% endif %}</td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% for dados in itens %}{% if dados.avisos %}{% for a in dados.avisos %}<p class="mt-2 flex items-start gap-2 text-xs text-amber-800">{% icon "triangle-alert" "icon-sm mt-px" %} {{ a }}</p>{% endfor %}{% endif %}{% endfor %}
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-comissao">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 id="titulo-comissao" class="card-title">Comissão</h2>
+      {% if compromisso.status == "CONFIRMADA" and pode_lancar and not acerto_aprovado %}<a href="{% url 'procurement:comissao_definir' compromisso.pk %}" class="btn-secondary btn-sm">{% icon "pencil" "icon-sm" %} {% if comissao %}Corrigir{% else %}Informar{% endif %}</a>{% endif %}
+    </div>
+    {% if comissao %}
+    <div class="rows">
+      <div><span>Regra gravada</span> <span>{{ comissao.regra_em_texto }}</span></div>
+      <div><span>Origem</span> <span>{{ comissao.get_source_display }}</span></div>
+      <div><span>Favorecido</span> <span>{{ comissao.payee.name|default:"—" }}</span></div>
+      {% if comissao.extra_amount %}<div><span>Comissão extra</span> <span>{{ comissao.extra_amount|brl }}</span></div>{% endif %}
+      <div class="total"><span>Valor no acerto</span> <span>{{ calculo.comissao_total|brl }}</span></div>
+    </div>
+    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} A regra foi gravada em {{ comissao.snapshot_at|date:"d/m/Y" }}: mudar o cadastro depois não altera este compromisso.</p>
+    {% else %}
+    <p class="text-sm text-gray-600">{% if compromisso.status == "CONFIRMADA" %}Nenhuma regra valia na aprovação. Informe a comissão aqui, se houver.{% else %}A regra vigente é gravada quando o compromisso for aprovado.{% endif %}</p>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="titulo-acerto">
+    <h2 id="titulo-acerto" class="card-title mb-2">Acerto</h2>
+    {% if acerto %}
+    <p class="text-sm"><a class="link code" href="{% url 'procurement:acerto_detalhe' acerto.pk %}">{{ acerto.code }}</a> <span class="text-gray-600">· {% if acerto.status == "CONFIRMADA" %}aprovado{% else %}em andamento{% endif %}</span></p>
+    {% if acerto.status == "RASCUNHO" and calculo.pendencias %}<ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">{% for p in calculo.pendencias %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+    {% elif compromisso.status == "CONFIRMADA" %}
+    <p class="text-sm text-gray-600">{% if calculo.cabecas_recebidas %}Há {{ calculo.cabecas_recebidas }} cabeças recebidas. Abra o acerto para conferir e aprovar.{% else %}O acerto se abre depois do primeiro recebimento.{% endif %}</p>
+    {% else %}
+    <p class="text-sm text-gray-600">O acerto se abre depois da aprovação do compromisso.</p>
+    {% endif %}
+  </section>
+</div>
+
+{% if compromisso.status == "CONFIRMADA" %}
+<section class="card mt-6" aria-labelledby="titulo-viagens">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="titulo-viagens" class="card-title">Viagens e recebimentos</h2>
+    {% if pode_programar %}<a href="{% url 'procurement:viagem_nova' compromisso.pk %}" class="btn-secondary btn-sm">{% icon "plus" "icon-sm" %} Nova viagem</a>{% endif %}
+  </div>
+  {% if viagens %}
+  <ul class="divide-y divide-gray-100 text-sm">
+    {% for linha in viagens %}
+    <li class="py-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span><a class="link code" href="{% url 'procurement:viagem_detalhe' linha.viagem.pk %}">{{ linha.viagem.code }}</a> <span class="text-gray-600">· retirada {{ linha.viagem.pickup_date|date:"d/m/Y" }} · {{ linha.cabecas }} cabeças{% if linha.viagem.carrier %} · {{ linha.viagem.carrier.name }}{% endif %}</span></span>
+        <span class="inline-flex flex-wrap items-center gap-1.5">
+          {% if linha.recebimento %}<span class="badge-confirmada">Recebida</span>{% else %}<span class="badge-editada">A caminho</span>{% endif %}
+          {% if linha.quebra.acima_do_limite %}<span class="badge-erro">Quebra {{ linha.quebra.quebra_percentual|quebra_percentual }}</span>{% endif %}
+        </span>
+      </div>
+      <p class="mt-1 text-gray-600">Frete: {% if linha.frete.final is not None %}{{ linha.frete.final|brl }} <span class="text-gray-500">({{ linha.frete.origem }})</span>{% else %}—{% endif %}{% if linha.recebimento %} · recebimento <a class="link code" href="{% url 'procurement:recebimento_detalhe' linha.recebimento.pk %}">{{ linha.recebimento.code }}</a>{% endif %}</p>
+      {% for a in linha.avisos %}<p class="mt-1 flex items-start gap-2 text-xs text-amber-800">{% icon "triangle-alert" "icon-sm mt-px" %} {{ a }}</p>{% endfor %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-gray-600">Nenhuma viagem lançada. Programe o embarque quando o caminhão for sair.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if compromisso.status == "CONFIRMADA" %}
+<section class="card mt-6" aria-labelledby="titulo-contrato">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="titulo-contrato" class="card-title">Contrato</h2>
+    {% if pode_gerar_contrato %}
+    <form method="post" action="{% url 'procurement:contrato_gerar' compromisso.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary btn-sm">{% icon "file-down" "icon-sm" %} Gerar contrato (PDF)</button></form>
+    {% endif %}
+  </div>
+  {% if contratos %}
+  <ul class="divide-y divide-gray-100 text-sm">
+    {% for d in contratos %}
+    <li class="flex flex-wrap items-center justify-between gap-2 py-2.5">
+      <span><a class="link" href="{% url 'documents:detalhe' d.document_id %}">Contrato gerado em {{ d.generated_at|date:"d/m/Y H:i" }}</a> <span class="text-gray-600">· {{ d.generated_by }} · layout {{ d.template_version }}</span></span>
+      <span>{% if d.status == "PRONTO" %}<span class="badge-confirmada">PDF pronto</span>{% elif d.status == "ERRO" %}<span class="badge-erro">Com erro</span>{% else %}<span class="badge-pendencia">Gerando</span>{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-gray-600">Nenhum contrato gerado. O PDF não leva dado bancário; guarda a versão do layout e o hash do arquivo.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'procurement:compromisso_excluir' compromisso.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir compromisso</a>{% endif %}
+  {% if pode_restaurar %}
+  <form method="post" action="{% url 'procurement:compromisso_restaurar' compromisso.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar compromisso</button></form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

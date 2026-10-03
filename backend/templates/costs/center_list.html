@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Centros de custo · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Centros de custo</h1>
+      {% info "centro_custo" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if user.role == "ADMIN" or user.role == "GESTOR" %}<a href="{% url 'costs:centro_novo' %}" class="btn-primary">{% icon "plus" %} Novo centro</a>{% endif %}
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if centros %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Centro</th><th scope="col">Centro pai</th><th scope="col">Rateio</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for centro in centros %}
+      <tr>
+        <td class="cell-title font-medium">{{ centro.name }}</td>
+        <td data-label="Centro pai" class="muted">{% if centro.parent %}{{ centro.parent.name }}{% else %}—{% endif %}</td>
+        <td data-label="Rateio">{{ centro.get_allocation_criterion_display }}</td>
+        <td data-label="Situação" class="cell-status">{% if centro.is_active %}<span class="badge-confirmada">Ativo</span>{% else %}<span class="badge-excluida">Inativo</span>{% endif %}</td>
+        <td class="cell-actions num">{% if user.role == "ADMIN" or user.role == "GESTOR" %}<a href="{% url 'costs:centro_editar' centro.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'costs:centro_novo' as url_nova %}
+  {% if user.role == "ADMIN" or user.role == "GESTOR" %}
+  {% include "partials/_empty.html" with icone="landmark" titulo="Nenhum centro de custo cadastrado" texto="Cadastre os centros para classificar os custos." url=url_nova acao="Novo centro" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="landmark" titulo="Nenhum centro de custo cadastrado" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

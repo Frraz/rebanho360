@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load core_tags l10n finance_tags %}
+{% block title %}{{ compra.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'purchases:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Compras</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ compra.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% status_badge compra.status %}
+        {% if compra.version > 1 and compra.status != "RASCUNHO" %}<span class="badge-editada">Editada (v{{ compra.version }})</span>{% endif %}
+      </span>
+    </h1>
+  </div>
+  <div class="page-actions">
+    {% if pode_confirmar %}<a href="{% url 'purchases:confirmar' compra.pk %}" class="btn-primary">{% icon "check" %} Confirmar compra</a>{% endif %}
+    {% if pode_editar %}<a href="{% url 'purchases:editar' compra.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
+  </div>
+</header>
+
+{% if compra.status == "EXCLUIDA" %}
+<div class="alert-warning mb-6" role="status">
+  {% icon "triangle-alert" %}
+  <p>Excluída por {{ compra.deleted_by }}{% if compra.delete_reason %}: "{{ compra.delete_reason }}"{% endif %}</p>
+</div>
+{% endif %}
+
+<section class="card" aria-label="Dados da compra">
+  <dl class="facts">
+    <div><dt>Data</dt><dd>{{ compra.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ compra.season.name }}</span></dd></div>
+    <div><dt>Vendedor</dt><dd>{{ compra.seller.name|default:"—" }}</dd></div>
+    <div><dt>Destino</dt><dd>{{ compra.destination_farm.name }} <span class="text-gray-500">· {{ compra.category.name }}</span></dd></div>
+    <div><dt>Cabeças</dt><dd>{{ compra.head_count }}</dd></div>
+    <div><dt>Peso</dt><dd>{% if compra.total_weight_kg %}{{ compra.total_weight_kg|numero:0 }} kg <span class="text-gray-500">(médio {{ custo.peso_medio_kg|numero:1 }} kg)</span>{% else %}sem peso na entrada{% endif %}</dd></div>
+    {% if compra.lot %}<div><dt>Lote</dt><dd><a class="link" href="{% url 'livestock:lote_detalhe' compra.lot.pk %}">{{ compra.lot.code }}</a></dd></div>{% endif %}
+    {% if compra.partnership %}<div><dt>Parceria</dt><dd>{{ compra.partnership }}</dd></div>{% endif %}
+    {% if compra.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ compra.notes }}</dd></div>{% endif %}
+  </dl>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-custo">
+    <h2 id="titulo-custo" class="card-title mb-2">Custo de aquisição</h2>
+    <div class="rows">
+      <div><span>Animais</span> <span>{{ compra.animal_value|brl }}</span></div>
+      <div><span>Frete</span> <span>{{ compra.freight_value|brl }}</span></div>
+      <div><span>Comissão</span> <span>{{ compra.commission_value|brl }}</span></div>
+      <div><span>Impostos</span> <span>{{ compra.tax_value|brl }}</span></div>
+      <div class="total"><span>Custo total</span> <span>{{ custo.custo_aquisicao|brl }}</span></div>
+      <div><span>Média por cabeça (animais)</span> <span>{{ custo.media_por_cabeca|brl }}</span></div>
+      <div><span>Custo de aquisição por cabeça</span> <span>{{ custo.custo_por_cabeca|brl }}</span></div>
+      <div><span>Custo por @ (peso vivo)</span> <span>{{ custo.custo_por_arroba|brl }}</span></div>
+      <div><span>Custo por kg</span> <span>{{ custo.custo_por_kg|numero:2 }}</span></div>
+    </div>
+    {% if custo.custo_por_arroba is None %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Custo por @ e por kg: indisponíveis — falta o peso total da compra.</p>{% endif %}
+  </section>
+
+  {% if compra.status == "CONFIRMADA" %}
+  <section class="card" aria-labelledby="titulo-gerou">
+    <h2 id="titulo-gerou" class="card-title mb-2">O que esta compra gerou</h2>
+    <ul class="divide-y divide-gray-100 text-sm">
+      {% if movimento %}<li class="py-2.5">Entrada no rebanho: <a class="link code" href="{% url 'herd:movimento_detalhe' movimento.pk %}">{{ movimento.code }}</a> <span class="text-gray-600">· +{{ movimento.quantity }} cabeças</span></li>{% endif %}
+      {% for c in custos_gerados %}
+        {% if c.status == "CONFIRMADA" %}<li class="py-2.5">Custo: <a class="link" href="{% url 'costs:detalhe' c.pk %}">{{ c.description }}</a> <span class="text-gray-600">· {{ c.amount|brl }} em {{ c.cost_center.name }}</span></li>{% endif %}
+      {% endfor %}
+    </ul>
+    {% if sugerir_pesagem %}
+    <div class="alert-info mt-4">
+      {% icon "scale" %}
+      <p>Esta compra tem peso. Registre a pesagem de entrada para o peso entrar no histórico do lote.
+        <a class="link whitespace-nowrap" href="{% url 'herd:pesagem_nova' %}?date={{ compra.date|date:'Y-m-d' }}&farm={{ compra.destination_farm_id }}&lot={{ compra.lot_id }}&reason=COMPRA&head_count={{ compra.head_count }}&total_weight_kg={{ compra.total_weight_kg|unlocalize }}">Registrar pesagem de entrada</a></p>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+
+
+{% if ver_financeiro and compra.status == "CONFIRMADA" %}
+<section class="card mt-6" aria-labelledby="titulo-financeiro">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="titulo-financeiro" class="card-title">Financeiro</h2>
+    {% if pode_novo_titulo %}<a href="{% url 'finance:titulo_novo' %}?compra={{ compra.pk }}" class="btn-secondary btn-sm">{% icon "plus" "icon-sm" %} Novo título desta compra</a>{% endif %}
+  </div>
+  {% if titulos %}
+  <ul class="divide-y divide-gray-100 text-sm">
+    {% for t in titulos %}
+    <li class="flex flex-wrap items-center justify-between gap-2 py-2.5">
+      <span><a class="link code" href="{% url 'finance:titulo_detalhe' t.pk %}">{{ t.code }}</a> <span class="text-gray-600">· {{ t.get_component_display }} · {{ t.amount|brl }} · vence {{ t.due_date|date:"d/m/Y" }}{% if t.payee %} · {{ t.payee.name }}{% endif %}</span></span>
+      <span class="inline-flex gap-1.5">{% titulo_selos t %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-gray-600">Esta compra ainda não passou pelo financeiro: nenhum título foi gerado.</p>
+  {% if pode_gerar_titulos %}
+  <form method="post" action="{% url 'finance:sem_titulo' %}" class="mt-3">
+    {% csrf_token %}
+    <input type="hidden" name="operacao" value="compra:{{ compra.pk }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <button type="submit" class="btn-secondary btn-sm">Gerar títulos desta compra</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'purchases:excluir' compra.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir compra</a>{% endif %}
+  {% if pode_restaurar %}
+  <form method="post" action="{% url 'purchases:restaurar' compra.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar compra</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

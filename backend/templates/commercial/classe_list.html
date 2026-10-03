@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Classificações de carcaça · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="page-title-row">
+      <h1 class="page-title">Classificações de carcaça</h1>
+      {% info "classe_carcaca" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if pode_gerenciar %}<a href="{% url 'commercial:classe_nova' %}" class="btn-primary">{% icon "plus" %} Nova classificação</a>{% endif %}
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if classes %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Classificação</th><th scope="col">Código</th><th scope="col" class="num">Faixa sugerida</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for classe in classes %}
+      <tr>
+        <td class="cell-title font-medium">{{ classe.name }}</td>
+        <td data-label="Código"><span class="code">{{ classe.code }}</span></td>
+        <td data-label="Faixa sugerida" class="num">{% if classe.default_band %}Faixa {{ classe.default_band }}{% else %}—{% endif %}</td>
+        <td data-label="Situação" class="cell-status">{% if classe.is_active %}<span class="badge-confirmada">Ativa</span>{% else %}<span class="badge-excluida">Inativa</span>{% endif %}</td>
+        <td class="cell-actions num">{% if pode_gerenciar %}<a href="{% url 'commercial:classe_editar' classe.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'commercial:classe_nova' as url_nova %}
+  {% if pode_gerenciar %}
+  {% include "partials/_empty.html" with icone="beef" titulo="Nenhuma classificação cadastrada" texto="Cadastre as classificações que o frigorífico usa no romaneio." url=url_nova acao="Nova classificação" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="beef" titulo="Nenhuma classificação cadastrada" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

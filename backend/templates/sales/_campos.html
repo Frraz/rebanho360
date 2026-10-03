@@ -1,0 +1,80 @@
+{% load widget_tweaks core_tags %}
+{% if form.non_field_errors %}
+<div class="alert-danger mb-5" role="alert">
+  {% icon "circle-x" %}
+  <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+</div>
+{% endif %}
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Venda</h2>
+    <p class="mt-1 text-sm text-gray-500">Tipo, data e para quem foi vendido.</p>
+  </header>
+  <div class="fields">
+    <div>
+      <label class="field-label" for="{{ form.type.id_for_label }}">{{ form.type.label }}</label>
+      {# select: só `change`. Digitável: só `input`. Os dois no mesmo campo dispararam duas requisições e a segunda respondia a um alvo já trocado. #}
+      {{ form.type|add_class:"field-input"|attr:"hx-get:/vendas/previa/"|attr:"hx-trigger:change"|attr:"hx-target:#previa-indicadores"|attr:"hx-swap:outerHTML"|attr:"hx-include:#form-venda"|attr:"hx-sync:#form-venda:replace" }}
+      {% include "partials/_errors.html" with field=form.type %}
+    </div>
+    {% include "partials/_field.html" with field=form.date %}
+    {% include "partials/_field.html" with field=form.buyer %}
+    {% include "partials/_field.html" with field=form.sale_form %}
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Origem</h2>
+    <p class="mt-1 text-sm text-gray-500">De qual fazenda e lote saem os animais.</p>
+  </header>
+  <div class="fields">
+    <div>
+      <label class="field-label" for="{{ form.farm.id_for_label }}">{{ form.farm.label }}</label>
+      {{ form.farm|add_class:"field-input"|attr:"hx-get:/rebanho/movimentacoes/lotes-da-fazenda/?campo=lot"|attr:"hx-target:#id_lot"|attr:"hx-swap:outerHTML"|attr:"hx-trigger:change" }}
+      {% include "partials/_errors.html" with field=form.farm %}
+    </div>
+    {% include "partials/_field.html" with field=form.lot %}
+    {% include "partials/_field.html" with field=form.category %}
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Pesos e valor</h2>
+    <p class="mt-1 text-sm text-gray-500">O peso de carcaça pode vir depois, com o romaneio do frigorífico. A prévia abaixo se atualiza enquanto você digita.</p>
+  </header>
+  <div class="fields">
+    <div id="valores" class="grid gap-4 sm:grid-cols-2">
+      {% include "sales/_campo_previa.html" with field=form.head_count %}
+      {% include "sales/_campo_previa.html" with field=form.total_value %}
+      {% include "sales/_campo_previa.html" with field=form.total_weight_kg %}
+      {% include "sales/_campo_previa.html" with field=form.carcass_weight_kg %}
+    </div>
+    {% include "sales/_previa.html" %}
+    {% include "partials/_field.html" with field=form.payment_days %}
+  </div>
+</section>
+
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Complemento</h2>
+  </header>
+  <div class="fields">
+    {% include "partials/_field.html" with field=form.partnership %}
+    {% include "partials/_field.html" with field=form.notes %}
+  </div>
+</section>
+
+{% if form.edit_reason %}
+<section class="form-section">
+  <header>
+    <h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2>
+    <p class="mt-1 text-sm text-gray-500">Obrigatório em venda confirmada. Fica na auditoria.</p>
+  </header>
+  <div class="fields">
+    {% include "partials/_field.html" with field=form.edit_reason %}
+  </div>
+</section>
+{% endif %}
