@@ -865,6 +865,7 @@ O que **nunca** fazer em produção: `dc down -v` · `docker volume rm` · `dock
 | `Bad Request (400)` ao abrir o domínio | Domínio fora de `DJANGO_ALLOWED_HOSTS`, ou Nginx sem `proxy_set_header Host $host;` | Ajustar o `.env` (e recriar) ou o vhost |
 | `403 CSRF verification failed` no login/POST | `Host`/`X-Forwarded-Proto` não repassados, ou acesso por `http://` | Conferir o vhost; acessar sempre por `https://` |
 | `502 Bad Gateway` | `web` fora do ar ou porta diferente da do `proxy_pass` | `dc ps`; `curl 127.0.0.1:8013/health/`; conferir `proxy_pass` |
+| `nginx -t` mostra `[warn] protocol options redefined for 0.0.0.0:443` | Vários vhosts declaram `listen 443 ssl http2` e as opções do `listen` se repetem entre eles | **Só aviso**, não erro (`syntax is ok`). Já vinha dos outros sistemas do VPS; não altere os vhosts alheios |
 | `413 Request Entity Too Large` | Upload maior que o limite do Nginx | `client_max_body_size` (o exemplo usa 20m); no `http {}` global pode haver valor menor |
 | `nginx -t` falha por certificado inexistente | Aplicou o vhost final antes do Certbot | Volte ao vhost provisório (7.1), emita o certificado, e aí aplique o final |
 | Certbot não valida o domínio | DNS não propagou, ou 80/443 fechadas | `dig +short domínio`; conferir `ufw` e o firewall do provedor |
