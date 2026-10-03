@@ -12,8 +12,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.models import AuditAction
-from apps.audit.services import registrar_auditoria
+from apps.audit.services import registrar_auditoria, registrar_operacao
 from apps.commercial.commission import escolher_regra
+from apps.commercial.payment import aplicar_condicao
 from apps.core import reversible
 from apps.core.exceptions import (
     BlockingDependencyError,
@@ -32,7 +33,7 @@ from apps.livestock.models import LotStatus
 from apps.organizations.models import Season, SeasonStatus
 from apps.partners.models import PartnerRoleChoice
 from apps.procurement import selectors
-from apps.procurement.codes import proximo_codigo
+from apps.procurement.codes import proximo_numero_da_operacao
 from apps.procurement.lines import sincronizar_linhas
 from apps.procurement.models import (
     Commission,
@@ -41,7 +42,11 @@ from apps.procurement.models import (
     CommitmentItem,
     PriceBasis,
 )
-from apps.procurement.permissions import pode_lancar_no_ciclo
+from apps.procurement.permissions import (
+    pode_aprovar_o_compromisso,
+    pode_encerrar_a_operacao,
+    pode_lancar_no_ciclo,
+)
 
 #: Os mesmos papéis que a compra aceita como vendedor: o item vira uma
 #: `Purchase`, e ela recusaria qualquer outro.
@@ -52,10 +57,10 @@ CAMPOS_EDITAVEIS = (
     "seller",
     "destination_farm",
     "commissioned",
-    "second_buyer",
     "origin_property",
     "origin_city",
     "payment_days",
+    "payment_condition",
     "pickup_date",
     "slaughter_date",
     "trucks",
@@ -78,6 +83,7 @@ CAMPOS_DO_ITEM = (
     "price_band_5",
     "expected_arrobas",
     "expected_band",
+    "entry_yield_percent",
     "lot",
 )
 
@@ -109,6 +115,16 @@ def exigir_acerto_aberto(commitment: Commitment, acao: str = "mudar isto") -> No
         )
 
 
+def exigir_operacao_aberta(commitment: Commitment, acao: str = "mudar isto") -> None:
+    """Operação **encerrada** não recebe lançamento: reabra-a antes (com motivo)."""
+    if commitment.encerrada:
+        raise BlockingDependencyError(
+            f"Não é possível prosseguir: a operação {commitment.code} está encerrada "
+            f"desde {commitment.closed_at:%d/%m/%Y}. Para {acao}, reabra a operação "
+            "antes (com motivo)."
+        )
+
+
 # --------------------------------------------------------------------------
 # Validação
 # --------------------------------------------------------------------------
@@ -127,18 +143,14 @@ def _validar_compromisso(dados: dict, *, usuario) -> Season:
             f"{seller} não tem o papel de Produtor nem de Fornecedor. "
             "Acrescente o papel no cadastro do parceiro."
         )
-    for campo, rotulo in (
-        ("commissioned", "comprador"),
-        ("second_buyer", "comprador adicional"),
+    parceiro = dados.get("commissioned")
+    if (
+        parceiro is not None
+        and not parceiro.roles.filter(role=PartnerRoleChoice.COMISSIONADO).exists()
     ):
-        parceiro = dados.get(campo)
-        if (
-            parceiro is not None
-            and not parceiro.roles.filter(role=PartnerRoleChoice.COMISSIONADO).exists()
-        ):
-            raise BusinessError(
-                f"{parceiro} não tem o papel de Comissionado, exigido para o {rotulo}."
-            )
+        raise BusinessError(
+            f"{parceiro} não tem o papel de Comissionado, exigido para o comprador."
+        )
 
     retirada, abate = dados.get("pickup_date"), dados.get("slaughter_date")
     if retirada and abate and abate < retirada:
@@ -199,6 +211,11 @@ def _validar_item(entrada: dict, *, farm) -> None:
     peso = entrada.get("avg_weight_kg")
     if peso is not None and Decimal(peso) <= 0:
         raise BusinessError(f"{rotulo}: o peso médio previsto deve ser maior que zero.")
+    rendimento = entrada.get("entry_yield_percent")
+    if rendimento is not None and not Decimal("1") <= Decimal(rendimento) <= Decimal(
+        "100"
+    ):
+        raise BusinessError(f"{rotulo}: o rendimento de entrada fica entre 1% e 100%.")
 
     lote = entrada.get("lot")
     if lote is not None:
@@ -275,20 +292,29 @@ def _sincronizar_itens(
 
 
 @transaction.atomic
-def criar_compromisso(*, usuario, itens: list[dict], **dados) -> Commitment:
-    """Cria o compromisso em negociação (`RASCUNHO`). Não afeta nada."""
+def criar_compromisso(
+    *, usuario, itens: list[dict], compradores: list[dict] | None = None, **dados
+) -> Commitment:
+    """Cria o compromisso em negociação (`RASCUNHO`). Não afeta nada.
+
+    `compradores`: um ou mais, cada um com a sua comissão. O primeiro é o
+    principal (`commissioned`).
+    """
     if not pode_lancar_no_ciclo(usuario):
         raise BusinessError("Você não tem permissão para lançar compromissos.")
+    if compradores:
+        dados["commissioned"] = compradores[0]["partner"]
     dados = {campo: dados.get(campo) for campo in CAMPOS_EDITAVEIS} | {
         "origin_property": dados.get("origin_property") or "",
         "origin_city": dados.get("origin_city") or "",
         "notes": dados.get("notes") or "",
     }
+    dados = aplicar_condicao(dados)
     season = _validar_compromisso(dados, usuario=usuario)
     season = Season.objects.select_for_update().get(pk=season.pk)
 
     compromisso = Commitment(**dados, season=season, created_by=usuario)
-    compromisso.code = proximo_codigo(Commitment, "CM", season)
+    compromisso.code = proximo_numero_da_operacao()
     compromisso.save()
     registrar_auditoria(
         action=AuditAction.CREATE,
@@ -297,12 +323,19 @@ def criar_compromisso(*, usuario, itens: list[dict], **dados) -> Commitment:
         actor=usuario,
     )
     _sincronizar_itens(compromisso, itens, usuario=usuario)
+    if compradores:
+        _sincronizar_compradores(compromisso, compradores, usuario=usuario)
     return compromisso
 
 
 @transaction.atomic
 def editar_rascunho(
-    compromisso: Commitment, dados: dict, itens: list[dict] | None, *, usuario
+    compromisso: Commitment,
+    dados: dict,
+    itens: list[dict] | None,
+    *,
+    usuario,
+    compradores: list[dict] | None = None,
 ) -> Commitment:
     """Rascunho se edita sem motivo (06#permissões): ainda não afeta nada."""
     compromisso = Commitment.objects.select_for_update().get(pk=compromisso.pk)
@@ -313,7 +346,11 @@ def editar_rascunho(
     if not pode_lancar_no_ciclo(usuario):
         raise BusinessError("Você não tem permissão para editar compromissos.")
 
-    novos = _completar(compromisso, dados)
+    if compradores:
+        dados = {**dados, "commissioned": compradores[0]["partner"]}
+    novos = aplicar_condicao(
+        _completar(compromisso, dados), atual=compromisso.payment_condition
+    )
     compromisso.season = _validar_compromisso(novos, usuario=usuario)
     antes = snapshot(compromisso)
     for campo, valor in novos.items():
@@ -335,6 +372,10 @@ def editar_rascunho(
         _sincronizar_itens(
             compromisso, itens, usuario=usuario, motivo="Edição do rascunho"
         )
+    if compradores is not None:
+        _sincronizar_compradores(
+            compromisso, compradores, usuario=usuario, motivo="Edição do rascunho"
+        )
     return compromisso
 
 
@@ -344,8 +385,11 @@ def aprovar_compromisso(compromisso: Commitment, *, usuario) -> Commitment:
     compromisso = Commitment.objects.select_for_update().get(pk=compromisso.pk)
     if compromisso.status != Status.RASCUNHO:
         raise BusinessError("Este compromisso já foi aprovado.")
-    if not pode_lancar_no_ciclo(usuario):
-        raise BusinessError("Você não tem permissão para aprovar compromissos.")
+    if not pode_aprovar_o_compromisso(usuario):
+        raise BusinessError(
+            "Você não tem permissão para aprovar compromissos. A aprovação é de "
+            "administrador ou gestor."
+        )
     if not compromisso.items.exists():
         raise BusinessError("O compromisso precisa de pelo menos um item.")
     compromisso.season = _validar_compromisso(
@@ -362,19 +406,33 @@ def editar_compromisso(
     *,
     usuario,
     motivo: str,
+    compradores: list[dict] | None = None,
 ) -> Commitment:
     """Compromisso aprovado: corrige com motivo. Acerto aprovado trava."""
     if compromisso.status == Status.RASCUNHO:
-        return editar_rascunho(compromisso, dados, itens, usuario=usuario)
+        return editar_rascunho(
+            compromisso, dados, itens, usuario=usuario, compradores=compradores
+        )
     if not pode_editar_confirmado(usuario):
         raise BusinessError("Você não tem permissão para editar compromisso aprovado.")
     exigir_acerto_aberto(compromisso, "corrigir o compromisso")
+    exigir_operacao_aberta(compromisso, "corrigir o compromisso")
 
-    novos = _completar(compromisso, dados)
+    if compradores:
+        dados = {**dados, "commissioned": compradores[0]["partner"]}
+    novos = aplicar_condicao(
+        _completar(compromisso, dados), atual=compromisso.payment_condition
+    )
     novos["season"] = _validar_compromisso(novos, usuario=usuario)
     compromisso = reversible.editar(compromisso, novos, usuario=usuario, motivo=motivo)
     if itens is not None:
         _sincronizar_itens(compromisso, itens, usuario=usuario, motivo=motivo)
+    if compradores is not None:
+        _sincronizar_compradores(
+            compromisso, compradores, usuario=usuario, motivo=motivo
+        )
+        # Comprador acrescentado sem valor informado recebe a regra vigente.
+        garantir_comissao(compromisso, usuario=usuario)
     return compromisso
 
 
@@ -432,6 +490,93 @@ def _restaurar_como_rascunho(registro, *, usuario):
 # --------------------------------------------------------------------------
 
 
+@transaction.atomic
+def encerrar_operacao(compromisso: Commitment, *, usuario, observacao: str = ""):
+    """Encerramento **manual** (cliente, 2026-10-03, pendência #29): o sistema
+    não decide que a operação acabou porque as contas foram pagas. Guarda
+    status, data, responsável e observação."""
+    if not pode_encerrar_a_operacao(usuario):
+        raise BusinessError(
+            "Você não tem permissão para encerrar operações. O encerramento é de "
+            "administrador ou gestor."
+        )
+    compromisso = Commitment.objects.select_for_update().get(pk=compromisso.pk)
+    if compromisso.status != Status.CONFIRMADA:
+        raise BusinessError("Só se encerra uma operação aprovada.")
+    if compromisso.encerrada:
+        raise BusinessError("Esta operação já está encerrada.")
+    if selectors.acerto_aprovado(compromisso) is None:
+        raise BusinessError(
+            "Aprove o acerto antes de encerrar: sem ele a operação ainda não "
+            "virou compra, custo e título."
+        )
+    antes = snapshot(compromisso)
+    compromisso.closed_at = timezone.now()
+    compromisso.closed_by = usuario
+    compromisso.closure_note = (observacao or "").strip()
+    compromisso.version += 1
+    compromisso.updated_by = usuario
+    compromisso.save()
+    depois = snapshot(compromisso)
+    registrar_auditoria(
+        action=AuditAction.UPDATE,
+        entity=compromisso,
+        before=antes,
+        after=depois,
+        changed_fields=diff_fields(antes, depois),
+        reason=compromisso.closure_note or "Operação encerrada.",
+        actor=usuario,
+    )
+    registrar_operacao(
+        entity=compromisso,
+        title="Operação encerrada",
+        description=compromisso.closure_note or "Encerrada manualmente.",
+        document=compromisso.code,
+        actor=usuario,
+    )
+    return compromisso
+
+
+@transaction.atomic
+def reabrir_operacao(compromisso: Commitment, *, usuario, motivo: str):
+    """Desfaz o encerramento (regra 5): com motivo, na auditoria."""
+    if not pode_encerrar_a_operacao(usuario):
+        raise BusinessError(
+            "Você não tem permissão para reabrir operações. A reabertura é de "
+            "administrador ou gestor."
+        )
+    if not (motivo or "").strip():
+        raise BusinessError("Informe o motivo da reabertura da operação.")
+    compromisso = Commitment.objects.select_for_update().get(pk=compromisso.pk)
+    if not compromisso.encerrada:
+        raise BusinessError("Esta operação não está encerrada.")
+    antes = snapshot(compromisso)
+    compromisso.closed_at = None
+    compromisso.closed_by = None
+    compromisso.closure_note = ""
+    compromisso.version += 1
+    compromisso.updated_by = usuario
+    compromisso.save()
+    depois = snapshot(compromisso)
+    registrar_auditoria(
+        action=AuditAction.UPDATE,
+        entity=compromisso,
+        before=antes,
+        after=depois,
+        changed_fields=diff_fields(antes, depois),
+        reason=motivo.strip(),
+        actor=usuario,
+    )
+    registrar_operacao(
+        entity=compromisso,
+        title="Operação reaberta",
+        description=f"Motivo: {motivo.strip()}",
+        document=compromisso.code,
+        actor=usuario,
+    )
+    return compromisso
+
+
 def bloqueios_do_compromisso(compromisso: Commitment) -> list:
     bloqueios = []
     if compromisso.season.status == SeasonStatus.ENCERRADA:
@@ -442,6 +587,11 @@ def bloqueios_do_compromisso(compromisso: Commitment) -> list:
     acerto = selectors.acerto_aprovado(compromisso)
     if acerto is not None:
         bloqueios.append(bloqueio_do_acerto_aprovado(acerto, "mexer no compromisso"))
+    if compromisso.encerrada:
+        bloqueios.append(
+            f"a operação {compromisso.code} está encerrada. Reabra a operação "
+            "antes (com motivo)."
+        )
     return bloqueios
 
 
@@ -457,16 +607,26 @@ def dependentes_do_compromisso(compromisso: Commitment) -> list:
 
 
 def comissao_do(compromisso: Commitment) -> Commission | None:
-    """Por consulta, não pelo atributo: o acessor reverso guarda em cache o
-    "não existe" e deixaria uma instância velha enxergando a comissão errada."""
-    return Commission.objects.filter(commitment=compromisso).first()
+    """A comissão do comprador principal. Por consulta, não pelo atributo: o
+    cache guardaria o "não existe" e deixaria uma instância velha enxergando a
+    comissão errada."""
+    return Commitment.objects.get(pk=compromisso.pk).commission
+
+
+def comissoes_do(compromisso: Commitment) -> list[Commission]:
+    """Uma por comprador, na ordem em que foram informados."""
+    return list(
+        Commission.objects.filter(commitment=compromisso)
+        .select_related("payee")
+        .order_by("position", "id")
+    )
 
 
 def descrever_efeitos_do_compromisso(compromisso: Commitment) -> list[str]:
     efeitos = ["a aprovação do compromisso e o contrato dela"]
-    comissao = comissao_do(compromisso)
-    if comissao is not None:
-        efeitos.append(f"a regra de comissão gravada ({comissao.regra_em_texto()})")
+    for comissao in comissoes_do(compromisso):
+        quem = f"{comissao.payee}: " if comissao.payee_id else ""
+        efeitos.append(f"a comissão gravada ({quem}{comissao.regra_em_texto()})")
     return efeitos
 
 
@@ -490,47 +650,168 @@ def _categoria_unica(compromisso: Commitment):
     return next(iter(categorias.values())) if len(categorias) == 1 else None
 
 
-def garantir_comissao(compromisso: Commitment, *, usuario) -> Commission | None:
-    """Copia a regra vigente para o compromisso — **uma vez**. Sem regra, não
-    cria nada (a comissão fica "—" e pode ser informada à mão).
+def _validar_comprador(entrada: dict, posicao: int) -> None:
+    rotulo = f"Comprador {posicao}"
+    parceiro = entrada.get("partner")
+    if parceiro is None:
+        raise BusinessError(f"{rotulo}: escolha o comprador.")
+    if not parceiro.roles.filter(role=PartnerRoleChoice.COMISSIONADO).exists():
+        raise BusinessError(
+            f"{rotulo}: {parceiro} não tem o papel de Comissionado. Acrescente o "
+            "papel no cadastro do parceiro."
+        )
+    tipo = entrada.get("type")
+    if tipo not in ("PERCENTUAL", "POR_CABECA", "VALOR"):
+        raise BusinessError(f"{rotulo}: escolha o tipo da comissão.")
+    valor = Decimal(entrada.get("value") or 0)
+    extra = Decimal(entrada.get("extra_amount") or 0)
+    if valor < 0 or extra < 0:
+        raise BusinessError(f"{rotulo}: a comissão não pode ser negativa.")
+    if tipo == "PERCENTUAL" and valor > 100:
+        raise BusinessError(f"{rotulo}: um percentual não passa de 100.")
 
-    Já existe: não se mexe, **exceto** se veio de regra e o comissionado do
-    compromisso mudou — a regra de outra pessoa não vale para esta.
+
+def _sincronizar_compradores(
+    compromisso: Commitment, compradores: list[dict], *, usuario, motivo: str = ""
+) -> list[Commission]:
+    """Os compradores do compromisso, cada um com a sua comissão **digitada**
+    (cliente, 2026-10-03). Cria, corrige e retira as linhas de `Commission`;
+    o primeiro é o principal. Quem ficou sem valor informado recebe, na
+    aprovação, a regra vigente (`garantir_comissao`).
+
+    Com o compromisso aprovado, corrigir exige motivo.
     """
-    existente = comissao_do(compromisso)
-    if existente is not None and not (
-        existente.source == CommissionSource.REGRA
-        and existente.payee_id != compromisso.commissioned_id
-    ):
-        return existente
+    aprovado = compromisso.status != Status.RASCUNHO
+    if aprovado and not (motivo or "").strip():
+        raise BusinessError("Informe o motivo da correção dos compradores.")
+    vistos = set()
+    for posicao, entrada in enumerate(compradores, start=1):
+        _validar_comprador(entrada, posicao)
+        if entrada["partner"].pk in vistos:
+            raise BusinessError(
+                f"{entrada['partner']} aparece mais de uma vez nos compradores."
+            )
+        vistos.add(entrada["partner"].pk)
 
+    existentes = {
+        c.payee_id: c for c in Commission.objects.filter(commitment=compromisso)
+    }
+    resultado = []
+    for posicao, entrada in enumerate(compradores, start=1):
+        parceiro = entrada["partner"]
+        valor = Decimal(entrada.get("value") or 0)
+        extra = Decimal(entrada.get("extra_amount") or 0)
+        # Sem valor e sem extra: o comprador entra "à espera da regra".
+        sem_valor = valor == 0 and extra == 0
+        atual = existentes.pop(parceiro.pk, None)
+        antes = snapshot(atual) if atual else None
+        linha = atual or Commission(commitment=compromisso, payee=parceiro)
+        linha.position = posicao
+        linha.type = entrada["type"]
+        linha.base = "BRUTO"
+        linha.value = valor
+        linha.extra_amount = extra
+        linha.due_date = entrada.get("due_date")
+        if sem_valor and (atual is None or atual.source == CommissionSource.REGRA):
+            linha.source, linha.rule = CommissionSource.REGRA, None
+        else:
+            linha.source, linha.rule = CommissionSource.MANUAL, None
+        linha.save()
+        depois = snapshot(linha)
+        if antes != depois:
+            registrar_auditoria(
+                action=AuditAction.UPDATE if atual else AuditAction.CREATE,
+                entity=linha,
+                before=antes,
+                after=depois,
+                changed_fields=diff_fields(antes, depois) if antes else None,
+                reason=motivo or "",
+                actor=usuario,
+            )
+        resultado.append(linha)
+
+    for sobra in existentes.values():
+        if sobra.payee_id is None:
+            continue  # comissão sem comprador (regra genérica): não some numa edição
+        registrar_auditoria(
+            action=AuditAction.DELETE,
+            entity=sobra,
+            before=snapshot(sobra),
+            reason=motivo or "Comprador retirado do compromisso.",
+            actor=usuario,
+        )
+        sobra.delete()
+
+    principal = compradores[0]["partner"] if compradores else None
+    if compromisso.commissioned_id != (principal.pk if principal else None):
+        compromisso.commissioned = principal
+        compromisso.save(update_fields=["commissioned"])
+    return resultado
+
+
+def _snapshot_da_regra(linha: Commission, compromisso: Commitment, *, usuario):
+    """Copia a regra vigente para a linha que ficou sem comissão informada."""
     regra = escolher_regra(
-        comissionado=compromisso.commissioned,
+        comissionado=linha.payee,
         categoria=_categoria_unica(compromisso),
         data=compromisso.date,
     )
     if regra is None:
-        return existente
-
-    antes = snapshot(existente) if existente else None
-    comissao = existente or Commission(commitment=compromisso)
-    comissao.payee = compromisso.commissioned
-    comissao.source = CommissionSource.REGRA
-    comissao.rule = regra
-    comissao.type = regra.type
-    comissao.base = regra.base
-    comissao.value = regra.value
-    comissao.save()
+        return linha
+    antes = snapshot(linha) if linha.pk else None
+    linha.source = CommissionSource.REGRA
+    linha.rule = regra
+    linha.type = regra.type
+    linha.base = regra.base
+    linha.value = regra.value
+    linha.save()
     registrar_auditoria(
-        action=AuditAction.UPDATE if existente else AuditAction.CREATE,
-        entity=comissao,
+        action=AuditAction.UPDATE if antes else AuditAction.CREATE,
+        entity=linha,
         before=antes,
-        after=snapshot(comissao),
-        changed_fields=diff_fields(antes, snapshot(comissao)) if antes else None,
+        after=snapshot(linha),
+        changed_fields=diff_fields(antes, snapshot(linha)) if antes else None,
         reason="Regra de comissão gravada na aprovação do compromisso.",
         actor=usuario,
     )
-    return comissao
+    return linha
+
+
+def garantir_comissao(compromisso: Commitment, *, usuario) -> list[Commission]:
+    """Na aprovação, copia a regra vigente para **cada comprador** que ainda não
+    tem comissão informada — **uma vez**. Sem regra, nada é criado (a comissão
+    fica "—" e pode ser informada à mão). Comissão digitada (`MANUAL`) ou já
+    gravada nunca é sobrescrita.
+    """
+    linhas = comissoes_do(compromisso)
+    principal = compromisso.commissioned
+    if not any(
+        linha.payee_id == (principal.pk if principal else None) for linha in linhas
+    ):
+        # Comprador principal sem linha: tenta a regra dele.
+        nova = Commission(
+            commitment=compromisso,
+            payee=principal,
+            position=1,
+            type="PERCENTUAL",
+            value=Decimal("0"),
+        )
+        if escolher_regra(
+            comissionado=principal,
+            categoria=_categoria_unica(compromisso),
+            data=compromisso.date,
+        ):
+            linhas.insert(0, _snapshot_da_regra(nova, compromisso, usuario=usuario))
+    for linha in linhas:
+        espera_regra = (
+            linha.source == CommissionSource.REGRA
+            and linha.rule_id is None
+            and linha.value == 0
+            and linha.extra_amount == 0
+        )
+        if espera_regra:
+            _snapshot_da_regra(linha, compromisso, usuario=usuario)
+    return comissoes_do(compromisso)
 
 
 @transaction.atomic
@@ -538,21 +819,24 @@ def definir_comissao(
     compromisso: Commitment,
     *,
     tipo: str,
-    base: str,
+    base: str = "BRUTO",
     valor: Decimal,
     extra: Decimal = Decimal("0"),
     favorecido=None,
+    vencimento=None,
     usuario,
     motivo: str = "",
 ) -> Commission:
-    """Comissão informada **neste compromisso**, sem regra cadastrada — ou
-    correção da que foi gravada. Vale só para este compromisso."""
+    """Comissão de **um comprador**, informada neste compromisso — ou correção
+    da que foi gravada. Informar um comprador novo o acrescenta. Vale só para
+    este compromisso."""
     if not pode_lancar_no_ciclo(usuario):
         raise BusinessError("Você não tem permissão para alterar a comissão.")
     compromisso = Commitment.objects.select_for_update().get(pk=compromisso.pk)
     if compromisso.status != Status.CONFIRMADA:
         raise BusinessError("A comissão se define depois da aprovação do compromisso.")
     exigir_acerto_aberto(compromisso, "mudar a comissão")
+    exigir_operacao_aberta(compromisso, "mudar a comissão")
     if Decimal(valor) < 0 or Decimal(extra or 0) < 0:
         raise BusinessError("Comissão não pode ser negativa.")
     if tipo == "PERCENTUAL" and Decimal(valor) > 100:
@@ -563,19 +847,28 @@ def definir_comissao(
     ):
         raise BusinessError(f"{favorecido} não tem o papel de Comissionado.")
 
-    existente = comissao_do(compromisso)
+    existente = Commission.objects.filter(
+        commitment=compromisso, payee=favorecido
+    ).first()
     if existente is not None and not (motivo or "").strip():
         raise BusinessError("Informe o motivo da correção da comissão.")
     antes = snapshot(existente) if existente else None
-    comissao = existente or Commission(commitment=compromisso)
-    comissao.payee = favorecido
+    comissao = existente or Commission(
+        commitment=compromisso,
+        payee=favorecido,
+        position=Commission.objects.filter(commitment=compromisso).count() + 1,
+    )
     comissao.source = CommissionSource.MANUAL
     comissao.rule = None
     comissao.type = tipo
-    comissao.base = base
+    comissao.base = base or "BRUTO"
     comissao.value = valor
     comissao.extra_amount = extra or 0
+    comissao.due_date = vencimento
     comissao.save()
+    if compromisso.commissioned_id is None and favorecido is not None:
+        compromisso.commissioned = favorecido
+        compromisso.save(update_fields=["commissioned"])
     depois = snapshot(comissao)
     registrar_auditoria(
         action=AuditAction.UPDATE if existente else AuditAction.CREATE,
@@ -587,3 +880,31 @@ def definir_comissao(
         actor=usuario,
     )
     return comissao
+
+
+@transaction.atomic
+def retirar_comprador(
+    compromisso: Commitment, comissao: Commission, *, usuario, motivo: str
+) -> None:
+    """Tira um comprador (e a comissão dele) do compromisso aprovado."""
+    if not pode_lancar_no_ciclo(usuario):
+        raise BusinessError("Você não tem permissão para alterar a comissão.")
+    compromisso = Commitment.objects.select_for_update().get(pk=compromisso.pk)
+    exigir_acerto_aberto(compromisso, "retirar um comprador")
+    exigir_operacao_aberta(compromisso, "retirar um comprador")
+    if not (motivo or "").strip():
+        raise BusinessError("Informe o motivo para retirar o comprador.")
+    comissao = Commission.objects.get(pk=comissao.pk, commitment=compromisso)
+    registrar_auditoria(
+        action=AuditAction.DELETE,
+        entity=comissao,
+        before=snapshot(comissao),
+        reason=motivo,
+        actor=usuario,
+    )
+    era_principal = comissao.payee_id == compromisso.commissioned_id
+    comissao.delete()
+    if era_principal:
+        proxima = comissoes_do(compromisso)
+        compromisso.commissioned = proxima[0].payee if proxima else None
+        compromisso.save(update_fields=["commissioned"])

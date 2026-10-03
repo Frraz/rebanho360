@@ -4,7 +4,7 @@
 
 O núcleo. Da F1-06 à F1-09 está a decisão mais importante do projeto: o saldo do rebanho como razão de partidas dobradas ([ADR 0002](../arquitetura/adr/0002-rebanho-como-razao-de-movimentacoes.md)).
 
-> **Pendência [#5](../regras-negocio/99-pendencias.md) decidida em 2026-10-01:** sem resposta ainda sobre São Francisco/São Francisco II, seguindo com padrão reversível (duas fazendas distintas, como já estava no `seed_demo`). Não bloqueia mais a F1-02 — mas continua bloqueando a carga histórica real da Fase 2.
+> **Pendência [#5](../regras-negocio/99-pendencias-resolvidas.md) decidida em 2026-10-01:** sem resposta ainda sobre São Francisco/São Francisco II, seguindo com padrão reversível (duas fazendas distintas, como já estava no `seed_demo`). Não bloqueia mais a F1-02 — mas continua bloqueando a carga histórica real da Fase 2.
 
 ---
 
@@ -354,6 +354,6 @@ Alimenta o painel de pendências.
 - [x] A conciliação de transferências vem vazia
 - [ ] Está no ar em produção — **falta VPS** (F1-16, mesmo bloqueio da F0-17/F0-18)
 
-> **[#1](../regras-negocio/99-pendencias.md) confirmada em 2026-10-01** (evolução = 2 linhas). **[#2](../regras-negocio/99-pendencias.md)** (os −140 da aba `GERAL`) segue aberta por decisão explícita — padrão reversível (transferência sempre interna), a resolver antes do importador da Fase 2.
+> **[#1](../regras-negocio/99-pendencias-resolvidas.md) confirmada em 2026-10-01** (evolução = 2 linhas). **[#2](../regras-negocio/99-pendencias-resolvidas.md)** (os −140 da aba `GERAL`) segue aberta por decisão explícita — padrão reversível (transferência sempre interna), a resolver antes do importador da Fase 2.
 
 **Próxima:** [Fase 2 — Custos, compras e importação](fase-2-custos-compras-importacao.md)

@@ -28,6 +28,29 @@ ETAPAS_DO_CICLO = (
 )
 
 
+_CLASSE_DA_SITUACAO = {
+    "AGUARDANDO_FINANCEIRO": "badge-pendencia",
+    "PAGAMENTO_PROGRAMADO": "badge-editada",
+    "PAGO": "badge-confirmada",
+    "ENCERRADA": "badge-excluida",
+}
+
+
+@register.simple_tag
+def situacao_financeira_selo(situacao):
+    """Passo depois do acerto (aguardando financeiro, programado, pago,
+    encerrada). Texto e classe: nunca só cor."""
+    from apps.procurement.selectors import SituacaoFinanceira
+
+    if not situacao:
+        return ""
+    return format_html(
+        '<span class="{}">{}</span>',
+        _CLASSE_DA_SITUACAO[situacao],
+        SituacaoFinanceira(situacao).label,
+    )
+
+
 @register.simple_tag
 def etapa_selo(etapa):
     etapa = Etapa(etapa)

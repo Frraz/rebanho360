@@ -2,7 +2,7 @@
 
 Leva os dados do sistema para fora — tudo, ou só o que o usuário escolher — em CSV, Excel, JSON e PDF. Serve a quem quer guardar uma cópia, analisar em outra ferramenta ou, um dia, deixar de usar o sistema **sem perder nada**. Código em `apps/exports` (`catalog.py`, `tabular.py`, `writers.py`, `packaging.py`, `services.py`, `tasks.py`).
 
-Tela: **Sistema → Exportações** (`/exportacoes/`). Papéis: `ADMIN`, `GESTOR`, `ESCRITORIO` e `FINANCEIRO` ([#44](99-pendencias.md#44--🟢-quem-exporta-e-o-que-cada-papel-leva-fase-6)). `CAMPO` e `CONSULTA` não entram.
+Tela: **Sistema → Exportações** (`/exportacoes/`). Papéis: `ADMIN`, `GESTOR`, `ESCRITORIO` e `FINANCEIRO` ([#44](99-pendencias.md#44--exportação-de-dados-além-do-pdf-fase-6)). `CAMPO` e `CONSULTA` não entram.
 
 É o espelho da [importação](../migracao/01-planilhas-e-importacao.md): lá, planilha → prévia → confirmação → sistema; aqui, sistema → escolha → processamento em segundo plano → arquivo.
 

@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django import forms
 
+from apps.commercial.models import PaymentCondition
 from apps.core import context as ctx
 from apps.livestock.models import AnimalCategory, Lot, LotStatus
 from apps.partners.models import Partner, PartnerRoleChoice
@@ -56,6 +57,23 @@ class SaleEntryForm(forms.Form):
     sale_form = forms.ChoiceField(
         label="Forma", choices=SaleForm.choices, initial=SaleForm.PASTO
     )
+    payment_condition = forms.ModelChoiceField(
+        label="Condição de recebimento",
+        queryset=PaymentCondition.objects.none(),
+        required=False,
+        empty_label="Informar o prazo em dias",
+        help_text="Cadastrada em Comercial. Parcelada gera um título por parcela.",
+    )
+    reported_yield_percent = forms.DecimalField(
+        label="Rendimento informado pelo frigorífico (%)",
+        required=False,
+        min_value=Decimal("1"),
+        max_value=Decimal("100"),
+        max_digits=5,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"inputmode": "decimal", "step": "0.01"}),
+        help_text="O rendimento oficial do romaneio prevalece sobre o calculado.",
+    )
     payment_days = forms.IntegerField(
         label="Prazo de recebimento (dias)",
         required=False,
@@ -83,6 +101,9 @@ class SaleEntryForm(forms.Form):
             Lot.objects.for_user(user).exclude(status=LotStatus.EXCLUIDO)
             if user
             else Lot.objects.none()
+        )
+        self.fields["payment_condition"].queryset = PaymentCondition.objects.filter(
+            is_active=True
         )
         self.fields["buyer"].queryset = Partner.objects.filter(
             is_active=True,

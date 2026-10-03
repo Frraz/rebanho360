@@ -212,6 +212,7 @@ def registrar_movimento(
     destination_category=None,
     partner=None,
     reason: str = "",
+    death_cause: str = "",
     notes: str = "",
     season=None,
     origin_purchase=None,
@@ -222,6 +223,9 @@ def registrar_movimento(
 
     if type in TYPES_COM_MOTIVO_OBRIGATORIO and not reason.strip():
         raise BusinessError(f"Motivo é obrigatório para {MovementType(type).label}.")
+
+    if death_cause and type != MovementType.MORTE:
+        raise BusinessError("A causa da morte só se informa em movimentação de morte.")
 
     if type == MovementType.AJUSTE_INVENTARIO and not pode_lancar_ajuste_inventario(
         usuario
@@ -269,6 +273,7 @@ def registrar_movimento(
         origin_purchase=origin_purchase,
         origin_sale=origin_sale,
         reason=reason,
+        death_cause=death_cause or "",
         notes=notes,
         created_by=usuario,
     )

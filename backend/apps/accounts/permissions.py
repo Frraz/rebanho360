@@ -21,3 +21,19 @@ class GerenciaUsuariosMixin(LoginRequiredMixin, UserPassesTestMixin):
 
     def test_func(self):
         return pode_gerenciar_usuarios(self.request.user)
+
+
+def pode_aprovar_acessos(user) -> bool:
+    """Decidir pedidos de acesso: `ADMIN` e `GESTOR` (pendência #41, respondida
+    pelo cliente em 2026-10-03). Quem aprova não ganha com isso o resto da
+    gestão de usuários — editar, redefinir senha e excluir seguem do `ADMIN`."""
+    return bool(
+        user.is_authenticated
+        and user.is_active
+        and (user.role in (Role.ADMIN, Role.GESTOR) or user.is_superuser)
+    )
+
+
+class AprovaAcessosMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        return pode_aprovar_acessos(self.request.user)

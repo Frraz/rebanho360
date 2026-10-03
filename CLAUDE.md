@@ -11,7 +11,7 @@ Sistema de gestão pecuária para **uma operação real de fazenda a pasto, com 
 ## Antes de codificar
 
 1. Ler [`docs/00-visao-geral.md`](docs/00-visao-geral.md)
-2. Ler [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md) — **48 pendências** (1 confirmada; as demais abertas, cada uma com padrão reversível implementado)
+2. Ler [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md) — **18 pendências abertas** (as 30 respondidas ou dispensadas estão em [`99-pendencias-resolvidas.md`](docs/regras-negocio/99-pendencias-resolvidas.md); a maior parte das respostas é do cliente em **2026-10-03**, provisórias, ver [`docs/regras-negocio/12`](docs/regras-negocio/12-decisoes-do-cliente-2026-10-03.md)); as demais abertas, cada uma com padrão reversível implementado
 3. Consultar [`docs/roadmap/`](docs/roadmap/README.md) para saber em que fase e em que tarefa estamos
 4. Vai mexer em tela? Ler [`docs/ux/02-design-system.md`](docs/ux/02-design-system.md) — componentes, tokens e padrões já existem; não inventar outro
 
@@ -99,9 +99,11 @@ backend/apps/
 ├── partners/       Parceiro multi-papel, Conta bancária
 ├── livestock/      Categoria, Raça, Lote
 ├── herd/           HerdMovement, HerdLedgerEntry, Pesagem   ← núcleo
+├── reproduction/   Ciclo reprodutivo (resumido): prenhez, desmama, índices
+├── infrastructure/ Estruturas da fazenda, máquinas e uso (resumido)
 ├── costs/          Centro de custo, Lançamento, rateio
-├── commercial/     Classes de carcaça, tipos de tributo, regras de comissão
-├── procurement/    Ciclo de compra: compromisso → viagem → recebimento → acerto
+├── commercial/     Classes de carcaça, tipos de tributo, regras de comissão, condições de pagamento
+├── procurement/    Ciclo de compra (nº único `OP-…`): compromisso → viagem → recebimento → acerto
 ├── purchases/      Compra
 ├── sales/          Venda / Abate
 ├── finance/        Títulos e baixas (Fase 4)
@@ -180,10 +182,18 @@ Erro de negócio é específico: "Saldo insuficiente: há 12 cabeças de Machos 
 
 ---
 
+## Diretriz do cliente (2026-10-03): registrar, não deduzir
+
+> **Duas ressalvas do próprio cliente.** (1) As respostas vieram do Facholi, rápidas e **provisórias**: quem responde de verdade são os usuários finais, e a validação é **em reunião, com o sistema na tela** — trate cada ✅ de 2026-10-03 como "decisão para seguir", e **não** reabra o que já foi decidido sem a reunião ([`14`](docs/regras-negocio/14-roteiro-de-validacao-com-os-usuarios.md)). (2) **A planilha São Francisco é um exemplo**: o sistema contém os **campos** das planilhas, **não os dados** — lacuna ou divergência dentro dela **não é requisito** (pendências #2, #5, #6, #10, #11, #12, #18 estão ⚪ dispensadas); não gaste esforço conciliando-a.
+
+O sistema é prioritariamente de **registro, controle e rastreabilidade**. Onde preço, alíquota, comissão, quebra, custo, condição ou regra comercial podem variar entre operações, prefira **campos editáveis** a presumir valor — o cliente respondeu 34 perguntas assim ([`docs/regras-negocio/12`](docs/regras-negocio/12-decisoes-do-cliente-2026-10-03.md)). Na prática: **sem rateio automático** (o usuário distribui frete, comissão e tributos entre itens), **quebra de viagem digitada** e **sem alerta** de quebra nem de mortalidade, **tributo com favorecido e vencimento informados**, aprovar o próprio lançamento é permitido (a auditoria guarda os dois), encerramento da operação **manual**. A automação serve a reaproveitar o já registrado, gerar documentos e títulos de lançamentos aprovados, consolidar centro de custo e alimentar relatórios.
+
+---
+
 ## Quando faltar uma regra de negócio
 
 1. **Não inventar em silêncio**
-2. Registrar em [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md), com a pergunta, o porquê e o custo de mudar
+2. Registrar em [`docs/regras-negocio/99-pendencias.md`](docs/regras-negocio/99-pendencias.md), com a pergunta, o porquê e o custo de mudar (resolvida, a pendência vai para o arquivo de resolvidas)
 3. Implementar a alternativa mais **reversível** para continuar
 4. Deixar o código isolado para ajuste
 

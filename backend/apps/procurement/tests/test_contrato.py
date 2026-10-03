@@ -1,4 +1,5 @@
-"""F5-06 — contrato em PDF, com versão de template e hash; sem dado bancário."""
+"""F5-06 — contrato em PDF, com versão de template e hash; dado bancário só para
+quem já o vê (cliente, 2026-10-03)."""
 
 import hashlib
 
@@ -10,7 +11,8 @@ from apps.audit.models import AuditAction, AuditEvent, OperationEvent
 from apps.core.exceptions import BusinessError
 from apps.documents.models import DocumentStatus, DocumentType, GeneratedDocument
 from apps.partners.models import BankAccount
-from apps.procurement import contract
+from apps.procurement import commitments, contract
+from apps.procurement.tests.conftest import D
 
 pytestmark = pytest.mark.django_db
 
@@ -21,7 +23,7 @@ class TestGerar:
 
         assert documento.status == DocumentStatus.PRONTO
         assert documento.doc_type == DocumentType.CONTRATO
-        assert documento.template_version == contract.TEMPLATE_VERSION == "contrato-v1"
+        assert documento.template_version == contract.TEMPLATE_VERSION == "contrato-v2"
         assert documento.entity_type == "Commitment"
         assert documento.entity_id == str(compromisso.pk)
         conteudo = documento.file.read()
@@ -94,8 +96,8 @@ class TestConteudo:
         assert "01/09/2025" in html and "03/09/2025" in html
         assert "30 dias" in html
 
-    def test_nao_leva_dado_bancario(self, compromisso, escritorio, produtor):
-        BankAccount.objects.create(
+    def _conta(self, produtor):
+        return BankAccount.objects.create(
             partner=produtor,
             bank_code="001",
             bank_name="Banco do Brasil",
@@ -104,12 +106,59 @@ class TestConteudo:
             pix_key="chave-pix-secreta",
             is_default=True,
         )
+
+    def test_sem_permissao_para_dado_bancario_o_contrato_sai_sem_ele(
+        self, compromisso, escritorio, produtor
+    ):
+        self._conta(produtor)
         html = self._html(compromisso, escritorio)
         for sensivel in ("4249-8", "1303-X", "chave-pix-secreta", "Banco do Brasil"):
             assert sensivel not in html
 
+    def test_com_permissao_leva_banco_agencia_e_conta_mas_nunca_o_pix(
+        self, compromisso, gestor, produtor
+    ):
+        """Cliente, 2026-10-03 (#27): o contrato de compra traz banco, agência e
+        conta — só para quem já pode ver dado bancário."""
+        self._conta(produtor)
+        import django.utils.timezone as tz
+
+        html = contract.renderizar_html(
+            compromisso,
+            emitido_por=str(gestor),
+            emitido_em=tz.localtime(),
+            com_dado_bancario=True,
+        )
+        assert "Banco do Brasil" in html and "1303-X" in html and "4249-8" in html
+        assert "chave-pix-secreta" not in html
+
+    def test_gerar_pelo_gestor_registra_o_dado_bancario_na_auditoria(
+        self, compromisso, gestor, produtor
+    ):
+        self._conta(produtor)
+        documento = contract.gerar_contrato(compromisso, usuario=gestor)
+        evento = AuditEvent.objects.get(
+            entity_type="Documento", entity_id=str(documento.document_id)
+        )
+        assert "com dados bancários" in evento.reason
+
+    def test_varios_compradores_saem_no_contrato(
+        self, criar_compromisso, gestor, comissionado, outro_comissionado
+    ):
+        c = commitments.aprovar_compromisso(
+            criar_compromisso(
+                compradores=[
+                    {"partner": comissionado, "type": "PERCENTUAL", "value": D("1")},
+                    {"partner": outro_comissionado, "type": "VALOR", "value": D("9")},
+                ]
+            ),
+            usuario=gestor,
+        )
+        html = self._html(c, gestor)
+        assert comissionado.name in html and outro_comissionado.name in html
+
     def test_item_por_cabeca_mostra_o_preco_por_cabeca(
-        self, escritorio, criar_compromisso, categoria_desmamados
+        self, escritorio, gestor, criar_compromisso, categoria_desmamados
     ):
         from decimal import Decimal
 
@@ -127,7 +176,7 @@ class TestConteudo:
                     )
                 ]
             ),
-            usuario=escritorio,
+            usuario=gestor,
         )
         assert "por cabeça" in self._html(c, escritorio)
 
@@ -191,4 +240,4 @@ class TestTela:
         html = client.get(
             reverse("procurement:compromisso_detalhe", args=[compromisso.pk])
         ).content.decode()
-        assert "Contrato gerado em" in html and "contrato-v1" in html
+        assert "Contrato gerado em" in html and "contrato-v2" in html

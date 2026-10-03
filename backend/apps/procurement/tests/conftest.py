@@ -108,9 +108,9 @@ def rascunho(criar_compromisso):
 
 
 @pytest.fixture
-def compromisso(rascunho, escritorio):
+def compromisso(rascunho, escritorio, gestor):
     """Aprovado, sem regra de comissão cadastrada."""
-    return commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+    return commitments.aprovar_compromisso(rascunho, usuario=gestor)
 
 
 @pytest.fixture
@@ -240,6 +240,7 @@ def saldo_do_lote():
 
 @pytest.fixture
 def compromisso_duplo(
+    gestor,
     escritorio,
     criar_compromisso,
     categoria_desmamados,
@@ -267,7 +268,7 @@ def compromisso_duplo(
                 ),
             ]
         ),
-        usuario=escritorio,
+        usuario=gestor,
     )
     primeiro, segundo = c.items.order_by("number")
     viagem = trips.criar_viagem(
@@ -323,3 +324,22 @@ def compromisso_duplo(
         usuario=escritorio,
     )
     return c
+
+
+@pytest.fixture
+def acerto_duplo(escritorio, compromisso_duplo):
+    """Dois itens: o frete (R$ 1.000,00) é **distribuído pelo usuário** — aqui,
+    por cabeça recebida (344,83 / 655,17), como a tela sugeriria."""
+    acerto = closing.criar_acerto(
+        usuario=escritorio, compromisso=compromisso_duplo, date=DATA_ACERTO
+    )
+    primeiro, segundo = compromisso_duplo.items.order_by("number")
+    closing.registrar_distribuicao(
+        acerto,
+        [
+            {"item": primeiro.pk, "freight_value": D("344.83")},
+            {"item": segundo.pk, "freight_value": D("655.17")},
+        ],
+        usuario=escritorio,
+    )
+    return acerto

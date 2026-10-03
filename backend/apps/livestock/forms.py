@@ -32,6 +32,7 @@ class LotForm(forms.ModelForm):
             "breed",
             "cost_center",
             "origin_partner",
+            "regime",
             "notes",
         ]
         widgets = {
@@ -40,6 +41,11 @@ class LotForm(forms.ModelForm):
             "exit_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }
 
+    def clean_regime(self):
+        # Campo novo e opcional: sem escolha, o lote é de pasto (o padrão).
+        return self.cleaned_data.get("regime") or "PASTO"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["regime"].required = False
         self.fields["farm"].queryset = Farm.objects.filter(is_active=True)

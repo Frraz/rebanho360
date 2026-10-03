@@ -24,6 +24,44 @@ class Etapa(models.TextChoices):
     EXCLUIDO = "EXCLUIDO", "Excluído"
 
 
+class SituacaoFinanceira(models.TextChoices):
+    """O que acontece **depois** do acerto aprovado (cliente, 2026-10-03,
+    pendência #29). Derivada dos títulos — o financeiro faz a operação avançar
+    sem ninguém atualizar status à mão. `ENCERRADA` é o único passo manual."""
+
+    AGUARDANDO_FINANCEIRO = "AGUARDANDO_FINANCEIRO", "Aguardando financeiro"
+    PAGAMENTO_PROGRAMADO = "PAGAMENTO_PROGRAMADO", "Pagamento programado"
+    PAGO = "PAGO", "Pago"
+    ENCERRADA = "ENCERRADA", "Encerrada"
+
+
+def situacao_financeira(commitment: Commitment) -> str | None:
+    """`None` enquanto não há acerto aprovado: a etapa do ciclo é a que vale."""
+    if commitment.status != Status.CONFIRMADA:
+        return None
+    if commitment.encerrada:
+        return SituacaoFinanceira.ENCERRADA
+    acerto = acerto_aprovado(commitment)
+    if acerto is None:
+        return None
+    from apps.finance.models import Direction, Invoice, PaymentStatus
+
+    titulos = Invoice.objects.filter(
+        Q(origin_settlement=acerto)
+        | Q(origin_purchase__commitment_item__commitment=commitment),
+        status=Status.CONFIRMADA,
+        direction=Direction.PAGAR,
+    ).values_list("payment_status", flat=True)
+    situacoes = list(titulos)
+    if not situacoes:
+        return SituacaoFinanceira.AGUARDANDO_FINANCEIRO
+    if all(s == PaymentStatus.PAGO for s in situacoes):
+        return SituacaoFinanceira.PAGO
+    if any(s != PaymentStatus.A_PAGAR for s in situacoes):
+        return SituacaoFinanceira.PAGAMENTO_PROGRAMADO
+    return SituacaoFinanceira.AGUARDANDO_FINANCEIRO
+
+
 def acerto_vigente(commitment: Commitment) -> Settlement | None:
     """O acerto que vale: o ativo; sem ele, o último excluído (é o que a
     restauração reaplica)."""

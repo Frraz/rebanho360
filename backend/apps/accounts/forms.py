@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.accounts import user_management as usuarios
 from apps.accounts.models import Role, User
+from apps.accounts.permissions import pode_gerenciar_usuarios
 from apps.core.validators import formatar_cpf, validar_cpf
 from apps.properties.models import Farm
 
@@ -157,9 +158,8 @@ class UsuarioForm(forms.Form):
     last_name = forms.CharField(label="Sobrenome", max_length=150, required=False)
     email = forms.EmailField(
         label="E-mail",
-        required=False,
-        help_text="Para o convite e para redefinir a senha. Pode ficar em branco "
-        "para quem não usa e-mail — aí a senha é temporária.",
+        help_text="Obrigatório para todos: identifica o usuário (dá para entrar com "
+        "ele), recebe o convite e redefine a senha. Só o administrador o altera.",
     )
     phone = forms.CharField(label="Telefone", max_length=20, required=False)
     role = forms.ChoiceField(label="Papel", choices=Role.choices)
@@ -192,7 +192,14 @@ class UsuarioForm(forms.Form):
     )
 
     def __init__(
-        self, *args, modo="criar", usuario=None, solicitacao=None, proprio=False, **kw
+        self,
+        *args,
+        modo="criar",
+        usuario=None,
+        solicitacao=None,
+        proprio=False,
+        ator=None,
+        **kw,
     ):
         assert modo in self.MODOS
         super().__init__(*args, **kw)
@@ -202,6 +209,11 @@ class UsuarioForm(forms.Form):
         # ignora), então a regra "ao menos uma fazenda" não se aplica.
         self.proprio = proprio
         self.solicitacao = solicitacao
+        if ator is not None and not pode_gerenciar_usuarios(ator):
+            # Quem só aprova pedidos (o gestor) não concede o papel de topo.
+            self.fields["role"].choices = [
+                (valor, rotulo) for valor, rotulo in Role.choices if valor != Role.ADMIN
+            ]
         self.farms = list(Farm.objects.filter(is_active=True).order_by("name"))
 
         if modo != "criar":
@@ -309,12 +321,6 @@ class UsuarioForm(forms.Form):
                     email=dados.get("email", ""),
                 )
                 _validar_senhas(self, provisorio)
-            elif not dados.get("email") and "email" not in self.errors:
-                self.add_error(
-                    "email",
-                    "Informe o e-mail para enviar o convite, ou escolha a senha "
-                    "temporária.",
-                )
         return dados
 
 

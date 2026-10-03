@@ -206,6 +206,7 @@ class TestConfirmacao:
         assert len(custos) == 4
         assert {c.cost_center.name for c in custos.values()} == {
             "DESPESA GADO",
+            "FRETE",
             "COMISSÃO",
             "IMPOSTO E TAXAS",
         }
@@ -301,7 +302,7 @@ def test_confirmacao_concorrente_da_mesma_compra_cria_um_movimento_nao_dois():
 
     for nome in ("CUSTEIO",):
         CostClass.objects.get_or_create(name=nome)
-    for nome in ("DESPESA GADO", "COMISSÃO", "IMPOSTO E TAXAS"):
+    for nome in ("DESPESA GADO", "FRETE", "COMISSÃO", "IMPOSTO E TAXAS"):
         CostCenter.objects.get_or_create(name=nome)
 
     usuario = User.objects.create_user(username="dupla", password="x", role=Role.GESTOR)

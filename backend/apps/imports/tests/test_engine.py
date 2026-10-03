@@ -330,4 +330,4 @@ class TestPlanilhaRealNoMotor:
         assert batch.rows.count() == 235
         assert batch.read_stats == {"lidas": 417, "em_branco": 182, "lancamentos": 235}
         assert CostEntry.objects.count() == 0
-        assert CostCenter.objects.count() == 11
+        assert CostCenter.objects.count() == 12  # os 11 da planilha + FRETE

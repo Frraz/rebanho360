@@ -15,7 +15,7 @@
 <form method="post" class="mt-6 space-y-4">
   {% csrf_token %}
   <div>
-    <label class="field-label" for="{{ form.username.id_for_label }}">Usuário</label>
+    <label class="field-label" for="{{ form.username.id_for_label }}">Usuário ou e-mail</label>
     {{ form.username|add_class:"field-input"|attr:"autocomplete:username"|attr:"autofocus" }}
   </div>
   <div>

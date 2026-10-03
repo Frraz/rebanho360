@@ -197,41 +197,55 @@ class TestBaixa:
 
 
 class TestQuemAprovaNaoExecuta:
-    def test_quem_aprovou_nao_paga_havendo_outro_financeiro(
-        self, titulo, escritorio, financeiro, financeiro2
+    """Cliente, 2026-10-03: aprovam ADMIN e GESTOR; executa o FINANCEIRO. O
+    ADMIN, perfil superior, também executa — mas não o que aprovou, havendo
+    outro executor."""
+
+    def test_financeiro_nao_aprova(self, titulo, escritorio, financeiro):
+        programado(titulo, escritorio)
+        with pytest.raises(BusinessError, match="permissão"):
+            services.aprovar_titulo(titulo, usuario=financeiro)
+
+    def test_gestor_nao_da_baixa(self, titulo, escritorio, gestor):
+        aprovado(titulo, escritorio, gestor)
+        with pytest.raises(BusinessError, match="permissão"):
+            baixa(titulo, gestor)
+
+    def test_quem_aprovou_nao_paga_havendo_outro_executor(
+        self, titulo, escritorio, admin_fin, financeiro
     ):
         programado(titulo, escritorio)
-        services.aprovar_titulo(titulo, usuario=financeiro)
+        services.aprovar_titulo(titulo, usuario=admin_fin)
 
         with pytest.raises(BusinessError, match="Quem aprova não é quem paga"):
-            baixa(titulo, financeiro)
+            baixa(titulo, admin_fin)
 
-        # Outra pessoa do financeiro dá a baixa normalmente.
-        baixa(titulo, financeiro2)
+        # O financeiro dá a baixa normalmente.
+        baixa(titulo, financeiro)
         titulo.refresh_from_db()
         assert titulo.payment_status == PaymentStatus.PAGO
 
-    def test_unico_usuario_financeiro_pode_aprovar_e_pagar_e_fica_na_auditoria(
-        self, titulo, escritorio, financeiro
+    def test_unico_executor_pode_aprovar_e_pagar_e_fica_na_auditoria(
+        self, titulo, escritorio, admin_fin
     ):
         from apps.audit.models import AuditEvent
 
         programado(titulo, escritorio)
-        services.aprovar_titulo(titulo, usuario=financeiro)
+        services.aprovar_titulo(titulo, usuario=admin_fin)
 
-        baixa(titulo, financeiro)
+        baixa(titulo, admin_fin)
 
         assert AuditEvent.objects.filter(
             entity_type="Invoice", reason__contains="mesma pessoa"
         ).exists()
 
-    def test_outro_financeiro_sem_acesso_a_fazenda_nao_conta_como_alternativa(
-        self, titulo, escritorio, financeiro, goiano_sem_acesso
+    def test_outro_executor_sem_acesso_a_fazenda_nao_conta_como_alternativa(
+        self, titulo, escritorio, admin_fin, goiano_sem_acesso
     ):
         programado(titulo, escritorio)
-        services.aprovar_titulo(titulo, usuario=financeiro)
+        services.aprovar_titulo(titulo, usuario=admin_fin)
 
-        baixa(titulo, financeiro)  # o outro não enxerga São Francisco
+        baixa(titulo, admin_fin)  # o outro não enxerga São Francisco
 
         titulo.refresh_from_db()
         assert titulo.payment_status == PaymentStatus.PAGO

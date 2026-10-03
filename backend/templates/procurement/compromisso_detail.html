@@ -9,6 +9,7 @@
       <span class="code !text-2xl">{{ compromisso.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% etapa_selo etapa %}
+        {% situacao_financeira_selo situacao_financeira %}
         {% if compromisso.version > 1 and compromisso.status != "RASCUNHO" %}<span class="badge-editada">Editado (v{{ compromisso.version }})</span>{% endif %}
       </span>
     </h1>
@@ -19,6 +20,8 @@
     <form method="post" action="{% url 'procurement:acerto_novo' compromisso.pk %}">{% csrf_token %}<button type="submit" class="btn-primary">{% icon "scale" %} Abrir acerto</button></form>
     {% endif %}
     {% if pode_editar %}<a href="{% url 'procurement:compromisso_editar' compromisso.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
+    {% if pode_encerrar %}<a href="{% url 'procurement:operacao_encerrar' compromisso.pk %}" class="btn-secondary">{% icon "lock" %} Encerrar operação</a>{% endif %}
+    {% if pode_reabrir_operacao %}<a href="{% url 'procurement:operacao_reabrir' compromisso.pk %}" class="btn-secondary">{% icon "rotate-ccw" %} Reabrir operação</a>{% endif %}
   </div>
 </header>
 
@@ -33,12 +36,13 @@
     <div><dt>Data do movimento</dt><dd>{{ compromisso.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ compromisso.season.name }}</span></dd></div>
     <div><dt>Produtor</dt><dd>{{ compromisso.seller.name }}</dd></div>
     <div><dt>Destino</dt><dd>{{ compromisso.destination_farm.name }}</dd></div>
-    <div><dt>Comprador</dt><dd>{{ compromisso.commissioned.name|default:"—" }}{% if compromisso.second_buyer %} <span class="text-gray-500">+ {{ compromisso.second_buyer.name }}</span>{% endif %}</dd></div>
+    <div><dt>Compradores</dt><dd>{% for x in comissoes %}{% if x.comissao.payee %}{{ x.comissao.payee.name }}{% if not forloop.last %}, {% endif %}{% endif %}{% empty %}—{% endfor %}</dd></div>
     {% if compromisso.origin_property or compromisso.origin_city %}<div><dt>Origem</dt><dd>{{ compromisso.origin_property|default:"—" }}{% if compromisso.origin_city %} <span class="text-gray-500">· {{ compromisso.origin_city }}</span>{% endif %}</dd></div>{% endif %}
     <div><dt>Retirada</dt><dd>{% if compromisso.pickup_date %}{{ compromisso.pickup_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
     <div><dt>Abate previsto</dt><dd>{% if compromisso.slaughter_date %}{{ compromisso.slaughter_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
     <div><dt>Caminhões · distância</dt><dd>{{ compromisso.trucks|default_if_none:"—" }} · {% if compromisso.distance_km %}{{ compromisso.distance_km }} km{% else %}—{% endif %}</dd></div>
-    <div><dt>Prazo de pagamento</dt><dd>{% if compromisso.payment_days is not None %}{{ compromisso.payment_days }} dias{% else %}na data{% endif %}</dd></div>
+    <div><dt>Condição de pagamento</dt><dd>{% if compromisso.payment_condition %}{{ compromisso.payment_condition.name }}{% elif compromisso.payment_days is not None %}{{ compromisso.payment_days }} dias{% else %}na data{% endif %}</dd></div>
+    {% if compromisso.encerrada %}<div><dt>Encerrada</dt><dd>{{ compromisso.closed_at|date:"d/m/Y H:i" }} <span class="text-gray-500">· {{ compromisso.closed_by }}{% if compromisso.closure_note %} · {{ compromisso.closure_note }}{% endif %}</span></dd></div>{% endif %}
     {% if compromisso.approved_at %}<div><dt>Aprovado</dt><dd>{{ compromisso.approved_at|date:"d/m/Y H:i" }} <span class="text-gray-500">· {{ compromisso.approved_by }}</span></dd></div>{% endif %}
     {% if compromisso.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ compromisso.notes }}</dd></div>{% endif %}
   </dl>
@@ -78,21 +82,30 @@
 <div class="mt-6 grid gap-6 lg:grid-cols-2">
   <section class="card" aria-labelledby="titulo-comissao">
     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <h2 id="titulo-comissao" class="card-title">Comissão</h2>
-      {% if compromisso.status == "CONFIRMADA" and pode_lancar and not acerto_aprovado %}<a href="{% url 'procurement:comissao_definir' compromisso.pk %}" class="btn-secondary btn-sm">{% icon "pencil" "icon-sm" %} {% if comissao %}Corrigir{% else %}Informar{% endif %}</a>{% endif %}
+      <h2 id="titulo-comissao" class="card-title">Compradores e comissão</h2>
+      {% if compromisso.status == "CONFIRMADA" and pode_lancar and not acerto_aprovado and not compromisso.encerrada %}<a href="{% url 'procurement:comissao_definir' compromisso.pk %}?comprador=novo" class="btn-secondary btn-sm">{% icon "plus" "icon-sm" %} Adicionar comprador</a>{% endif %}
     </div>
-    {% if comissao %}
-    <div class="rows">
-      <div><span>Regra gravada</span> <span>{{ comissao.regra_em_texto }}</span></div>
-      <div><span>Origem</span> <span>{{ comissao.get_source_display }}</span></div>
-      <div><span>Favorecido</span> <span>{{ comissao.payee.name|default:"—" }}</span></div>
-      {% if comissao.extra_amount %}<div><span>Comissão extra</span> <span>{{ comissao.extra_amount|brl }}</span></div>{% endif %}
-      <div class="total"><span>Valor no acerto</span> <span>{{ calculo.comissao_total|brl }}</span></div>
+    {% for x in comissoes %}
+    <div class="{% if not forloop.first %}mt-4 border-t border-gray-100 pt-3{% endif %}">
+      <p class="text-sm font-medium text-gray-900">{{ x.comissao.payee.name|default:"Comprador não informado" }}{% if forloop.first %} <span class="badge-editada">principal</span>{% endif %}</p>
+      <div class="rows">
+        <div><span>Regra gravada</span> <span>{{ x.comissao.regra_em_texto }}</span></div>
+        <div><span>Origem</span> <span>{{ x.comissao.get_source_display }}</span></div>
+        {% if x.comissao.extra_amount %}<div><span>Comissão extra</span> <span>{{ x.comissao.extra_amount|brl }}</span></div>{% endif %}
+        <div><span>Vencimento</span> <span>{% if x.comissao.due_date %}{{ x.comissao.due_date|date:"d/m/Y" }}{% else %}na data do acerto{% endif %}</span></div>
+        <div class="total"><span>Valor no acerto</span> <span>{% if x.valor %}{{ x.valor.total|brl }}{% else %}—{% endif %}</span></div>
+      </div>
+      {% if compromisso.status == "CONFIRMADA" and pode_lancar and not acerto_aprovado and not compromisso.encerrada %}
+      <div class="mt-2 flex flex-wrap gap-2">
+        {% if x.comissao.payee_id %}<a href="{% url 'procurement:comissao_definir' compromisso.pk %}?comprador={{ x.comissao.payee_id }}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Corrigir</a>
+        <a href="{% url 'procurement:comprador_retirar' compromisso.pk x.comissao.pk %}" class="btn-ghost btn-sm">{% icon "trash-2" "icon-sm" %} Retirar</a>{% endif %}
+      </div>
+      {% endif %}
     </div>
-    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} A regra foi gravada em {{ comissao.snapshot_at|date:"d/m/Y" }}: mudar o cadastro depois não altera este compromisso.</p>
-    {% else %}
-    <p class="text-sm text-gray-600">{% if compromisso.status == "CONFIRMADA" %}Nenhuma regra valia na aprovação. Informe a comissão aqui, se houver.{% else %}A regra vigente é gravada quando o compromisso for aprovado.{% endif %}</p>
-    {% endif %}
+    {% empty %}
+    <p class="text-sm text-gray-600">{% if compromisso.status == "CONFIRMADA" %}Nenhuma regra valia na aprovação. Informe a comissão de cada comprador aqui, se houver.{% else %}A regra vigente é gravada quando o compromisso for aprovado, para o comprador que ficar sem comissão informada.{% endif %}</p>
+    {% endfor %}
+    {% if comissoes %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Comissão = valor bruto dos animais × percentual, ou o valor informado direto. Mudar o cadastro depois não altera este compromisso.</p>{% endif %}
   </section>
 
   <section class="card" aria-labelledby="titulo-acerto">
@@ -122,7 +135,7 @@
         <span><a class="link code" href="{% url 'procurement:viagem_detalhe' linha.viagem.pk %}">{{ linha.viagem.code }}</a> <span class="text-gray-600">· retirada {{ linha.viagem.pickup_date|date:"d/m/Y" }} · {{ linha.cabecas }} cabeças{% if linha.viagem.carrier %} · {{ linha.viagem.carrier.name }}{% endif %}</span></span>
         <span class="inline-flex flex-wrap items-center gap-1.5">
           {% if linha.recebimento %}<span class="badge-confirmada">Recebida</span>{% else %}<span class="badge-editada">A caminho</span>{% endif %}
-          {% if linha.quebra.acima_do_limite %}<span class="badge-erro">Quebra {{ linha.quebra.quebra_percentual|quebra_percentual }}</span>{% endif %}
+          {% if linha.quebra.quebra_percentual is not None %}<span class="badge-editada">Quebra {{ linha.quebra.quebra_percentual|quebra_percentual }}</span>{% endif %}
         </span>
       </div>
       <p class="mt-1 text-gray-600">Frete: {% if linha.frete.final is not None %}{{ linha.frete.final|brl }} <span class="text-gray-500">({{ linha.frete.origem }})</span>{% else %}—{% endif %}{% if linha.recebimento %} · recebimento <a class="link code" href="{% url 'procurement:recebimento_detalhe' linha.recebimento.pk %}">{{ linha.recebimento.code }}</a>{% endif %}</p>

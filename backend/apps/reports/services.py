@@ -21,9 +21,10 @@ from apps.core.formatting import dinheiro_br, numero_br
 from apps.core.money import safe_div
 from apps.core.reversible import Status
 from apps.costs import selectors as custos
+from apps.dashboards.bi.escopo import pode_ver_dinheiro
 from apps.finance import selectors as financeiro
 from apps.finance.models import Direction
-from apps.finance.permissions import pode_ver_dado_bancario, pode_ver_titulos
+from apps.finance.permissions import pode_ver_titulos
 from apps.herd.models import Weighing
 from apps.herd.weight_gain import desempenho_do_lote
 from apps.livestock.models import Lot, LotStatus
@@ -897,11 +898,12 @@ def programacao_de_pagamentos(user, *, season, farm, start=None, end=None) -> Re
     """Tudo o que há a pagar, na ordem em que o dinheiro precisa sair: o que já
     tem data de pagamento primeiro, depois pelo vencimento. Reúne o que o
     documento funcional pede (seção 10): compra, favorecido, documento,
-    vencimento, valor, banco, agência, conta e situação.
+    vencimento, valor e situação.
 
-    Banco, agência e conta só saem para quem pode ver dado bancário — na tela,
-    no CSV/XLSX e no PDF, que passam todos por aqui."""
-    com_conta = pode_ver_dado_bancario(user)
+    **Sem dado bancário** (cliente, 2026-10-03, pendência #27): banco, agência e
+    conta só aparecem nos documentos em que já fazem parte do modelo — o
+    contrato de compra e a conferência do acerto —, não nos demais relatórios.
+    A coluna "Atenção" ainda avisa quando o título não tem conta cadastrada."""
     titulos = list(
         financeiro.listar_titulos_para(
             user,
@@ -924,7 +926,6 @@ def programacao_de_pagamentos(user, *, season, farm, start=None, end=None) -> Re
     hoje = datetime.date.today()
     linhas = []
     for t in titulos:
-        conta = t.bank_account if t.bank_account_id else None
         linhas.append(
             {
                 "compra": t.origem.code if t.origem is not None else "—",
@@ -938,9 +939,6 @@ def programacao_de_pagamentos(user, *, season, farm, start=None, end=None) -> Re
                 ),
                 "valor": t.amount,
                 "saldo": t.balance,
-                "banco": (conta.bank_name or conta.bank_code) if conta else None,
-                "agencia": conta.branch if conta else None,
-                "conta": conta.account if conta else None,
                 "situacao": "Vencido" if t.vencido(hoje) else t.situacao_rotulo,
                 "atencao": _atencao_do_pagamento(t),
             }
@@ -957,20 +955,12 @@ def programacao_de_pagamentos(user, *, season, farm, start=None, end=None) -> Re
         Coluna("valor", "Valor", DINHEIRO),
         Coluna("saldo", "Saldo", DINHEIRO),
     ]
-    if com_conta:
-        colunas += [
-            Coluna("banco", "Banco"),
-            Coluna("agencia", "Agência"),
-            Coluna("conta", "Conta"),
-        ]
     colunas += [Coluna("situacao", "Situação"), Coluna("atencao", "Atenção")]
 
     notas = [
         "O período filtra o vencimento. Título cancelado não entra.",
         "Para programar, aprovar ou dar baixa, abra o título em Contas a pagar.",
     ]
-    if not com_conta:
-        notas.append("Banco, agência e conta aparecem só para quem vê dado bancário.")
     sem_destino = sum(1 for lin in linhas if lin["atencao"])
     if sem_destino:
         notas.append(
@@ -979,7 +969,7 @@ def programacao_de_pagamentos(user, *, season, farm, start=None, end=None) -> Re
         )
     return Relatorio(
         titulo="Programação de pagamentos",
-        descricao="O que há a pagar: favorecido, vencimento, valor e para onde vai o dinheiro.",
+        descricao="O que há a pagar: favorecido, vencimento, valor e situação.",
         colunas=colunas,
         linhas=linhas,
         totais={
@@ -1200,6 +1190,35 @@ RELATORIOS.update(
     }
 )
 
+
+def _do_consultor(funcao):
+    """Indicadores do consultor (`reports/consultor.py`), também preguiçosos."""
+
+    def montar(user, **kwargs):
+        from apps.reports import consultor
+
+        return getattr(consultor, funcao)(user, **kwargs)
+
+    return montar
+
+
+RELATORIOS.update(
+    {
+        "mortalidade-por-causa": _do_consultor("mortalidade_por_causa"),
+        "curva-abc-de-custos": _do_consultor("curva_abc_de_custos"),
+        "inventario-valorizado": _do_consultor("inventario_valorizado"),
+        "tir-da-safra": _do_consultor("tir_da_safra"),
+        "confinamento": _do_consultor("confinamento"),
+        "indicadores-reprodutivos": _do_consultor("indicadores_reprodutivos"),
+    }
+)
+
+#: Dinheiro (custo, valor de mercado, retorno): o pessoal de campo não os abre
+#: — o mesmo corte do dashboard (`dashboards.bi.escopo.PAPEIS_SEM_DINHEIRO`).
+RELATORIOS_COM_DINHEIRO = frozenset(
+    {"curva-abc-de-custos", "inventario-valorizado", "tir-da-safra"}
+)
+
 #: Preço, comissão e frete são dado comercial: quem não vê o ciclo (o `CAMPO`)
 #: não abre estes relatórios — na tela, no CSV/XLSX nem no PDF.
 RELATORIOS_DO_CICLO = frozenset(
@@ -1236,6 +1255,8 @@ def montar_relatorio(user, slug, *, season, farm, extras=None) -> Relatorio:
         raise PermissionDenied
     if slug in RELATORIOS_DO_CICLO and not pode_ver_o_ciclo(user):
         raise PermissionDenied
+    if slug in RELATORIOS_COM_DINHEIRO and not pode_ver_dinheiro(user):
+        raise PermissionDenied
     return RELATORIOS[slug](user, season=season, farm=farm, **(extras or {}))
 
 
@@ -1243,11 +1264,13 @@ def catalogo_para(user):
     """O índice só lista o que o papel pode abrir."""
     pode_financeiro = pode_ver_titulos(user)
     pode_ciclo = pode_ver_o_ciclo(user)
+    pode_dinheiro = pode_ver_dinheiro(user)
     return [
         item
         for item in CATALOGO
         if (pode_financeiro or item[0] not in RELATORIOS_FINANCEIROS)
         and (pode_ciclo or item[0] not in RELATORIOS_DO_CICLO)
+        and (pode_dinheiro or item[0] not in RELATORIOS_COM_DINHEIRO)
     ]
 
 
@@ -1269,6 +1292,10 @@ PARAMETROS = {
     "fretes-e-quebra": ("de", "ate"),
     "historico-por-pecuarista": ("de", "ate"),
     "programado-x-realizado": ("de", "ate"),
+    "mortalidade-por-causa": ("de", "ate"),
+    "curva-abc-de-custos": ("de", "ate"),
+    "inventario-valorizado": ("preco_arroba",),
+    "tir-da-safra": ("preco_arroba",),
 }
 
 CATALOGO = [
@@ -1326,7 +1353,7 @@ CATALOGO = [
     (
         "programacao-de-pagamentos",
         "Programação de pagamentos",
-        "O que há a pagar, na ordem em que o dinheiro sai: favorecido, vencimento, valor, banco, agência e conta.",
+        "O que há a pagar, na ordem em que o dinheiro sai: favorecido, vencimento, valor e situação.",
     ),
     (
         "pagamentos-realizados",
@@ -1366,7 +1393,7 @@ CATALOGO = [
     (
         "fretes-e-quebra",
         "Fretes e quebra de viagem",
-        "Frete previsto × realizado e a quebra de peso, viagem a viagem.",
+        "Frete previsto × realizado e a quebra de viagem informada, viagem a viagem.",
     ),
     (
         "historico-por-pecuarista",
@@ -1377,5 +1404,35 @@ CATALOGO = [
         "programado-x-realizado",
         "Programado × realizado",
         "Onde a operação divergiu do compromisso: cabeças, peso, preço, valor e datas.",
+    ),
+    (
+        "mortalidade-por-causa",
+        "Mortalidade por causa",
+        "Quantas cabeças morreram e de quê, com a taxa por fazenda.",
+    ),
+    (
+        "curva-abc-de-custos",
+        "Curva ABC de custos",
+        "Os centros de custo que concentram o desembolso: perfil A, B e C.",
+    ),
+    (
+        "inventario-valorizado",
+        "Inventário valorizado",
+        "O rebanho de hoje, lote a lote, a custo e a valor de mercado.",
+    ),
+    (
+        "tir-da-safra",
+        "TIR da safra",
+        "Fluxo de caixa mensal da safra e a taxa interna de retorno.",
+    ),
+    (
+        "confinamento",
+        "Confinamento",
+        "Lotes em confinamento: permanência, GMD, @ produzida e custo por @.",
+    ),
+    (
+        "indicadores-reprodutivos",
+        "Indicadores reprodutivos",
+        "Fertilidade, inseminadas, nascimentos e desmama de cada ciclo.",
     ),
 ]

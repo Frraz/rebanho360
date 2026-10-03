@@ -164,12 +164,86 @@ class TestOpcional:
         outro.post(reverse("accounts:2fa_verificar"), {"codigo": codigo_de(financeiro)})
         assert "Proteja a sua conta" not in outro.get("/").content.decode()
 
+    def test_agora_nao_esconde_o_aviso_por_14_dias_em_qualquer_aparelho(
+        self, client, financeiro
+    ):
+        entrar(client, financeiro)
+        assert "Proteja a sua conta" in client.get("/").content.decode()
+
+        resposta = client.post(reverse("accounts:2fa_adiar_lembrete"), {"next": "/"})
+        assert resposta.status_code == 302 and resposta["Location"] == "/"
+
+        assert "Proteja a sua conta" not in client.get("/").content.decode()
+        # o adiamento é do usuário, não do navegador: outro aparelho também não vê
+        outro = Client()
+        entrar(outro, financeiro)
+        assert "Proteja a sua conta" not in outro.get("/").content.decode()
+
+    def test_o_aviso_volta_depois_de_14_dias(self, financeiro):
+        import datetime
+
+        from django.utils import timezone
+
+        two_factor.adiar_lembrete(financeiro)
+        assert two_factor.recomenda_segundo_fator(financeiro) is False
+
+        financeiro.two_factor_reminder_until = timezone.now() - datetime.timedelta(
+            minutes=1
+        )
+        financeiro.save()
+        assert two_factor.recomenda_segundo_fator(financeiro) is True
+
+        two_factor.adiar_lembrete(financeiro)
+        faltam = financeiro.two_factor_reminder_until - timezone.now()
+        assert (
+            datetime.timedelta(days=13, hours=23)
+            < faltam
+            <= datetime.timedelta(days=14)
+        )
+
+    def test_adiar_pede_login_e_nao_aceita_get(self, client, financeiro):
+        assert client.post(reverse("accounts:2fa_adiar_lembrete")).status_code == 302
+        assert (
+            "/entrar/"
+            in client.post(reverse("accounts:2fa_adiar_lembrete"))["Location"]
+        )
+        entrar(client, financeiro)
+        assert client.get(reverse("accounts:2fa_adiar_lembrete")).status_code == 405
+
+    def test_adiar_nao_redireciona_para_fora_do_site(self, client, financeiro):
+        entrar(client, financeiro)
+        resposta = client.post(
+            reverse("accounts:2fa_adiar_lembrete"), {"next": "https://mal.example/x"}
+        )
+        assert resposta["Location"] == "/"
+
     def test_conta_diz_que_nao_e_obrigatorio(self, client, gestor):
         entrar(client, gestor)
 
         html = client.get(reverse("accounts:conta")).content.decode()
 
         assert "Não é obrigatório" in html and "Ativar o segundo fator" in html
+
+    def test_se_for_obrigatorio_vale_para_todos_e_leva_a_configurar(
+        self, client, gestor, settings
+    ):
+        """Pendência #19: o cliente ainda decide. Ligada a variável, todo usuário
+        sem o segundo fator é levado a configurá-lo antes de usar o sistema."""
+        settings.TWO_FACTOR_OBRIGATORIO = True
+        entrar(client, gestor)
+
+        resposta = client.get("/")
+
+        assert resposta.status_code == 302
+        assert "/2fa/configurar/" in resposta["Location"]
+        assert two_factor.recomenda_segundo_fator(gestor) is False
+
+    def test_desligado_por_padrao_quem_nao_ativou_entra_so_com_a_senha(
+        self, client, gestor
+    ):
+        entrar(client, gestor)
+
+        assert client.get("/").status_code == 200
 
     def test_adesao_voluntaria_vale_para_qualquer_papel(self, client, gestor):
         ativar(client, gestor)

@@ -11,7 +11,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from django.conf import settings
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from django.urls import reverse
@@ -314,16 +313,6 @@ def kpi_cabecas(e: Escopo) -> Kpi:
 def kpi_mortalidade(e: Escopo) -> Kpi:
     m = mortalidade(e)
     anterior = mortalidade(e.anterior).taxa if e.anterior else None
-    limite = Decimal(settings.MORTALIDADE_LIMITE_PERCENTUAL)
-    estado = estado_texto = ""
-    if m.taxa is not None:
-        if m.taxa > limite:
-            estado, estado_texto = (
-                "ruim",
-                f"Acima do limite de {specs.formatar(limite, 'pct')}",
-            )
-        else:
-            estado, estado_texto = "bom", "Dentro do limite"
     return Kpi(
         "Mortalidade na safra",
         specs.formatar(m.taxa, "pct"),
@@ -334,8 +323,6 @@ def kpi_mortalidade(e: Escopo) -> Kpi:
             "Mortes ÷ saldo médio do período × 100, por fazenda e depois "
             "ponderado pelo saldo médio — o mesmo cálculo do painel inicial."
         ),
-        estado=estado,
-        estado_texto=estado_texto,
     )
 
 
@@ -692,16 +679,10 @@ def grafico_mortalidade_por_fazenda(e: Escopo) -> specs.Grafico:
         mostrar_participacao=False,
         aditivo=False,
         largura="terco",
-        nota="Mortes ÷ saldo médio da fazenda. A linha marca o limite de alerta do sistema.",
+        nota="Mortes ÷ saldo médio da fazenda. O sistema não julga o que é "
+        '"acima do normal": a leitura é sua.',
     )
-    g.opcoes["linhas_ref"] = [
-        {"valor": num_limite(), "rotulo": f"Limite {num_limite():.0f}%"}
-    ]
     return g
-
-
-def num_limite() -> float:
-    return float(settings.MORTALIDADE_LIMITE_PERCENTUAL)
 
 
 def grafico_lotacao(e: Escopo) -> specs.Grafico:
@@ -757,15 +738,6 @@ def tabela_de_fazendas(e: Escopo) -> Tabela:
         colunas, linhas, numericas=[1, 2, 3, 4, 5, 6], titulo="Posição por fazenda"
     )
     t.barra(1, valores)
-    limite = Decimal(settings.MORTALIDADE_LIMITE_PERCENTUAL)
-    for i, f in enumerate(e.fazendas()):
-        taxa = m.por_fazenda[f].taxa
-        if taxa is not None:
-            t.marcas[(i, 6)] = (
-                ("ruim", "acima do limite")
-                if taxa > limite
-                else ("bom", "dentro do limite")
-            )
     t.vazio = "Nenhuma fazenda com animais no recorte."
     return t
 

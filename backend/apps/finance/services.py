@@ -29,6 +29,7 @@ from apps.core.formatting import dinheiro_br
 from apps.core.permissions import pode_excluir_confirmado
 from apps.core.reversible import Status
 from apps.core.serialization import diff_fields, snapshot
+from apps.costs.allocation import ratear_em_centavos
 from apps.finance.models import (
     COMPONENTES_A_PAGAR,
     COMPONENTES_A_RECEBER,
@@ -314,6 +315,7 @@ def _sincronizar_titulo(
     criar: bool,
     restaurar_cancelados: bool,
     seguir_favorecido: bool,
+    ref: str = "",
 ) -> Invoice | None:
     """Cria, atualiza ou cancela o título `(origem, componente)` para ficar
     igual à operação. É a única porta de entrada dos títulos que nascem de
@@ -327,7 +329,7 @@ def _sincronizar_titulo(
     """
     titulo = (
         Invoice.objects.select_for_update()
-        .filter(**{campo_origem: origem}, component=componente)
+        .filter(**{campo_origem: origem}, component=componente, ref=ref)
         .first()
     )
     tem_valor = amount is not None and Decimal(amount) > 0
@@ -338,6 +340,7 @@ def _sincronizar_titulo(
         titulo = Invoice(
             direction=direction,
             component=componente,
+            ref=ref,
             season=season,
             farm=farm,
             payee=payee,
@@ -358,7 +361,9 @@ def _sincronizar_titulo(
         except IntegrityError:
             # Outra transação criou o mesmo título entre a leitura e a escrita:
             # a chave `(origem, componente)` fez o trabalho dela. Vale o que ficou.
-            return Invoice.objects.get(**{campo_origem: origem}, component=componente)
+            return Invoice.objects.get(
+                **{campo_origem: origem}, component=componente, ref=ref
+            )
         registrar_auditoria(
             action=AuditAction.CREATE,
             entity=titulo,
@@ -403,6 +408,11 @@ def _sincronizar_titulo(
     # gerado, o prazo se ajusta no próprio título.
     if titulo.issue_date != issue_date:
         titulo.issue_date, titulo.due_date = issue_date, due_date
+        mudou_o_que_o_pagamento_depende = True
+    elif ref and not ref.startswith("parcela") and titulo.due_date != due_date:
+        # Título com vencimento **próprio** (frete, comissão, tributo, parcela):
+        # o vencimento é dado da origem, não ajuste do título.
+        titulo.due_date = due_date
         mudou_o_que_o_pagamento_depende = True
     titulo.voided_with_origin = False
     if mudou_o_que_o_pagamento_depende:
@@ -467,47 +477,191 @@ def _dados_da_venda(venda):
     )
 
 
+def _parcelas(
+    operacao, valor, data: datetime.date
+) -> list[tuple[str, Decimal, datetime.date]]:
+    """`[(ref, valor, vencimento)]`: um título só (`ref` vazio) ou uma parcela por
+    prazo da condição de pagamento parcelada (`parcela:1`, `parcela:2`…). O valor
+    se divide em centavos exatos, a última parcela fecha a conta."""
+    condicao = getattr(operacao, "payment_condition", None)
+    if condicao is None or not condicao.parcelado:
+        return [("", valor, _vencimento(data, operacao.payment_days))]
+    prazos = condicao.prazos
+    valor = Decimal(valor)
+    fatias = ratear_em_centavos(valor, {i: Decimal(1) for i in range(len(prazos))})
+    return [
+        (f"parcela:{i + 1}", fatias[i], _vencimento(data, prazo))
+        for i, prazo in enumerate(prazos)
+    ]
+
+
+def _cancelar_obsoletos(base: dict, componente: str, refs_vigentes: set, *, usuario):
+    """Título do componente cuja `ref` não faz mais parte da operação (a condição
+    deixou de ser parcelada, a viagem saiu…) é cancelado junto com a origem."""
+    origem = base["origem"]
+    for titulo in Invoice.objects.select_for_update().filter(
+        **{base["campo_origem"]: origem},
+        component=componente,
+        status=Status.CONFIRMADA,
+    ):
+        if titulo.ref not in refs_vigentes:
+            _cancelar_com_a_origem(titulo, origem, usuario=usuario)
+
+
 def _sincronizar_compra(
     compra, *, usuario, criar, restaurar_cancelados
 ) -> list[Invoice]:
     base = _dados_da_compra(compra) | {"usuario": usuario}
-    # Compra que nasceu de um acerto (Fase 5) sabe a quem pagar o frete e a
-    # comissão, e paga o vendedor pelo líquido. Compra direta: `{}`, igual a antes.
+    # Compra que nasceu de um acerto sabe pagar o vendedor pelo líquido; frete,
+    # comissão e tributos têm título próprio, do acerto (ver
+    # `gerar_titulos_do_acerto`). Compra direta: `{}`, igual a antes.
     from apps.procurement.settlement import ajustes_financeiros_da_compra
 
     ajustes = ajustes_financeiros_da_compra(compra)
+    somente_animais = ajustes.get("somente_animais", False)
     titulos = []
     for campo, componente in COMPONENTES_DA_COMPRA:
+        if somente_animais and componente != Component.ANIMAIS:
+            continue
         ajuste = ajustes.get(componente, {})
-        favorecido = ajuste.get("payee")
+        favorecido = compra.seller if componente == Component.ANIMAIS else None
+        valor = ajuste.get("amount", getattr(compra, campo))
+        if componente == Component.ANIMAIS and valor and Decimal(valor) > 0:
+            parcelas = _parcelas(compra, valor, compra.date)
+        else:
+            parcelas = [("", valor, base["due_date"])]
+        for ref, valor_da_parcela, vencimento in parcelas:
+            titulo = _sincronizar_titulo(
+                **(base | {"due_date": vencimento}),
+                componente=componente,
+                payee=favorecido,
+                amount=valor_da_parcela,
+                criar=criar,
+                restaurar_cancelados=restaurar_cancelados,
+                seguir_favorecido=componente == Component.ANIMAIS,
+                ref=ref,
+            )
+            if titulo is not None:
+                titulos.append(titulo)
         if componente == Component.ANIMAIS:
-            favorecido = compra.seller
-        titulo = _sincronizar_titulo(
-            **base,
-            componente=componente,
-            payee=favorecido,
-            amount=ajuste.get("amount", getattr(compra, campo)),
-            criar=criar,
-            restaurar_cancelados=restaurar_cancelados,
-            seguir_favorecido=componente == Component.ANIMAIS or favorecido is not None,
-        )
-        if titulo is not None:
-            titulos.append(titulo)
+            _cancelar_obsoletos(
+                base, componente, {ref for ref, _, _ in parcelas}, usuario=usuario
+            )
     return titulos
 
 
 def _sincronizar_venda(venda, *, usuario, criar, restaurar_cancelados) -> list[Invoice]:
     base = _dados_da_venda(venda) | {"usuario": usuario}
-    titulo = _sincronizar_titulo(
-        **base,
-        componente=Component.VENDA,
-        payee=venda.buyer,
-        amount=venda.total_value,
-        criar=criar,
-        restaurar_cancelados=restaurar_cancelados,
+    parcelas = _parcelas(venda, venda.total_value, venda.date)
+    titulos = []
+    for ref, valor, vencimento in parcelas:
+        titulo = _sincronizar_titulo(
+            **(base | {"due_date": vencimento}),
+            componente=Component.VENDA,
+            payee=venda.buyer,
+            amount=valor,
+            criar=criar,
+            restaurar_cancelados=restaurar_cancelados,
+            seguir_favorecido=True,
+            ref=ref,
+        )
+        if titulo is not None:
+            titulos.append(titulo)
+    _cancelar_obsoletos(
+        base, Component.VENDA, {ref for ref, _, _ in parcelas}, usuario=usuario
+    )
+    return titulos
+
+
+# --------------------------------------------------------------------------
+# Títulos do acerto: frete por viagem, comissão por comprador, tributos por
+# linha — cada um com favorecido e vencimento próprios (cliente, 2026-10-03)
+# --------------------------------------------------------------------------
+
+
+def gerar_titulos_do_acerto(acerto, calculo, *, usuario) -> list[Invoice]:
+    """Idempotente (chave `(acerto, componente, ref)`). Chamado na aprovação do
+    acerto, depois das compras.
+
+    - **Frete**: um título por viagem, ao transportador dela;
+    - **Comissão**: um título por comprador, a ele;
+    - **Tributos e taxas** (efeito de custo): um título por linha, ao
+      favorecido que o usuário informou — o sistema não presume o destinatário.
+
+    O vencimento de cada um é o próprio (viagem, comprador, linha); sem ele,
+    vence na data do acerto. Independem do vencimento dos animais.
+    """
+    from apps.procurement.settlement import Tratamento, efeito_da_linha
+
+    compromisso = acerto.commitment
+    base = dict(
+        campo_origem="origin_settlement",
+        origem=acerto,
+        direction=Direction.PAGAR,
+        farm=compromisso.destination_farm,
+        season=compromisso.season,
+        issue_date=acerto.date,
+        usuario=usuario,
+        criar=True,
+        restaurar_cancelados=False,
         seguir_favorecido=True,
     )
-    return [titulo] if titulo is not None else []
+    esperados: dict[str, set] = {
+        Component.FRETE: set(),
+        Component.COMISSAO: set(),
+        Component.IMPOSTOS: set(),
+    }
+    titulos = []
+
+    def _emitir(componente, ref, favorecido, valor, vencimento):
+        if not valor or Decimal(valor) <= 0:
+            return
+        esperados[componente].add(ref)
+        titulo = _sincronizar_titulo(
+            **(base | {"due_date": vencimento or acerto.date}),
+            componente=componente,
+            payee=favorecido,
+            amount=valor,
+            ref=ref,
+        )
+        if titulo is not None:
+            titulos.append(titulo)
+
+    for frete in calculo.fretes:
+        _emitir(
+            Component.FRETE,
+            f"viagem:{frete.viagem.pk}",
+            frete.favorecido,
+            frete.valor,
+            frete.vencimento,
+        )
+    for comissao in calculo.comissoes:
+        _emitir(
+            Component.COMISSAO,
+            f"comissao:{comissao.commission.pk}",
+            comissao.payee,
+            comissao.total,
+            comissao.commission.due_date,
+        )
+    for linha in calculo.linhas:
+        if efeito_da_linha(linha) == Tratamento.CUSTO:
+            _emitir(
+                Component.IMPOSTOS,
+                f"linha:{linha.pk}",
+                linha.payee,
+                linha.amount,
+                linha.due_date,
+            )
+    for componente, refs in esperados.items():
+        _cancelar_obsoletos(base, componente, refs, usuario=usuario)
+    return titulos
+
+
+def desfazer_titulos_do_acerto(acerto, *, usuario, raiz) -> None:
+    """Reabrir ou excluir o acerto cancela os títulos dele, na mesma cascata.
+    Baixa já feita bloqueia antes de chegar aqui (`bloqueios_do_acerto`)."""
+    for titulo in acerto.invoices.filter(status=Status.CONFIRMADA):
+        _cancelar_com_a_origem(titulo, acerto, usuario=usuario, raiz=raiz)
 
 
 def gerar_titulos_da_compra(compra, *, usuario, restaurar_cancelados=False):

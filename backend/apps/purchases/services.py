@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
+from apps.commercial.payment import aplicar_condicao
 from apps.core import reversible
 from apps.core.exceptions import BlockingDependencyError, BusinessError
 from apps.core.money import kg_to_arroba, safe_div
@@ -45,7 +46,7 @@ from apps.purchases.permissions import pode_confirmar_compra, pode_lancar_compra
 #: (docs/regras-negocio/03#custos-gerados). A ordem é a ordem dos lançamentos.
 CUSTOS_GERADOS = (
     ("animal_value", "DESPESA GADO", "animais"),
-    ("freight_value", "DESPESA GADO", "frete"),
+    ("freight_value", "FRETE", "frete"),
     ("commission_value", "COMISSÃO", "comissão"),
     ("tax_value", "IMPOSTO E TAXAS", "impostos"),
 )
@@ -144,6 +145,11 @@ def _validar_dados(dados: dict, *, usuario) -> Season:
     peso = dados.get("total_weight_kg")
     if peso is not None and Decimal(peso) <= 0:
         raise BusinessError("O peso total, quando informado, deve ser maior que zero.")
+    rendimento = dados.get("entry_yield_percent")
+    if rendimento is not None and not Decimal("1") <= Decimal(rendimento) <= Decimal(
+        "100"
+    ):
+        raise BusinessError("O rendimento estimado de entrada fica entre 1% e 100%.")
     if dados["date"] > timezone.localdate():
         raise BusinessError("Compra com data futura não é permitida.")
 
@@ -200,6 +206,8 @@ CAMPOS_EDITAVEIS = (
     "tax_value",
     "lot",
     "payment_days",
+    "payment_condition",
+    "entry_yield_percent",
     "partnership",
     "notes",
 )
@@ -207,9 +215,10 @@ CAMPOS_EDITAVEIS = (
 
 def _completar(compra: Purchase, dados: dict) -> dict:
     """Dados novos sobre os atuais: o que não veio, fica."""
-    return {
-        campo: dados.get(campo, getattr(compra, campo)) for campo in CAMPOS_EDITAVEIS
-    }
+    return aplicar_condicao(
+        {campo: dados.get(campo, getattr(compra, campo)) for campo in CAMPOS_EDITAVEIS},
+        atual=compra.payment_condition,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -222,6 +231,8 @@ def criar_compra(*, usuario, **dados) -> Purchase:
     """Cria o rascunho. Rascunho não afeta nada: nem rebanho, nem custo."""
     if not pode_lancar_compra(usuario):
         raise BusinessError("Você não tem permissão para lançar compras.")
+    # `codigo` só vem do ciclo de compra (número único da operação, #32).
+    codigo = dados.get("codigo")
     dados = {campo: dados.get(campo) for campo in CAMPOS_EDITAVEIS} | {
         "freight_value": dados.get("freight_value") or 0,
         "commission_value": dados.get("commission_value") or 0,
@@ -229,11 +240,12 @@ def criar_compra(*, usuario, **dados) -> Purchase:
         "partnership": dados.get("partnership") or "",
         "notes": dados.get("notes") or "",
     }
+    dados = aplicar_condicao(dados)
     season = _validar_dados(dados, usuario=usuario)
     season = Season.objects.select_for_update().get(pk=season.pk)
 
     compra = Purchase(**dados, season=season, created_by=usuario)
-    compra.code = gerar_codigo_compra(season)
+    compra.code = codigo or gerar_codigo_compra(season)
     compra.save()
     registrar_auditoria(
         action=AuditAction.CREATE, entity=compra, after=snapshot(compra), actor=usuario

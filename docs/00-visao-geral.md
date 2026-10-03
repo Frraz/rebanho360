@@ -66,10 +66,12 @@ Acesso a dados é limitado por **fazenda**, não só por papel — quem cuida do
 
 | Fonte | O que é | Como usamos |
 |---|---|---|
-| `docs/fontes/planilhas/CONTROLE PASTO…xlsx` | A operação real do produtor, safra 25/26, dados verdadeiros | **Fonte primária.** Define entidades, vocabulário e o que importar |
+| `docs/fontes/planilhas/CONTROLE PASTO…xlsx` | A planilha da fazenda São Francisco, safra 25/26. **É um exemplo** (cliente, 2026-10-03): vale pelos **campos**, não pelos dados | **Fonte de entidades, campos e vocabulário.** Os dados dela **não** são requisito: lacuna ou divergência na planilha não é relevante |
 | `docs/fontes/Sistema_Gestao_Pasto_Compra_Gado_Estrutura_Funcional.md` + `imagem.jpeg` | **O escopo funcional consolidado**: gestão a pasto + compra de gado, em 3 blocos (Entrada, Movimentações, Relatórios e Análise) | **Fonte principal do escopo.** Fluxo, status, relatórios e integração entre telas |
 | `docs/fontes/relatorios-legado/*.png` | 5 relatórios do SisAtak do frigorífico Boi Brasil (Alvorada-TO) | **Conceitos e números do ciclo de compra** (contrato, programação, acerto, comissão, histórico). Não o layout |
 | `docs/fontes/planilhas/REPORTAGEM IVAN.xlsx` | Análise de consultoria da Fazenda Katuete: GMD, carcaça, eficiência biológica, TIR, curva ABC | **Referência de indicadores.** Define o que os dashboards devem chegar a calcular |
+
+> **Planilha é exemplo, respostas são provisórias (2026-10-03).** O cliente (via Facholi) disse que o sistema deve conter **os campos** das planilhas e **não replicar os dados** delas; o que "falta" na planilha São Francisco é esquecimento, não requisito. E as 34 respostas dele são **provisórias**: os usuários finais as validam **em reunião, com o sistema na tela**. Ver [12](regras-negocio/12-decisoes-do-cliente-2026-10-03.md) e [14](regras-negocio/14-roteiro-de-validacao-com-os-usuarios.md).
 
 > **Mudança de posicionamento (2026-10-02, Warley):** até aqui estes documentos tratavam o escopo funcional como "outro negócio (mesa de compra de frigorífico)" e a Fase 5 como "antecipada, sem demanda". Está corrigido: o escopo funcional é a fonte principal, e o projeto é um **Sistema de Gestão a Pasto + Compra de Gado**. O `CLAUDE.md` original em `docs/fontes/referencia/` segue arquivado — foi escrito antes dessa decisão.
 

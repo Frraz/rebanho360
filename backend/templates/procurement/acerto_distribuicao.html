@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Distribuição entre os itens · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{{ voltar }}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ voltar_rotulo }}</a>
+    <h1 class="page-title">Distribuição entre os itens</h1>
+    <p class="page-subtitle max-w-3xl">O sistema não rateia sozinho. Informe quanto de cada total é de cada item; a soma tem de fechar com o total do acerto.</p>
+  </div>
+</header>
+
+{% if sugerido %}
+<div class="alert-info mb-4 max-w-4xl" role="note">
+  {% icon "info" %}
+  <div>Os valores abaixo são uma <strong>sugestão</strong> (frete, comissão e tributos por cabeça recebida; descontos e adiantamentos pelo valor dos animais). Confira, ajuste se a negociação foi outra e salve: só vale depois disso.</div>
+</div>
+{% endif %}
+
+<section class="card max-w-4xl mb-4" aria-label="Totais do acerto">
+  <h2 class="card-title mb-2">Totais do acerto</h2>
+  <div class="rows">
+    {% for rotulo, valor in totais %}<div><span>{{ rotulo }}</span> <span>{{ valor|brl }}</span></div>{% endfor %}
+  </div>
+</section>
+
+{% if calculo.distribuicao_pendente %}
+<div class="alert-warning mb-4 max-w-4xl" role="status">{% icon "triangle-alert" %}<p>Há totais que ainda não fecham com a distribuição salva. As mensagens aparecem na aprovação do acerto.</p></div>
+{% endif %}
+
+<form method="post" class="card max-w-4xl space-y-5 pb-24 md:pb-5">
+  {% csrf_token %}
+  {{ formset.management_form }}
+  {% if reason_form.non_field_errors %}<div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for e in reason_form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div></div>{% endif %}
+  {% for form, item in linhas %}
+  <fieldset class="rounded-lg border {% if form.errors %}border-red-300{% else %}border-gray-200{% endif %} p-4">
+    <legend class="eyebrow px-1">Item {{ item.number }}{% if item %} · {{ item.category.name }}{% endif %}</legend>
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {% for field in form.visible_fields %}{% include "partials/_field.html" %}{% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
+  {% include "partials/_field.html" with field=reason_form.reason %}
+  <div class="form-actions md:border-t md:border-gray-200 md:pt-5">
+    <a href="{{ voltar }}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">Salvar distribuição</button>
+  </div>
+</form>
+{% endblock %}

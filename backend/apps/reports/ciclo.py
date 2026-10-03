@@ -15,6 +15,7 @@ from decimal import Decimal
 from apps.core.formatting import dinheiro_br, numero_br
 from apps.core.money import safe_div
 from apps.core.reversible import Status
+from apps.finance.permissions import pode_ver_dado_bancario
 from apps.livestock.models import Sex
 from apps.procurement import commitments, receivings, selectors, trips
 from apps.procurement.models import Commitment, PriceBasis, Settlement, Trip
@@ -101,7 +102,9 @@ def programacao_de_embarque(user, *, season, farm, start=None, end=None) -> Rela
                 "produtor": v.commitment.seller.name,
                 "cidade": v.commitment.origin_city or None,
                 "transportador": v.carrier.name if v.carrier_id else None,
-                "veiculo": " · ".join(x for x in (v.driver_name, v.vehicle_plate) if x)
+                "veiculo": " · ".join(
+                    x for x in (v.driver_name, v.vehicle, v.vehicle_plate) if x
+                )
                 or None,
                 "cabecas": trips.cabecas_da_viagem(v),
                 "distancia": v.distance_km,
@@ -136,6 +139,14 @@ def programacao_de_embarque(user, *, season, farm, start=None, end=None) -> Rela
     )
 
 
+def _condicao_em_texto(operacao) -> str:
+    """A condição escolhida; sem ela, o prazo em dias (ou "à vista")."""
+    condicao = getattr(operacao, "payment_condition", None)
+    if condicao is not None:
+        return condicao.name
+    return f"{operacao.payment_days} dias" if operacao.payment_days else "à vista"
+
+
 def programacao_de_abate(user, *, season, farm, start=None, end=None) -> Relatorio:
     """Por compromisso aprovado: quem, onde, quando e a que preço por faixa."""
     qs = _compromissos(user, season=season, farm=farm)
@@ -146,7 +157,7 @@ def programacao_de_abate(user, *, season, farm, start=None, end=None) -> Relator
 
     linhas = []
     for c in qs.order_by("slaughter_date", "pickup_date", "id"):
-        comissao = commitments.comissao_do(c)
+        comissoes = commitments.comissoes_do(c)
         for item in c.items.select_related("category").order_by("number"):
             linhas.append(
                 {
@@ -156,16 +167,18 @@ def programacao_de_abate(user, *, season, farm, start=None, end=None) -> Relator
                         x for x in (c.origin_property, c.origin_city) if x
                     )
                     or None,
-                    "comprador": c.commissioned.name if c.commissioned_id else None,
+                    "comprador": ", ".join(
+                        x.payee.name for x in comissoes if x.payee_id
+                    )
+                    or None,
                     "movimento": _data(c.date),
                     "retirada": _data(c.pickup_date),
                     "abate": _data(c.slaughter_date),
                     "caminhoes": c.trucks,
                     "distancia": c.distance_km,
-                    "pagamento": (
-                        f"{c.payment_days} dias" if c.payment_days else "à vista"
-                    ),
-                    "comissao": _regra_em_texto(comissao),
+                    "pagamento": _condicao_em_texto(c),
+                    "comissao": "; ".join(_regra_em_texto(x) or "—" for x in comissoes)
+                    or None,
                     "item": f"{item.number} · {item.category.name}",
                     "cabecas": item.head_count,
                     "media_arrobas": item.expected_arrobas,
@@ -275,49 +288,66 @@ def conferencia_do_acerto(user, *, season, farm, acerto: Settlement | None = Non
             }
         )
 
+    # Banco, agência e conta fazem parte do modelo desta conferência (cliente,
+    # 2026-10-03, pendência #27) — só para quem já pode ver dado bancário.
+    com_conta = pode_ver_dado_bancario(user)
     titulos = []
-    for item in c.items.select_related("purchase"):
-        compra = item.purchase
-        if compra is None or compra.status != Status.CONFIRMADA:
-            continue
-        for t in compra.invoices.filter(status=Status.CONFIRMADA).select_related(
-            "payee"
-        ):
-            titulos.append(
-                {
-                    "titulo": t.code,
-                    "componente": t.get_component_display(),
-                    "emissao": _data(t.issue_date),
-                    "vencimento": _data(t.due_date),
-                    "favorecido": t.payee.name if t.payee_id else "A definir",
-                    "valor": t.amount,
-                    "situacao": t.situacao_rotulo,
-                }
-            )
+    origens = [
+        t
+        for item in c.items.select_related("purchase")
+        if item.purchase is not None and item.purchase.status == Status.CONFIRMADA
+        for t in item.purchase.invoices.filter(status=Status.CONFIRMADA)
+    ]
+    origens += list(acerto.invoices.filter(status=Status.CONFIRMADA))
+    for t in sorted(origens, key=lambda x: (x.due_date, x.pk)):
+        t = type(t).objects.select_related("payee", "bank_account").get(pk=t.pk)
+        conta = t.bank_account if t.bank_account_id else None
+        linha = {
+            "titulo": t.code,
+            "componente": t.get_component_display(),
+            "emissao": _data(t.issue_date),
+            "vencimento": _data(t.due_date),
+            "favorecido": t.payee.name if t.payee_id else "A definir",
+            "valor": t.amount,
+            "situacao": t.situacao_rotulo,
+        }
+        if com_conta:
+            linha["banco"] = (conta.bank_name or conta.bank_code) if conta else None
+            linha["agencia"] = conta.branch if conta else None
+            linha["conta"] = conta.account if conta else None
+        titulos.append(linha)
+    colunas_do_detalhamento = [
+        Coluna("titulo", "Título"),
+        Coluna("componente", "Componente"),
+        Coluna("emissao", "Emissão"),
+        Coluna("vencimento", "Vencimento"),
+        Coluna("favorecido", "Favorecido"),
+    ]
+    if com_conta:
+        colunas_do_detalhamento += [
+            Coluna("banco", "Banco"),
+            Coluna("agencia", "Agência"),
+            Coluna("conta", "Conta"),
+        ]
+    colunas_do_detalhamento += [
+        Coluna("valor", "Valor", DINHEIRO),
+        Coluna("situacao", "Situação"),
+    ]
     detalhamento = Relatorio(
         titulo="Detalhamento financeiro",
         descricao="",
-        colunas=[
-            Coluna("titulo", "Título"),
-            Coluna("componente", "Componente"),
-            Coluna("emissao", "Emissão"),
-            Coluna("vencimento", "Vencimento"),
-            Coluna("favorecido", "Favorecido"),
-            Coluna("valor", "Valor", DINHEIRO),
-            Coluna("situacao", "Situação"),
-        ],
+        colunas=colunas_do_detalhamento,
         linhas=titulos,
         totais=(
             {"titulo": "Total", "valor": sum((t["valor"] for t in titulos), ZERO)}
             if titulos
             else None
         ),
-        notas=(
+        notas=([] if titulos else ["Os títulos nascem quando o acerto é aprovado."])
+        + (
             []
-            if titulos
-            else [
-                "Os títulos nascem quando o acerto é aprovado. Dado bancário não vai em relatório."
-            ]
+            if com_conta
+            else ["Banco, agência e conta aparecem só para quem vê dado bancário."]
         ),
     )
 
@@ -420,16 +450,19 @@ def conferencia_do_acerto(user, *, season, farm, acerto: Settlement | None = Non
 
 def comissao_por_comprador(user, *, season, farm, start=None, end=None) -> Relatorio:
     """A comissão **gravada na operação** (snapshot), não a do cadastro de hoje."""
-    qs = _compromissos(user, season=season, farm=farm).filter(commission__isnull=False)
+    qs = (
+        _compromissos(user, season=season, farm=farm)
+        .filter(commissions__isnull=False)
+        .distinct()
+    )
     if start:
         qs = qs.filter(date__gte=start)
     if end:
         qs = qs.filter(date__lte=end)
 
     linhas = []
-    for c in qs.order_by("commissioned__name", "date", "id"):
+    for c in qs.order_by("date", "id"):
         calculo = calcular_acerto(c)
-        comissao = commitments.comissao_do(c)
         recebidos = [i for i in calculo.itens if i.recebido]
         machos = sum(
             i.cabecas_recebidas for i in recebidos if i.item.category.sex == Sex.MACHO
@@ -444,28 +477,32 @@ def comissao_por_comprador(user, *, season, farm, start=None, end=None) -> Relat
             situacao = (
                 "Aprovado" if acerto.status == Status.CONFIRMADA else "Em andamento"
             )
-        linhas.append(
-            {
-                "comprador": (
-                    comissao.payee.name
-                    if comissao.payee_id
-                    else (c.commissioned.name if c.commissioned_id else None)
-                ),
-                "compromisso": c.code,
-                "data": _data(
-                    acerto.date
-                    if acerto and acerto.status != Status.EXCLUIDA
-                    else c.date
-                ),
-                "pecuarista": c.seller.name,
-                "machos": machos if recebidos else None,
-                "femeas": femeas if recebidos else None,
-                "cabecas": calculo.cabecas_recebidas or None,
-                "regra": _regra_em_texto(comissao),
-                "comissao": calculo.comissao_total if recebidos else None,
-                "situacao": situacao,
-            }
-        )
+        # Uma linha por comprador: cada um tem a sua comissão.
+        for x in calculo.comissoes:
+            comissao = x.commission
+            linhas.append(
+                {
+                    "comprador": (
+                        comissao.payee.name
+                        if comissao.payee_id
+                        else (c.commissioned.name if c.commissioned_id else None)
+                    ),
+                    "compromisso": c.code,
+                    "data": _data(
+                        acerto.date
+                        if acerto and acerto.status != Status.EXCLUIDA
+                        else c.date
+                    ),
+                    "pecuarista": c.seller.name,
+                    "machos": machos if recebidos else None,
+                    "femeas": femeas if recebidos else None,
+                    "cabecas": calculo.cabecas_recebidas or None,
+                    "regra": _regra_em_texto(comissao),
+                    "comissao": x.total if recebidos else None,
+                    "situacao": situacao,
+                }
+            )
+    linhas.sort(key=lambda lin: (lin["comprador"] or "", lin["compromisso"]))
     return Relatorio(
         titulo="Comissão por comprador",
         descricao="Por comprador: o que cada compromisso rende de comissão, pela regra gravada nele.",
@@ -537,16 +574,11 @@ def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
                 "origem": quebra.peso_origem_kg if quebra else None,
                 "recebido": quebra.peso_recebido_kg if quebra else None,
                 "quebra": quebra.quebra_percentual if quebra else None,
-                "alerta": (
-                    "Acima do limite"
-                    if quebra and quebra.acima_do_limite
-                    else ("Dentro do limite" if quebra else None)
-                ),
             }
         )
     return Relatorio(
         titulo="Fretes e quebra de viagem",
-        descricao="Por viagem: frete previsto × realizado e a quebra de peso entre a origem e a chegada.",
+        descricao="Por viagem: frete previsto × realizado e a quebra de viagem informada no recebimento.",
         colunas=[
             Coluna("retirada", "Retirada"),
             Coluna("viagem", "Viagem"),
@@ -559,8 +591,7 @@ def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
             Coluna("diferenca", "Diferença", DINHEIRO),
             Coluna("origem", "Peso de origem (kg)", NUMERO),
             Coluna("recebido", "Peso recebido (kg)", NUMERO),
-            Coluna("quebra", "Quebra", PERCENTUAL),
-            Coluna("alerta", "Limite"),
+            Coluna("quebra", "Quebra informada", PERCENTUAL),
         ],
         linhas=linhas,
         totais={
@@ -576,8 +607,9 @@ def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
         },
         filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
         notas=[
-            'A quebra só mede: não desconta nada do valor dos animais. "—" = falta '
-            "o peso de origem ou o recebido, ou o frete ainda não foi cobrado.",
+            "A quebra é a que o usuário digitou no recebimento: o sistema não a "
+            "calcula, não alerta e não desconta nada do valor dos animais. "
+            '"—" = não informada, ou o frete ainda não foi cobrado.',
         ],
     )
 
@@ -628,7 +660,7 @@ def historico_por_pecuarista(user, *, season, farm, start=None, end=None) -> Rel
                 "acerto": a.code,
                 "data": _data(a.date),
                 "cidade": c.origin_city or None,
-                "pagamento": f"{c.payment_days} dias" if c.payment_days else "à vista",
+                "pagamento": _condicao_em_texto(c),
                 "cabecas": calculo.cabecas_recebidas,
                 "peso": peso_carcaca,
                 "media_arrobas": safe_div(arrobas, calculo.cabecas_recebidas),

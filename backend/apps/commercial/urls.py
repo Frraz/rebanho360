@@ -19,6 +19,17 @@ urlpatterns = [
         views.TaxTypeUpdateView.as_view(),
         name="tributo_editar",
     ),
+    path("condicoes/", views.PaymentConditionListView.as_view(), name="condicao_lista"),
+    path(
+        "condicoes/nova/",
+        views.PaymentConditionCreateView.as_view(),
+        name="condicao_nova",
+    ),
+    path(
+        "condicoes/<int:pk>/editar/",
+        views.PaymentConditionUpdateView.as_view(),
+        name="condicao_editar",
+    ),
     path("comissoes/", views.CommissionRuleListView.as_view(), name="comissao_lista"),
     path(
         "comissoes/nova/",

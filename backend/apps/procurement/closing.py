@@ -13,6 +13,7 @@ desfeitos juntos.
 
 import datetime
 import uuid
+from decimal import Decimal
 
 from django.db import transaction
 from django.urls import reverse
@@ -31,10 +32,11 @@ from apps.core.formatting import dinheiro_br
 from apps.core.permissions import pode_excluir_confirmado
 from apps.core.reversible import Status
 from apps.core.serialization import diff_fields, snapshot
+from apps.finance import services as financeiro
 from apps.herd.permissions import tem_acesso_de_escrita_a_fazenda
 from apps.organizations.models import Season
 from apps.procurement import selectors
-from apps.procurement.codes import proximo_codigo
+from apps.procurement.codes import codigo_da_compra_do_item, codigo_da_etapa
 from apps.procurement.commitments import (
     _restaurar_como_rascunho,
     exigir_acerto_aberto,
@@ -44,13 +46,23 @@ from apps.procurement.models import (
     Commitment,
     FiscalNote,
     Settlement,
+    SettlementAllocation,
     SettlementLine,
 )
 from apps.procurement.permissions import pode_aprovar_o_acerto, pode_lancar_no_ciclo
-from apps.procurement.settlement import calcular_acerto
+from apps.procurement.settlement import TOTAIS_A_DISTRIBUIR, calcular_acerto
 from apps.purchases import services as compras
 
-CAMPOS_DA_LINHA = ("tax_type", "amount", "reference", "notes")
+CAMPOS_DA_LINHA = (
+    "tax_type",
+    "amount",
+    "rate_percent",
+    "base_amount",
+    "payee",
+    "due_date",
+    "reference",
+    "notes",
+)
 CAMPOS_DA_NOTA = ("number", "series", "issue_date", "amount")
 
 
@@ -85,7 +97,9 @@ def criar_acerto(
     acerto = Settlement(
         commitment=compromisso, date=date, notes=notes or "", created_by=usuario
     )
-    acerto.code = proximo_codigo(Settlement, "AC", season)
+    acerto.code = codigo_da_etapa(
+        Settlement, compromisso=compromisso, sufixo="AC", legado="AC", season=season
+    )
     acerto.save()
     registrar_auditoria(
         action=AuditAction.CREATE,
@@ -213,6 +227,65 @@ def registrar_notas(
         usuario=usuario,
         motivo=motivo,
     )
+
+
+@transaction.atomic
+def registrar_distribuicao(
+    acerto: Settlement, distribuicao: list[dict], *, usuario, motivo: str = ""
+) -> list[SettlementAllocation]:
+    """O que cada item recebe do frete, da comissão, dos tributos, dos descontos
+    e dos adiantamentos — **informado pelo usuário** (cliente, 2026-10-03: o
+    sistema não rateia sozinho). Só com o acerto em andamento. A soma contra o
+    total é conferida na aprovação (`calcular_acerto` aponta o que falta)."""
+    if not pode_lancar_no_ciclo(usuario):
+        raise BusinessError("Você não tem permissão para lançar no acerto.")
+    acerto = Settlement.objects.select_for_update().get(pk=acerto.pk)
+    exigir_acerto_aberto(acerto.commitment, "mudar a distribuição do acerto")
+    if acerto.status != Status.RASCUNHO:
+        raise BusinessError("Este acerto está excluído.")
+    itens = {i.pk: i for i in acerto.commitment.items.all()}
+    vistos = set()
+    for entrada in distribuicao:
+        item_id = entrada.get("item")
+        if item_id not in itens:
+            raise BusinessError(
+                "A distribuição aponta para um item de outro compromisso."
+            )
+        if item_id in vistos:
+            raise BusinessError(f"O item {itens[item_id].number} aparece duas vezes.")
+        vistos.add(item_id)
+        for campo, _ in TOTAIS_A_DISTRIBUIR:
+            if Decimal(entrada.get(campo) or 0) < 0:
+                raise BusinessError("Valores distribuídos não podem ser negativos.")
+    antes = {
+        a.item_id: snapshot(a)
+        for a in SettlementAllocation.objects.filter(settlement=acerto)
+    }
+    SettlementAllocation.objects.filter(settlement=acerto).delete()
+    criadas = []
+    for entrada in distribuicao:
+        valores = {
+            campo: Decimal(entrada.get(campo) or 0) for campo, _ in TOTAIS_A_DISTRIBUIR
+        }
+        if not any(valores.values()):
+            continue
+        criadas.append(
+            SettlementAllocation.objects.create(
+                settlement=acerto, item=itens[entrada["item"]], **valores
+            )
+        )
+    depois = {a.item_id: snapshot(a) for a in criadas}
+    if antes != depois:
+        registrar_auditoria(
+            action=AuditAction.UPDATE,
+            entity=acerto,
+            before={"distribuicao": antes},
+            after={"distribuicao": depois},
+            changed_fields=["distribuicao"],
+            reason=motivo or "Distribuição entre os itens informada pelo usuário.",
+            actor=usuario,
+        )
+    return criadas
 
 
 # --------------------------------------------------------------------------
@@ -367,6 +440,12 @@ def bloqueios_do_acerto(acerto: Settlement) -> list:
             if str(bloqueio) not in vistos:
                 vistos.add(str(bloqueio))
                 bloqueios.append(bloqueio)
+    # Baixa em título de frete, comissão ou tributo do acerto também trava.
+    for titulo in acerto.invoices.filter(status=Status.CONFIRMADA):
+        for bloqueio in titulo.bloqueios():
+            if str(bloqueio) not in vistos:
+                vistos.add(str(bloqueio))
+                bloqueios.append(bloqueio)
     notas = list(acerto.fiscal_notes.all())
     if notas:
         numeros = ", ".join(n.number for n in notas)
@@ -404,6 +483,11 @@ def descrever_efeitos_do_acerto(acerto: Settlement) -> list[str]:
     for compra in _compras_do_acerto(acerto):
         efeitos.append(f"a compra {compra.code} e tudo que ela gerou:")
         efeitos.extend(f"  · {linha}" for linha in compra.descrever_efeitos())
+    for titulo in acerto.invoices.filter(status=Status.CONFIRMADA):
+        efeitos.append(
+            f"o título {titulo.code} ({titulo.get_component_display().lower()}, "
+            f"{dinheiro_br(titulo.amount)}) é cancelado"
+        )
     return efeitos
 
 
@@ -435,6 +519,9 @@ def aplicar_efeitos_do_acerto(acerto: Settlement, *, usuario) -> None:
             tax_value=rateio.tax_value,
             lot=item.lot,
             payment_days=compromisso.payment_days,
+            payment_condition=compromisso.payment_condition,
+            entry_yield_percent=item.entry_yield_percent,
+            codigo=codigo_da_compra_do_item(compromisso, item),
             notes=f"Gerada pelo acerto {acerto.code} (compromisso {compromisso.code}).",
         )
         compra = item.purchase
@@ -446,7 +533,8 @@ def aplicar_efeitos_do_acerto(acerto: Settlement, *, usuario) -> None:
         elif compra.status == Status.EXCLUIDA:
             # Restauração: a compra volta com os valores de agora.
             for campo, valor in campos.items():
-                setattr(compra, campo, valor)
+                if campo != "codigo":
+                    setattr(compra, campo, valor)
             compra.season = compras.season_para_data(compra.date)
             compra.save()
             reversible.restaurar(compra, usuario=usuario)
@@ -455,6 +543,10 @@ def aplicar_efeitos_do_acerto(acerto: Settlement, *, usuario) -> None:
                 f"O item {item.number} já tem a compra {compra.code} confirmada."
             )
         criadas.append(compra)
+
+    # Frete (por viagem), comissão (por comprador) e tributos (por linha) têm
+    # título próprio, com favorecido e vencimento próprios.
+    financeiro.gerar_titulos_do_acerto(acerto, calculo, usuario=usuario)
 
     if acerto.approved_at is None:
         acerto.approved_by = usuario
@@ -480,6 +572,7 @@ def desfazer_efeitos_do_acerto(acerto: Settlement, *, usuario) -> None:
     raiz = getattr(acerto, "cascade_root", None) or uuid.uuid4()
     acerto.cascade_root_usado = True
     motivo = f"Desfeito junto com o acerto {acerto.code}"
+    financeiro.desfazer_titulos_do_acerto(acerto, usuario=usuario, raiz=raiz)
     for compra in _compras_do_acerto(acerto):
         reversible.excluir(
             compra, usuario=usuario, motivo=motivo, cascata=True, raiz=raiz

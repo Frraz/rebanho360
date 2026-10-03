@@ -53,7 +53,9 @@
       {% include "sales/_campo_previa.html" with field=form.carcass_weight_kg %}
     </div>
     {% include "sales/_previa.html" %}
+    {% include "partials/_field.html" with field=form.payment_condition %}
     {% include "partials/_field.html" with field=form.payment_days %}
+    {% include "partials/_field.html" with field=form.reported_yield_percent %}
   </div>
 </section>
 

@@ -1,26 +1,26 @@
 """Recebimento e quebra de viagem.
 
-**Quebra** = `(peso de origem − peso recebido) ÷ peso de origem`, derivada.
-Só mede e alerta (pendência #23): não desconta nada do valor dos animais.
+**Quebra** é informação **digitada** pelo usuário no recebimento (cliente,
+2026-10-03, pendência #23): o sistema não a calcula, não gera alerta
+percentual e não desconta nada do valor dos animais. Os pesos de origem e
+recebido continuam aparecendo lado a lado, como fato, para quem digita.
 """
 
 import datetime
 from dataclasses import dataclass
 from decimal import Decimal
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from apps.core import reversible
 from apps.core.exceptions import BlockingDependencyError, BusinessError
-from apps.core.money import safe_div
 from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmado
 from apps.core.reversible import Status
 from apps.herd.permissions import tem_acesso_de_escrita_a_fazenda
 from apps.organizations.models import Season, SeasonStatus
 from apps.procurement import selectors
-from apps.procurement.codes import proximo_codigo
+from apps.procurement.codes import codigo_da_etapa
 from apps.procurement.commitments import (
     bloqueio_do_acerto_aprovado,
     exigir_acerto_aberto,
@@ -29,7 +29,7 @@ from apps.procurement.lines import sincronizar_linhas
 from apps.procurement.models import Receiving, ReceivingLine, Trip
 from apps.procurement.permissions import pode_lancar_no_ciclo
 
-CAMPOS_EDITAVEIS = ("date", "notes")
+CAMPOS_EDITAVEIS = ("date", "notes", "trip_loss_percent")
 CAMPOS_DA_LINHA = (
     "load",
     "received_qty",
@@ -46,19 +46,24 @@ CAMPOS_DA_LINHA = (
 
 @dataclass(frozen=True)
 class QuebraDeViagem:
-    peso_origem_kg: Decimal
-    peso_recebido_kg: Decimal
-    quebra_kg: Decimal
-    #: em pontos percentuais (2,5 = 2,5%); negativo = chegou mais do que saiu
+    #: a quebra que o usuário digitou, em pontos percentuais (2,5 = 2,5%)
     quebra_percentual: Decimal | None
-    acima_do_limite: bool
-    #: alguma carga não tinha os dois pesos e ficou de fora da conta
+    #: os pesos lado a lado, só como referência (`None` se nenhuma carga tem os dois)
+    peso_origem_kg: Decimal | None
+    peso_recebido_kg: Decimal | None
+    #: alguma carga não tinha os dois pesos e ficou de fora da soma
     parcial: bool
+
+    @property
+    def diferenca_de_peso_kg(self) -> Decimal | None:
+        if self.peso_origem_kg is None or self.peso_recebido_kg is None:
+            return None
+        return self.peso_origem_kg - self.peso_recebido_kg
 
 
 def quebra_da_viagem(recebimento: Receiving) -> QuebraDeViagem | None:
-    """`None` quando nenhuma carga tem os dois pesos — "—" na tela, nunca
-    `0%`. Peso de origem zero também devolve `None` (regra 3)."""
+    """`None` quando não há quebra digitada **nem** pesos para comparar — "—"
+    na tela, nunca `0%`."""
     origem = Decimal("0")
     recebido = Decimal("0")
     pares = 0
@@ -69,17 +74,13 @@ def quebra_da_viagem(recebimento: Receiving) -> QuebraDeViagem | None:
             origem += peso_origem
             recebido += linha.received_weight_kg
             pares += 1
-    if not pares:
+    informada = recebimento.trip_loss_percent
+    if not pares and informada is None:
         return None
-    razao = safe_div(origem - recebido, origem)
-    percentual = razao * 100 if razao is not None else None
-    limite = Decimal(settings.QUEBRA_ALERTA_PERCENTUAL)
     return QuebraDeViagem(
-        peso_origem_kg=origem,
-        peso_recebido_kg=recebido,
-        quebra_kg=origem - recebido,
-        quebra_percentual=percentual,
-        acima_do_limite=percentual is not None and percentual > limite,
+        quebra_percentual=informada,
+        peso_origem_kg=origem if pares else None,
+        peso_recebido_kg=recebido if pares else None,
         parcial=pares < len(linhas),
     )
 
@@ -116,6 +117,9 @@ def _validar_recebimento(dados: dict, viagem: Trip, *, usuario) -> None:
         raise BusinessError(
             f"O recebimento não pode ser antes da retirada ({viagem.pickup_date:%d/%m/%Y})."
         )
+    quebra = dados.get("trip_loss_percent")
+    if quebra is not None and not Decimal("0") <= Decimal(quebra) <= Decimal("100"):
+        raise BusinessError("A quebra de viagem fica entre 0 e 100%.")
     season = compromisso.season
     if season.status == SeasonStatus.ENCERRADA:
         raise BusinessError(
@@ -180,7 +184,13 @@ def _sincronizar_linhas(
 
 @transaction.atomic
 def criar_recebimento(
-    *, usuario, viagem: Trip, linhas: list[dict], date: datetime.date, notes: str = ""
+    *,
+    usuario,
+    viagem: Trip,
+    linhas: list[dict],
+    date: datetime.date,
+    notes: str = "",
+    trip_loss_percent: Decimal | None = None,
 ) -> Receiving:
     if not pode_lancar_no_ciclo(usuario):
         raise BusinessError("Você não tem permissão para lançar recebimentos.")
@@ -191,12 +201,22 @@ def criar_recebimento(
             f"A viagem {viagem.code} já tem recebimento. Corrija o que existe "
             "em vez de lançar outro."
         )
-    dados = {"date": date, "notes": notes or ""}
+    dados = {
+        "date": date,
+        "notes": notes or "",
+        "trip_loss_percent": trip_loss_percent,
+    }
     _validar_recebimento(dados, viagem, usuario=usuario)
 
     season = Season.objects.select_for_update().get(pk=viagem.commitment.season_id)
     recebimento = Receiving(**dados, trip=viagem, created_by=usuario)
-    recebimento.code = proximo_codigo(Receiving, "RB", season)
+    recebimento.code = codigo_da_etapa(
+        Receiving,
+        compromisso=viagem.commitment,
+        sufixo="R",
+        legado="RB",
+        season=season,
+    )
     recebimento.save()
     _sincronizar_linhas(recebimento, linhas, usuario=usuario)
     return reversible.confirmar(recebimento, usuario=usuario)

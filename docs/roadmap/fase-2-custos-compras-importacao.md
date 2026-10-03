@@ -10,10 +10,10 @@ Ao fim dela, tudo que a `CONTROLE PASTO` faz, o sistema faz — com saldo que fe
 
 **O que o importador achou na planilha real** (detalhes em [99-pendencias](../regras-negocio/99-pendencias.md) e [migracao/01](../migracao/01-planilhas-e-importacao.md#decisões-de-implementação-da-fase-2-o-que-a-planilha-real-mostrou)):
 
-1. Os **−140** são duas linhas `TRANSF. S` na aba `GOIANO` (95 + 45), sem entrada em lugar nenhum — [#2](../regras-negocio/99-pendencias.md), agora com os fatos na mão.
+1. Os **−140** são duas linhas `TRANSF. S` na aba `GOIANO` (95 + 45), sem entrada em lugar nenhum — [#2](../regras-negocio/99-pendencias-resolvidas.md), agora com os fatos na mão.
 2. O **`SALDO ANTERIOR`** (1.503 em São Francisco) está no quadro-resumo que a spec mandava descartar — é dado de entrada; sem ele o saldo fica negativo.
-3. As linhas **`COMPRA` das abas duplicam** a aba `COMPRA DE GADO` (828 × 954 cabeças); a diferença é a compra de 126 cabeças de 27/04/2026 — [#10](../regras-negocio/99-pendencias.md). O saldo de São Francisco fecha em **2.080**, não 1.954.
-4. **30 custos com ano digitado errado** (`03/01/2025` com `ANO = 2026`) — [#11](../regras-negocio/99-pendencias.md).
+3. As linhas **`COMPRA` das abas duplicam** a aba `COMPRA DE GADO` (828 × 954 cabeças); a diferença é a compra de 126 cabeças de 27/04/2026 — [#10](../regras-negocio/99-pendencias-resolvidas.md). O saldo de São Francisco fecha em **2.080**, não 1.954.
+4. **30 custos com ano digitado errado** (`03/01/2025` com `ANO = 2026`) — [#11](../regras-negocio/99-pendencias-resolvidas.md).
 5. **Uma linha de custo com R$ 0,00** (234 lançamentos + 1 ignorada = 235; o total R$ 1.046.907,76 bate).
 6. A doc errava o exemplo de data serial (`45840` = **02/07**, não 01/07) — corrigida.
 
@@ -150,7 +150,7 @@ As 5 abas de fazenda têm duas partes: linhas 4-16 são quadro-resumo derivado (
 
 O problema: `TRANSF. S` e `TRANSF. E` estão em linhas separadas e precisam virar **um movimento de 2 linhas**. O importador pareia por data, categoria e quantidade. **O que não parear vira pendência na tela, para o usuário decidir — nunca contrapartida inventada.**
 
-É aqui que os 140 aparecem. Com a pendência [#2](../regras-negocio/99-pendencias.md) resolvida, você sabe o que fazer com eles.
+É aqui que os 140 aparecem. Com a pendência [#2](../regras-negocio/99-pendencias-resolvidas.md) resolvida, você sabe o que fazer com eles.
 
 Destinos em texto livre ("COPERFRIGU", "CANTINA", "COMPRA GOIANO") viram `Partner` ou `Farm`, com confirmação.
 
@@ -187,9 +187,9 @@ Imprime a tabela comparativa sistema × planilha: 235 lançamentos, R$ 1.046.907
 
 - [x] 235 linhas de custo somando R$ 1.046.907,76 *(234 lançamentos + 1 de R$ 0,00 ignorada)*
 - [x] 954 cabeças por R$ 2.457.752,15
-- [ ] Saldo 1.954 em São Francisco — **fecha em 2.080** até responder a [#10](../regras-negocio/99-pendencias.md) (compra de 126 cabeças fora da aba)
+- [ ] Saldo 1.954 em São Francisco — **fecha em 2.080** até responder a [#10](../regras-negocio/99-pendencias-resolvidas.md) (compra de 126 cabeças fora da aba)
 - [x] Os 11 centros de custo somam o total
-- [x] Nenhuma transferência importada sem contrapartida *(as 2 órfãs ficam pendentes, [#2](../regras-negocio/99-pendencias.md))*
+- [x] Nenhuma transferência importada sem contrapartida *(as 2 órfãs ficam pendentes, [#2](../regras-negocio/99-pendencias-resolvidas.md))*
 - [ ] `conferir_importacao` roda limpo — **roda e acusa as 2 divergências acima**, de propósito
 - [x] Rateio de custo não perde centavo
 - [x] Confirmação concorrente da mesma compra cria um movimento
@@ -199,6 +199,6 @@ Imprime a tabela comparativa sistema × planilha: 235 lançamentos, R$ 1.046.907
 
 Tecnicamente. A aposentadoria de verdade é operacional e tem documento próprio.
 
-> **Resolver antes da carga real:** **[#2]**, **[#5]**, **[#10]**, **[#11]**, e nesta fase também **[#3](../regras-negocio/99-pendencias.md)** (o que é "PARCERIA") e **[#6](../regras-negocio/99-pendencias.md)** (quem é "ONODA"). Ambas afetam a importação.
+> **Resolver antes da carga real:** **[#2]**, **[#5]**, **[#10]**, **[#11]**, e nesta fase também **[#3](../regras-negocio/99-pendencias.md)** (o que é "PARCERIA") e **[#6](../regras-negocio/99-pendencias-resolvidas.md)** (quem é "ONODA"). Ambas afetam a importação.
 
 **Próximo:** [Marco — Virada](marco-virada.md)

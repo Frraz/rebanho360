@@ -13,15 +13,19 @@
 </header>
 
 {% if sugerir_segundo_fator %}
-{# Recomendação, não exigência: some por 14 dias ao dispensar (localStorage). #}
-<div class="alert-info mb-6" role="note" x-data="{ visivel: true }" x-init="try { const t = +localStorage.getItem('dica2fa'); if (t && Date.now() - t < 14 * 864e5) visivel = false } catch (e) {}" x-show="visivel" x-cloak>
+{# Recomendação, não exigência: "Agora não" a esconde por 14 dias (no usuário, não no navegador). #}
+<div class="alert-info mb-6" role="note">
   {% icon "shield-check" %}
   <div class="flex-1">
     <p class="font-medium">Proteja a sua conta com o segundo fator</p>
-    <p class="mt-0.5 text-sm">Um código do aplicativo autenticador, além da senha. Leva um minuto e é opcional, mas recomendamos para todos.</p>
+    <p class="mt-0.5 text-sm">Um código do aplicativo autenticador, além da senha. Leva um minuto e é opcional, mas recomendamos para todos. Se escolher "Agora não", lembramos de novo em 14 dias.</p>
     <div class="mt-3 flex flex-wrap gap-2">
       <a href="{% url 'accounts:2fa_configurar' %}" class="btn-primary btn-sm">Ativar agora</a>
-      <button type="button" class="btn-secondary btn-sm" @click="visivel = false; try { localStorage.setItem('dica2fa', Date.now()) } catch (e) {}">Agora não</button>
+      <form method="post" action="{% url 'accounts:2fa_adiar_lembrete' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="btn-secondary btn-sm">Agora não</button>
+      </form>
     </div>
   </div>
 </div>

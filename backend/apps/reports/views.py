@@ -81,6 +81,8 @@ class RelatorioView(LoginRequiredMixin, View):
                 "aceita_periodo": "de" in aceitos,
                 "aceita_lote": "lote" in aceitos,
                 "aceita_rendimento": "rendimento_entrada" in aceitos,
+                "aceita_preco_arroba": "preco_arroba" in aceitos,
+                "preco_arroba": request.GET.get("preco_arroba", ""),
                 "tem_filtros": bool(aceitos),
                 "lotes": (
                     Lot.objects.for_user(request.user).order_by("code")

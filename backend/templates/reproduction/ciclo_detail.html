@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ ciclo.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'reproduction:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Reprodução</a>
+    <h1 class="page-title">
+      <span class="code !text-2xl">{{ ciclo.code }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-base">
+        {% if ciclo.status == "EXCLUIDA" %}<span class="badge-excluida">Excluído</span>{% else %}<span class="badge-confirmada">Registrado</span>{% endif %}
+        {% if ciclo.version > 1 %}<span class="badge-editada">Editado (v{{ ciclo.version }})</span>{% endif %}
+      </span>
+    </h1>
+    <p class="page-subtitle">{{ ciclo.farm.name }} · safra de nascimento {{ ciclo.season.name }}{% if ciclo.breeding_months %} · estação de {{ ciclo.breeding_months }} meses{% endif %}</p>
+  </div>
+  <div class="page-actions">
+    {% if pode_editar %}<a href="{% url 'reproduction:editar' ciclo.pk %}" class="btn-secondary">{% icon "pencil" %} Corrigir</a>{% endif %}
+  </div>
+</header>
+
+{% if ciclo.status == "EXCLUIDA" %}
+<div class="alert-warning mb-6" role="status">{% icon "triangle-alert" %}<p>Excluído por {{ ciclo.deleted_by }}{% if ciclo.delete_reason %}: "{{ ciclo.delete_reason }}"{% endif %}</p></div>
+{% endif %}
+
+<div class="grid gap-6 lg:grid-cols-2">
+  <section class="card" aria-labelledby="titulo-estacao">
+    <h2 id="titulo-estacao" class="card-title mb-3">Estação de monta</h2>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th scope="col">Grupo</th><th scope="col" class="num">Em monta</th><th scope="col" class="num">Prenhes</th><th scope="col" class="num">Fertilidade</th></tr></thead>
+        <tbody>
+          {% for rotulo, expostas, prenhes in grupos %}
+          <tr>
+            <td class="cell-title font-medium">{{ rotulo }}</td>
+            <td data-label="Em monta" class="num">{{ expostas }}</td>
+            <td data-label="Prenhes" class="num">{{ prenhes }}</td>
+            <td data-label="Fertilidade" class="num nowrap">{% for nome, pct in ind.fertilidade_por_grupo.items %}{% if nome == rotulo %}{% if pct is None %}—{% else %}{{ pct|numero:1 }}%{% endif %}{% endif %}{% endfor %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="titulo-indices">
+    <h2 id="titulo-indices" class="card-title mb-2">Índices (calculados)</h2>
+    <div class="rows">
+      <div><span>Fêmeas em monta · prenhes · vazias</span> <span>{{ ind.expostas }} · {{ ind.prenhes }} · {{ ind.vazias }}</span></div>
+      <div><span>Fêmeas em reprodução (do rebanho)</span> <span>{% if ind.em_reproducao_pct is None %}—{% else %}{{ ind.em_reproducao_pct|numero:1 }}%{% endif %}</span></div>
+      <div><span>Aproveitamento (acima de 18 meses)</span> <span>{% if ind.aproveitamento_pct is None %}—{% else %}{{ ind.aproveitamento_pct|numero:1 }}%{% endif %}</span></div>
+      <div class="total"><span>Índice geral de fertilidade</span> <span>{% if ind.fertilidade_geral_pct is None %}—{% else %}{{ ind.fertilidade_geral_pct|numero:1 }}%{% endif %}</span></div>
+      <div><span>Matrizes inseminadas</span> <span>{% if ind.inseminadas_pct is None %}—{% else %}{{ ind.inseminadas_pct|numero:1 }}%{% endif %}</span></div>
+      <div><span>Fertilidade IA/IATF</span> <span>{% if ind.fertilidade_ia_pct is None %}—{% else %}{{ ind.fertilidade_ia_pct|numero:1 }}%{% endif %}</span></div>
+      <div><span>Fertilidade de touro</span> <span>{% if ind.fertilidade_touro_pct is None %}—{% else %}{{ ind.fertilidade_touro_pct|numero:1 }}%{% endif %}</span></div>
+    </div>
+    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} "—" quer dizer que falta o dado, não que o índice seja zero. O sistema não diz o que é um índice bom ou ruim.</p>
+  </section>
+
+  <section class="card" aria-labelledby="titulo-nascimentos">
+    <h2 id="titulo-nascimentos" class="card-title mb-2">Nascimentos e desmama</h2>
+    <div class="rows">
+      <div><span>Nascidos na safra (do razão do rebanho)</span> <span>{{ ind.nascidos }}</span></div>
+      <div><span>Machos · fêmeas</span> <span>{{ ind.nascidos_machos }} · {{ ind.nascidos_femeas }}</span></div>
+      <div><span>Bezerros desmamados</span> <span>{{ ciclo.weaned_calves }}</span></div>
+      <div class="total"><span>Desmama (desmamados ÷ nascidos)</span> <span>{% if ind.desmama_pct is None %}—{% else %}{{ ind.desmama_pct|numero:1 }}%{% endif %}</span></div>
+    </div>
+    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Os nascimentos não são digitados aqui: são as movimentações de <a class="link" href="{% url 'herd:lancar_movimento' %}">nascimento</a> da fazenda na safra.</p>
+  </section>
+
+  {% if ciclo.notes %}
+  <section class="card" aria-labelledby="titulo-obs"><h2 id="titulo-obs" class="card-title mb-2">Observações</h2><p class="text-sm text-gray-700">{{ ciclo.notes }}</p></section>
+  {% endif %}
+</div>
+
+{% if pode_excluir or pode_restaurar %}
+<div class="mt-8 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-6">
+  {% if pode_excluir %}<a href="{% url 'reproduction:excluir' ciclo.pk %}" class="btn-danger-outline">{% icon "trash-2" %} Excluir ciclo</a>{% endif %}
+  {% if pode_restaurar %}<form method="post" action="{% url 'reproduction:restaurar' ciclo.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar ciclo</button></form>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

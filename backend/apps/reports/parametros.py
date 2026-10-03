@@ -44,6 +44,8 @@ def parametros_do_relatorio(user, slug, origem) -> dict:
         extras["acerto"] = (
             Settlement.objects.for_user(user).filter(pk=origem["acerto"]).first()
         )
+    if "preco_arroba" in aceitos:
+        extras["preco_arroba"] = _decimal(origem.get("preco_arroba", ""))
     if "rendimento_entrada" in aceitos:
         extras["rendimento_entrada"] = _decimal(origem.get("rendimento_entrada", ""))
     return extras

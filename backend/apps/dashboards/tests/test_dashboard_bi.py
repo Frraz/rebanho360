@@ -675,7 +675,7 @@ class TestInsights:
     def test_sem_nada_a_dizer_devolve_lista_vazia(self, gestor, season):
         assert insights.gerar(escopo(gestor, season)) == []
 
-    def test_mortalidade_acima_do_limite(
+    def test_mortalidade_alta_nao_vira_leitura_automatica(
         self, gestor, escritorio, season, lote_gordo, sao_francisco, categoria_25_36
     ):
         herd.registrar_movimento(
@@ -691,13 +691,7 @@ class TestInsights:
         achados = insights.gerar(
             escopo(gestor, season, hoje=datetime.date(2025, 7, 31))
         )
-        assert (
-            achados[0].titulo == "Mortalidade acima do limite"
-            and achados[0].nivel == "alerta"
-        )
-        assert (
-            "São Francisco" in achados[0].texto and "limite de 2,0%" in achados[0].texto
-        )
+        assert not any("ortalidade" in a.titulo for a in achados)
 
     def test_lote_no_prejuizo_e_alerta_e_vem_antes_do_positivo(
         self, gestor, escritorio, season, lote_de_compra, frigorifico, categoria_25_36

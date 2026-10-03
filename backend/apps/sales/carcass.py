@@ -34,29 +34,52 @@ class IndicadoresDaVenda:
 
     peso_medio_vivo: Decimal | None  # kg por cabeça
     carcaca_media: Decimal | None  # kg por cabeça
-    rendimento: Decimal | None  # % (51,33 — não 0,5133)
+    rendimento: Decimal | None  # % (51,33 — não 0,5133): o oficial, se informado
     arrobas_carcaca: Decimal | None  # @ de carcaça: é a que vale no preço
     valor_por_cabeca: Decimal | None
     valor_por_arroba: Decimal | None  # R$ por @ de carcaça
     # Venda de animal vivo, sem carcaça: o preço é por cabeça ou por kg vivo.
     valor_por_kg_vivo: Decimal | None
     arrobas_vivas: Decimal | None  # só para conferência (05#conversões)
+    #: carcaça ÷ peso vivo, sempre calculado — para conferir com o informado
+    rendimento_calculado: Decimal | None = None
+    #: "informado" (frigorífico) ou "calculado" (carcaça ÷ vivo); `None` sem dado
+    rendimento_origem: str | None = None
 
 
 def calcular_carcaca(
-    *, head_count, total_weight_kg, total_value, carcass_weight_kg=None
+    *,
+    head_count,
+    total_weight_kg,
+    total_value,
+    carcass_weight_kg=None,
+    reported_yield_percent=None,
 ) -> IndicadoresDaVenda:
+    """`reported_yield_percent`: o rendimento que o frigorífico informou. Quando
+    existe, **prevalece** sobre o calculado (cliente, 2026-10-03, #7); o
+    calculado continua em `rendimento_calculado`, para conferência."""
     cabecas = head_count or 0
     vivo = Decimal(total_weight_kg) if total_weight_kg else None
     carcaca = Decimal(carcass_weight_kg) if carcass_weight_kg else None
     valor = Decimal(total_value) if total_value else None
 
     arrobas_carcaca = kg_to_arroba(carcaca) if carcaca else None
-    rendimento = safe_div(carcaca, vivo)
+    razao = safe_div(carcaca, vivo)
+    calculado = razao * CEM if razao is not None else None
+    informado = (
+        Decimal(reported_yield_percent) if reported_yield_percent is not None else None
+    )
+    rendimento = informado if informado is not None else calculado
     return IndicadoresDaVenda(
         peso_medio_vivo=safe_div(vivo, cabecas),
         carcaca_media=safe_div(carcaca, cabecas),
-        rendimento=rendimento * CEM if rendimento is not None else None,
+        rendimento=rendimento,
+        rendimento_calculado=calculado,
+        rendimento_origem=(
+            "informado"
+            if informado is not None
+            else ("calculado" if calculado is not None else None)
+        ),
         arrobas_carcaca=arrobas_carcaca,
         valor_por_cabeca=safe_div(valor, cabecas),
         valor_por_arroba=safe_div(valor, arrobas_carcaca),
@@ -71,6 +94,7 @@ def indicadores_da_venda(venda) -> IndicadoresDaVenda:
         total_weight_kg=venda.total_weight_kg,
         total_value=venda.total_value,
         carcass_weight_kg=venda.carcass_weight_kg,
+        reported_yield_percent=venda.reported_yield_percent,
     )
 
 
@@ -110,6 +134,22 @@ class AgregadoDeVendas:
     indicadores: IndicadoresDaVenda
 
 
+def _rendimento_ponderado(vendas) -> Decimal | None:
+    """Média do rendimento **efetivo** de cada venda (o informado, ou o calculado
+    dela), ponderada pelo peso vivo. Sem nenhum informado, é igual a carcaça
+    total ÷ vivo total."""
+    peso = sum((v.total_weight_kg for v in vendas), Decimal("0"))
+    if not peso:
+        return None
+    soma = Decimal("0")
+    for v in vendas:
+        ind = indicadores_da_venda(v)
+        if ind.rendimento is None:
+            return None
+        soma += ind.rendimento * v.total_weight_kg
+    return soma / peso
+
+
 def agregar(vendas) -> AgregadoDeVendas:
     vendas = list(vendas)
     cabecas = sum(v.head_count for v in vendas)
@@ -130,7 +170,9 @@ def agregar(vendas) -> AgregadoDeVendas:
         indicadores = IndicadoresDaVenda(
             peso_medio_vivo=base.peso_medio_vivo,
             carcaca_media=sobre_carcaca.carcaca_media,
-            rendimento=sobre_carcaca.rendimento,
+            rendimento=_rendimento_ponderado(com) or sobre_carcaca.rendimento,
+            rendimento_calculado=sobre_carcaca.rendimento_calculado,
+            rendimento_origem=sobre_carcaca.rendimento_origem,
             arrobas_carcaca=sobre_carcaca.arrobas_carcaca,
             valor_por_cabeca=base.valor_por_cabeca,
             valor_por_arroba=sobre_carcaca.valor_por_arroba,

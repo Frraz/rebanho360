@@ -11,7 +11,6 @@ import datetime
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from django.conf import settings
 from django.db.models import Max, Sum
 from django.urls import reverse
 
@@ -28,15 +27,12 @@ from apps.herd.models import (
     HerdLedgerEntry,
     Weighing,
 )
-from apps.herd.mortality import taxa_de_mortalidade
 from apps.imports.models import BatchStatus, ImportKind, ImportRow, RowStatus
 from apps.imports.permissions import pode_importar
 from apps.livestock.models import Lot, LotStatus
-from apps.procurement import receivings as recebimentos
 from apps.procurement import selectors as ciclo
-from apps.procurement.models import Commitment, Receiving, ReceivingLine, Settlement
+from apps.procurement.models import Commitment, ReceivingLine, Settlement
 from apps.procurement.permissions import pode_aprovar_o_acerto, pode_ver_o_ciclo
-from apps.properties.models import Farm
 from apps.purchases.models import Purchase
 from apps.sales import carcass
 from apps.sales.models import Sale, SaleType
@@ -223,46 +219,6 @@ def _lotes_zerados_abertos(user, farm) -> Pendencia | None:
     )
 
 
-def _mortalidade_acima_do_normal(user, farm, season, hoje) -> Pendencia | None:
-    if season is None:
-        return None
-    limite = settings.MORTALIDADE_LIMITE_PERCENTUAL
-    inicio = season.start_date
-    fim = min(hoje, season.end_date)
-    if fim < inicio:
-        return None
-    fazendas = (
-        [farm]
-        if farm is not None
-        else list(
-            Farm.objects.filter(
-                pk__in=HerdLedgerEntry.objects.for_user(user).values("farm_id")
-            )
-        )
-    )
-    achados = []
-    for f in fazendas:
-        t = taxa_de_mortalidade(farm=f, start=inicio, end=fim)
-        if t.taxa is not None and t.taxa > limite:
-            achados.append(
-                f"{f.name}: {numero_br(t.taxa, 1)}% na safra ({_plural(t.mortes, 'morte', 'mortes')}; "
-                f"limite {numero_br(limite, 0)}%)"
-            )
-    if not achados:
-        return None
-    return Pendencia(
-        "mortalidade",
-        _plural(
-            len(achados),
-            "fazenda com mortalidade acima do normal",
-            "fazendas com mortalidade acima do normal",
-        ),
-        len(achados),
-        reverse("herd:movimento_lista"),
-        tuple(achados[:EXEMPLOS]),
-    )
-
-
 def _rendimento_fora_da_faixa(user, farm) -> Pendencia | None:
     qs = Sale.objects.for_user(user).filter(
         status=Status.CONFIRMADA, type=SaleType.ABATE, carcass_weight_kg__isnull=False
@@ -409,37 +365,6 @@ def _acertos_a_aprovar(user, farm) -> Pendencia | None:
     )
 
 
-def _quebra_acima_do_limite(user, farm) -> Pendencia | None:
-    """Recebimento cuja quebra de viagem passou do limite de alerta."""
-    if not pode_ver_o_ciclo(user):
-        return None
-    recebimentos_ = Receiving.objects.for_user(user).filter(status=Status.CONFIRMADA)
-    if farm is not None:
-        recebimentos_ = recebimentos_.filter(trip__commitment__destination_farm=farm)
-    acima = []
-    for r in recebimentos_.select_related("trip__commitment").order_by("date", "id"):
-        quebra = recebimentos.quebra_da_viagem(r)
-        if quebra is not None and quebra.acima_do_limite:
-            acima.append((r, quebra))
-    if not acima:
-        return None
-    return Pendencia(
-        "quebra_acima_do_limite",
-        _plural(
-            len(acima),
-            "viagem com quebra de peso acima do limite",
-            "viagens com quebra de peso acima do limite",
-        ),
-        len(acima),
-        reverse("reports:relatorio", args=["fretes-e-quebra"]),
-        tuple(
-            f"{r.trip.code} · {numero_br(q.quebra_percentual, 2)}% "
-            f"({numero_br(q.peso_origem_kg, 0)} kg → {numero_br(q.peso_recebido_kg, 0)} kg)"
-            for r, q in acima[:EXEMPLOS]
-        ),
-    )
-
-
 def pendencias_do_painel(user, *, farm=None, season=None, hoje=None) -> list[Pendencia]:
     """Só devolve o que **tem** pendência. Lista vazia = nada a fazer hoje."""
     hoje = hoje or datetime.date.today()
@@ -449,13 +374,11 @@ def pendencias_do_painel(user, *, farm=None, season=None, hoje=None) -> list[Pen
         _lotes_sem_pesagem(user, farm, hoje),
         _vendas_sem_carcaca(user, farm),
         _lotes_zerados_abertos(user, farm),
-        _mortalidade_acima_do_normal(user, farm, season, hoje),
         _rendimento_fora_da_faixa(user, farm),
         _titulos_vencidos(user, farm, hoje),
         _pagamentos_a_aprovar(user, farm),
         _recebido_aguardando_acerto(user, farm),
         _acertos_a_aprovar(user, farm),
-        _quebra_acima_do_limite(user, farm),
     )
     return [p for p in regras if p is not None]
 

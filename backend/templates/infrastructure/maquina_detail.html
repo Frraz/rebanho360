@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ maquina.name }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'infrastructure:maquina_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Máquinas</a>
+    <h1 class="page-title">{{ maquina.name }}</h1>
+    <p class="page-subtitle">{{ maquina.get_kind_display }} · {{ maquina.farm.name }}{% if not maquina.is_active %} · inativa{% endif %}</p>
+  </div>
+  <div class="page-actions">
+    {% if pode_lancar %}<a href="{% url 'infrastructure:uso_novo' maquina.pk %}" class="btn-primary">{% icon "plus" %} Lançar uso</a>{% endif %}
+    {% if pode_gerenciar %}<a href="{% url 'infrastructure:maquina_editar' maquina.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
+  </div>
+</header>
+
+<section class="card" aria-labelledby="titulo-custo">
+  <h2 id="titulo-custo" class="card-title mb-2">Custo por hora (calculado)</h2>
+  <div class="rows">
+    <div><span>Horas trabalhadas</span> <span>{{ custo.horas|numero:1 }} h</span></div>
+    <div><span>Combustível</span> <span>{{ custo.combustivel|brl }}{% if custo.litros is not None %} <span class="text-gray-500">({{ custo.litros|numero:0 }} L)</span>{% endif %}</span></div>
+    <div><span>Manutenção</span> <span>{{ custo.manutencao|brl }}</span></div>
+    <div><span>Consumo</span> <span>{% if custo.consumo_l_h is None %}—{% else %}{{ custo.consumo_l_h|numero:2 }} L/h{% endif %}</span></div>
+    <div><span>Combustível por hora</span> <span>{{ custo.custo_hora_combustivel|brl }}</span></div>
+    <div><span>Manutenção por hora</span> <span>{{ custo.custo_hora_manutencao|brl }}</span></div>
+    <div class="total"><span>Custo por hora</span> <span>{{ custo.custo_hora|brl }}</span></div>
+  </div>
+  <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Não inclui operador nem depreciação. "—" = falta o dado, não que seja zero. O custo em si continua sendo lançado em <a class="link" href="{% url 'costs:lista' %}">Custos</a>.</p>
+</section>
+
+<section class="card mt-6" aria-labelledby="titulo-usos">
+  <h2 id="titulo-usos" class="card-title mb-3">Usos lançados</h2>
+  {% if usos %}
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th scope="col">Lançamento</th><th scope="col">Data</th><th scope="col" class="num">Horas</th><th scope="col" class="num">Litros</th><th scope="col" class="num">Combustível</th><th scope="col" class="num">Manutenção</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+      <tbody>
+        {% for u in usos %}
+        <tr>
+          <td class="cell-title code">{{ u.code }}</td>
+          <td data-label="Data" class="nowrap">{{ u.date|date:"d/m/Y" }}</td>
+          <td data-label="Horas" class="num">{{ u.hours|numero:1 }}</td>
+          <td data-label="Litros" class="num">{% if u.fuel_liters is None %}—{% else %}{{ u.fuel_liters|numero:0 }}{% endif %}</td>
+          <td data-label="Combustível" class="num nowrap">{{ u.fuel_cost|brl }}</td>
+          <td data-label="Manutenção" class="num nowrap">{{ u.maintenance_cost|brl }}</td>
+          <td class="cell-actions num"><a href="{% url 'infrastructure:uso_editar' u.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Corrigir</a> <a href="{% url 'infrastructure:uso_excluir' u.pk %}" class="btn-ghost btn-sm">{% icon "trash-2" "icon-sm" %} Excluir</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-600">Nenhum uso lançado ainda.</p>
+  {% endif %}
+</section>
+{% endblock %}

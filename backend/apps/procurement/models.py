@@ -103,21 +103,23 @@ class Commitment(ReversibleModel):
         related_name="commitments_as_commissioned",
         on_delete=models.PROTECT,
     )
-    # Comprador adicional do contrato: informativo, sem divisão de comissão.
-    second_buyer = models.ForeignKey(
-        "partners.Partner",
-        verbose_name="Comprador adicional",
-        null=True,
-        blank=True,
-        related_name="+",
-        on_delete=models.PROTECT,
-    )
+    # `commissioned` é o comprador principal (o primeiro da lista). Os demais
+    # compradores — sem limite — são linhas de `Commission`, cada uma com a sua
+    # comissão (cliente, 2026-10-03, pendência #30).
     origin_property = models.CharField(
         "Propriedade de origem", max_length=150, blank=True
     )
     origin_city = models.CharField("Cidade de origem", max_length=100, blank=True)
     payment_days = models.PositiveSmallIntegerField(
         "Prazo de pagamento (dias)", null=True, blank=True
+    )
+    payment_condition = models.ForeignKey(
+        "commercial.PaymentCondition",
+        verbose_name="Condição de pagamento",
+        null=True,
+        blank=True,
+        related_name="+",
+        on_delete=models.PROTECT,
     )
     # Programação
     pickup_date = models.DateField("Data da retirada", null=True, blank=True)
@@ -135,6 +137,20 @@ class Commitment(ReversibleModel):
         on_delete=models.PROTECT,
     )
     approved_at = models.DateTimeField("Aprovado em", null=True, blank=True)
+    # Encerramento **manual** (cliente, 2026-10-03, pendência #29): o sistema
+    # não decide que a operação acabou porque as contas foram pagas.
+    closed_at = models.DateTimeField("Encerrada em", null=True, blank=True)
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Encerrada por",
+        null=True,
+        blank=True,
+        related_name="+",
+        on_delete=models.PROTECT,
+    )
+    closure_note = models.CharField(
+        "Observação do encerramento", max_length=300, blank=True
+    )
 
     objects = ScopedManager()
 
@@ -154,6 +170,20 @@ class Commitment(ReversibleModel):
 
     def __str__(self) -> str:
         return self.code
+
+    @property
+    def encerrada(self) -> bool:
+        return self.closed_at is not None
+
+    @property
+    def commission(self):
+        """A comissão do comprador principal (ou a primeira, se ele não tem).
+        Consulta, não cache: a lista de comissões muda dentro da transação."""
+        comissoes = list(self.commissions.order_by("position", "id"))
+        for comissao in comissoes:
+            if comissao.payee_id == self.commissioned_id:
+                return comissao
+        return comissoes[0] if comissoes else None
 
     # ---- contrato ReversibleModel (implementado em commitments.py) ------
 
@@ -249,6 +279,16 @@ class CommitmentItem(LineModel):
     expected_band = models.PositiveSmallIntegerField(
         "Faixa esperada", null=True, blank=True, validators=BAND_VALIDATORS
     )
+    # Rendimento de carcaça **estimado na entrada** (cliente, 2026-10-03, #15a):
+    # editável; ~50% é a referência de uso, não um valor fixo do sistema.
+    entry_yield_percent = models.DecimalField(
+        "Rendimento estimado de entrada (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+    )
     lot = models.ForeignKey(
         "livestock.Lot",
         verbose_name="Lote existente",
@@ -308,28 +348,33 @@ class CommissionSource(models.TextChoices):
 
 
 class Commission(models.Model):
-    """**Snapshot** da regra de comissão do compromisso.
+    """Comissão de **um comprador** do compromisso — há uma linha por comprador.
 
-    Copiada de `commercial.CommissionRule` quando o compromisso é aprovado.
-    Mudar o cadastro depois não toca esta linha — a operação de janeiro não
-    passa a mostrar a regra de março. O **valor em reais não é gravado**: é
-    derivado (regra 6), calculado do snapshot e dos valores do acerto.
+    Antes da aprovação é o que o usuário digita (tipo e valor por comprador);
+    na aprovação, o comprador que ficou sem comissão informada recebe o
+    **snapshot** da regra de `commercial.CommissionRule` vigente. Mudar o
+    cadastro depois não toca esta linha. O **valor em reais não é gravado**: é
+    derivado (regra 6), do snapshot e dos valores do acerto.
+
+    Cada comprador tem o seu título de comissão, com **vencimento próprio**
+    (`due_date`; vazio = a data do acerto).
     """
 
-    commitment = models.OneToOneField(
+    commitment = models.ForeignKey(
         Commitment,
         verbose_name="Compromisso",
-        related_name="commission",
+        related_name="commissions",
         on_delete=models.PROTECT,
     )
     payee = models.ForeignKey(
         "partners.Partner",
-        verbose_name="Favorecido",
+        verbose_name="Comprador",
         null=True,
         blank=True,
         related_name="+",
         on_delete=models.PROTECT,
     )
+    position = models.PositiveSmallIntegerField("Ordem", default=1)
     source = models.CharField(
         "Origem",
         max_length=8,
@@ -346,18 +391,20 @@ class Commission(models.Model):
         on_delete=models.SET_NULL,
     )
     type = models.CharField("Tipo", max_length=12)
-    base = models.CharField("Base", max_length=8)
+    base = models.CharField("Base", max_length=8, default="BRUTO")
     value = models.DecimalField(
-        "Valor (% ou R$ por cabeça)", max_digits=12, decimal_places=4
+        "Valor (%, R$ por cabeça ou R$)", max_digits=12, decimal_places=4
     )
     extra_amount = models.DecimalField(
         "Comissão extra (R$)", max_digits=14, decimal_places=2, default=0
     )
+    due_date = models.DateField("Vencimento", null=True, blank=True)
     snapshot_at = models.DateTimeField("Gravada em", auto_now_add=True)
 
     class Meta:
         verbose_name = "Comissão do compromisso"
         verbose_name_plural = "Comissões dos compromissos"
+        ordering = ["commitment_id", "position", "id"]
         constraints = [
             models.CheckConstraint(
                 check=Q(value__gte=0), name="commission_value_not_negative"
@@ -365,19 +412,39 @@ class Commission(models.Model):
             models.CheckConstraint(
                 check=Q(extra_amount__gte=0), name="commission_extra_not_negative"
             ),
+            models.UniqueConstraint(
+                fields=["commitment", "payee"],
+                condition=Q(payee__isnull=False),
+                name="uniq_commission_buyer_per_commitment",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"Comissão de {self.commitment.code}"
 
+    @property
+    def aguarda_regra(self) -> bool:
+        """Comprador sem valor informado, ainda sem a regra gravada (ela entra
+        na aprovação do compromisso)."""
+        return (
+            self.source == CommissionSource.REGRA
+            and self.rule_id is None
+            and not self.value
+            and not self.extra_amount
+        )
+
     def regra_em_texto(self) -> str:
         """A regra **gravada**, como se lê na tela e nos relatórios."""
-        from apps.core.formatting import numero_br
+        from apps.core.formatting import dinheiro_br, numero_br
+
+        if self.aguarda_regra:
+            return "a regra vigente será gravada na aprovação"
 
         if self.type == "POR_CABECA":
             return f"R$ {numero_br(self.value, 2)} por cabeça"
-        base = "bruto" if self.base == "BRUTO" else "líquido"
-        return f"{numero_br(self.value, 2)}% sobre o {base}"
+        if self.type == "VALOR":
+            return f"{dinheiro_br(self.value)} (valor informado)"
+        return f"{numero_br(self.value, 2)}% sobre o valor bruto dos animais"
 
 
 # --------------------------------------------------------------------------
@@ -418,7 +485,10 @@ class Trip(ReversibleModel):
         on_delete=models.PROTECT,
     )
     driver_name = models.CharField("Motorista", max_length=100, blank=True)
+    vehicle = models.CharField("Veículo", max_length=100, blank=True)
     vehicle_plate = models.CharField("Placa", max_length=10, blank=True)
+    # Só o número/código do ADF, sem anexo obrigatório (cliente, 2026-10-03, #34).
+    adf_number = models.CharField("Número do ADF", max_length=40, blank=True)
     distance_km = models.PositiveIntegerField("Distância (km)", null=True, blank=True)
     freight_criterion = models.CharField(
         "Critério do frete",
@@ -432,6 +502,8 @@ class Trip(ReversibleModel):
     freight_actual = models.DecimalField(
         "Frete realizado (R$)", max_digits=14, decimal_places=2, null=True, blank=True
     )
+    # Vencimento próprio do título de frete, independente do dos animais.
+    freight_due_date = models.DateField("Vencimento do frete", null=True, blank=True)
     notes = models.TextField("Observações", blank=True)
 
     objects = ScopedManager()
@@ -528,6 +600,17 @@ class Receiving(ReversibleModel):
         on_delete=models.PROTECT,
     )
     date = models.DateField("Data do recebimento")
+    # **Digitada** (cliente, 2026-10-03): o sistema não calcula nem alerta a
+    # quebra, e não desconta nada do valor dos animais. É informação da viagem,
+    # usada nos relatórios.
+    trip_loss_percent = models.DecimalField(
+        "Quebra de viagem (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
     notes = models.TextField("Ocorrências", blank=True)
 
     objects = ScopedManager()
@@ -766,6 +849,24 @@ class SettlementLine(LineModel):
         on_delete=models.PROTECT,
     )
     amount = models.DecimalField("Valor (R$)", max_digits=14, decimal_places=2)
+    # Campos auxiliares, **só de registro** (cliente, 2026-10-03, #14): o valor
+    # digitado é a referência; alíquota e base não calculam nada.
+    rate_percent = models.DecimalField(
+        "Alíquota (%)", max_digits=7, decimal_places=4, null=True, blank=True
+    )
+    base_amount = models.DecimalField(
+        "Base (R$)", max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    # Quem recebe — informado pelo usuário, nunca deduzido.
+    payee = models.ForeignKey(
+        "partners.Partner",
+        verbose_name="Favorecido",
+        null=True,
+        blank=True,
+        related_name="+",
+        on_delete=models.PROTECT,
+    )
+    due_date = models.DateField("Vencimento", null=True, blank=True)
     reference = models.CharField("Documento", max_length=60, blank=True)
     notes = models.CharField("Observação", max_length=200, blank=True)
 
@@ -816,3 +917,64 @@ class FiscalNote(LineModel):
 
     def __str__(self) -> str:
         return f"NF {self.number}"
+
+
+class SettlementAllocation(models.Model):
+    """O que cada item recebe do frete, da comissão, dos tributos, dos
+    descontos e dos adiantamentos do acerto — **informado pelo usuário**.
+
+    O sistema não rateia sozinho (cliente, 2026-10-03, pendência #13): não
+    decide se o rateio é por cabeça, por peso ou por valor. Com um único item
+    recebido não há o que distribuir; com mais de um, cada total tem de ser
+    repartido aqui e a soma tem de fechar com o total — senão o acerto não é
+    aprovado, e a mensagem diz quanto falta.
+    """
+
+    settlement = models.ForeignKey(
+        Settlement,
+        verbose_name="Acerto",
+        related_name="allocations",
+        on_delete=models.CASCADE,
+    )
+    item = models.ForeignKey(
+        CommitmentItem,
+        verbose_name="Item",
+        related_name="+",
+        on_delete=models.PROTECT,
+    )
+    discount_value = models.DecimalField(
+        "Descontos (R$)", max_digits=14, decimal_places=2, default=0
+    )
+    abatement_value = models.DecimalField(
+        "Adiantamentos e créditos (R$)", max_digits=14, decimal_places=2, default=0
+    )
+    freight_value = models.DecimalField(
+        "Frete (R$)", max_digits=14, decimal_places=2, default=0
+    )
+    commission_value = models.DecimalField(
+        "Comissão (R$)", max_digits=14, decimal_places=2, default=0
+    )
+    tax_value = models.DecimalField(
+        "Tributos e taxas (R$)", max_digits=14, decimal_places=2, default=0
+    )
+
+    class Meta:
+        verbose_name = "Distribuição do acerto por item"
+        verbose_name_plural = "Distribuições do acerto por item"
+        ordering = ["settlement_id", "item__number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["settlement", "item"], name="uniq_allocation_item"
+            ),
+            models.CheckConstraint(
+                check=Q(discount_value__gte=0)
+                & Q(abatement_value__gte=0)
+                & Q(freight_value__gte=0)
+                & Q(commission_value__gte=0)
+                & Q(tax_value__gte=0),
+                name="allocation_not_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.settlement.code} · item {self.item.number}"

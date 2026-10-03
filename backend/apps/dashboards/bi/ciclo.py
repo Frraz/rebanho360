@@ -10,10 +10,10 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from django.conf import settings
 from django.db.models import Sum
 from django.urls import reverse
 
+from apps.core.money import safe_div
 from apps.core.reversible import Status
 from apps.procurement import receivings, trips
 from apps.procurement import selectors as ciclo_sel
@@ -129,7 +129,7 @@ def viagens(e: Escopo) -> list:
 
 
 def quebras(e: Escopo) -> list[tuple]:
-    """`[(recebimento, QuebraDeViagem)]` das viagens recebidas que têm os dois pesos."""
+    """`[(recebimento, QuebraDeViagem)]` das viagens recebidas com quebra informada."""
 
     def calcular():
         ids = [c.pk for c, _ in compromissos(e)]
@@ -150,12 +150,9 @@ def quebras(e: Escopo) -> list[tuple]:
 
 
 def quebra_media(e: Escopo) -> Decimal | None:
-    """Ponderada pelo peso de origem: Σ(origem − recebido) ÷ Σ origem."""
-    q = quebras(e)
-    return specs.pct(
-        sum((x.quebra_kg for _, x in q), ZERO),
-        sum((x.peso_origem_kg for _, x in q), ZERO),
-    )
+    """Média simples da quebra que o usuário informou em cada viagem."""
+    q = [x.quebra_percentual for _, x in quebras(e)]
+    return safe_div(sum(q, ZERO), len(q)) if q else None
 
 
 def fretes(e: Escopo) -> list[tuple]:
@@ -179,7 +176,6 @@ def kpis(e: Escopo) -> list[Kpi]:
         if etapa not in (Etapa.EM_NEGOCIACAO, Etapa.ACERTO_APROVADO)
     )
     media = quebra_media(e)
-    limite = Decimal(settings.QUEBRA_ALERTA_PERCENTUAL)
     frete_total = sum((f.final for _, f in fretes(e) if f.final is not None), ZERO)
     n_com_frete = sum(1 for _, f in fretes(e) if f.final is not None)
     return [
@@ -211,20 +207,11 @@ def kpis(e: Escopo) -> list[Kpi]:
             nota="cabeças recebidas ÷ contratadas",
         ),
         Kpi(
-            "Quebra de peso média",
+            "Quebra de viagem média",
             specs.formatar(media, "pct2"),
-            nota=f"{len(quebras(e))} viagem(ns) com os dois pesos",
-            estado=("ruim" if media > limite else "bom") if media is not None else "",
-            estado_texto=(
-                (
-                    f"Acima do limite de {specs.formatar(limite, 'pct')}"
-                    if media > limite
-                    else "Dentro do limite"
-                )
-                if media is not None
-                else ""
-            ),
-            ajuda="Peso de origem − peso recebido, ÷ peso de origem, somando todas as viagens recebidas.",
+            nota=f"{len(quebras(e))} viagem(ns) com quebra informada",
+            ajuda="Média da quebra que o usuário digitou em cada recebimento. "
+            "O sistema não calcula nem julga a quebra.",
         ),
         Kpi(
             "Aguardando acerto",
@@ -312,10 +299,9 @@ def grafico_previsto_embarcado_recebido(e: Escopo) -> specs.Grafico:
 
 def grafico_quebra(e: Escopo) -> specs.Grafico:
     q = quebras(e)
-    limite = float(settings.QUEBRA_ALERTA_PERCENTUAL)
     g = specs.cartesiano(
         "ciclo-quebra",
-        "Quebra de peso de cada viagem",
+        "Quebra de viagem de cada recebimento",
         [r.trip.code for r, _ in q],
         [
             specs.serie(
@@ -323,13 +309,11 @@ def grafico_quebra(e: Escopo) -> specs.Grafico:
                 [x.quebra_percentual for _, x in q],
                 cor="marca",
                 rotulo=True,
-                por_limite=limite,
             )
         ],
         formato="pct2",
-        titulo_y="% do peso de origem",
-        linhas_ref=[{"valor": limite, "rotulo": f"Limite {limite:.0f}%"}],
-        nota="Barra acima do limite pede conferência do peso de origem e do recebido.",
+        titulo_y="% informado",
+        nota="Quebra digitada em cada recebimento. Sem alerta automático: a leitura é sua.",
         largura="metade",
         url=reverse("reports:relatorio", args=["fretes-e-quebra"]),
     )

@@ -86,7 +86,7 @@
       <div><span>Valor dos animais</span> <span>{{ calculo.valor_dos_animais|brl }}</span></div>
       <div><span>Frete</span> <span>{{ calculo.frete|brl }}</span></div>
       <div><span>Tributos e taxas</span> <span>{{ calculo.tributos|brl }}</span></div>
-      <div><span>Comissão{% if calculo.comissao_extra %} (com extra){% endif %}</span> <span>{{ calculo.comissao_total|brl }}</span></div>
+      {% for c in calculo.comissoes %}<div><span>Comissão{% if c.payee %} · {{ c.payee.name }}{% endif %}{% if c.extra %} (com extra){% endif %}</span> <span>{{ c.total|brl }}</span></div>{% empty %}<div><span>Comissão</span> <span>{{ calculo.comissao_total|brl }}</span></div>{% endfor %}
       <div class="total"><span>Custo de aquisição</span> <span>{{ calculo.custo_aquisicao|brl }}</span></div>
       <div><span>Adiantamentos</span> <span>{{ calculo.adiantamentos|brl }}</span></div>
       <div><span>Créditos</span> <span>{{ calculo.creditos|brl }}</span></div>
@@ -101,13 +101,27 @@
     </div>
     {% if linhas %}
     <div class="rows">
-      {% for l in linhas %}<div><span>{{ l.tax_type.name }} <span class="text-xs text-gray-500">({{ l.tax_type.get_nature_display|lower }}){% if l.reference %} · {{ l.reference }}{% endif %}</span></span> <span>{{ l.amount|brl }}</span></div>{% endfor %}
+      {% for l in linhas %}<div><span>{{ l.tax_type.name }} <span class="text-xs text-gray-500">({{ l.tax_type.get_nature_display|lower }}){% if l.payee %} · {{ l.payee.name }}{% endif %}{% if l.due_date %} · vence {{ l.due_date|date:"d/m/Y" }}{% endif %}{% if l.reference %} · {{ l.reference }}{% endif %}</span></span> <span>{{ l.amount|brl }}</span></div>{% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-gray-600">Nenhum lançamento. Os valores são digitados: não há alíquota nem fórmula (pendência #21).</p>
+    <p class="text-sm text-gray-600">Nenhum lançamento. Os valores são digitados: o sistema não presume alíquota, base nem favorecido.</p>
     {% endif %}
   </section>
 </div>
+
+{% if calculo.itens|length > 1 or acerto.allocations.exists %}
+<section class="card mt-6" id="distribuicao" aria-labelledby="titulo-distribuicao">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="titulo-distribuicao" class="card-title">Distribuição entre os itens</h2>
+    {% if pode_editar %}<a href="{% url 'procurement:acerto_distribuicao' acerto.pk %}" class="btn-secondary btn-sm">{% icon "pencil" "icon-sm" %} Informar</a>{% endif %}
+  </div>
+  {% if calculo.distribuicao_pendente %}
+  <p class="text-sm text-amber-800">Falta distribuir o frete, a comissão, os tributos ou os descontos entre os itens: veja o aviso no topo.</p>
+  {% else %}
+  <p class="text-sm text-gray-600">Frete, comissão, tributos, descontos e adiantamentos estão distribuídos entre os itens, com a soma fechando com o total. O sistema não rateia sozinho.</p>
+  {% endif %}
+</section>
+{% endif %}
 
 <section class="card mt-6" id="notas-fiscais" aria-labelledby="titulo-notas">
   <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -130,6 +144,17 @@
   <ul class="divide-y divide-gray-100 text-sm">
     {% for c in compras %}
     <li class="py-2.5">Compra <a class="link code" href="{% url 'purchases:detalhe' c.pk %}">{{ c.code }}</a> <span class="text-gray-600">· {{ c.head_count }} cabeças no lote <a class="link code" href="{% url 'livestock:lote_detalhe' c.lot.pk %}">{{ c.lot.code }}</a> · animais {{ c.animal_value|brl }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if titulos %}
+<section class="card mt-6" aria-labelledby="titulo-titulos">
+  <h2 id="titulo-titulos" class="card-title mb-2">Títulos de frete, comissão e tributos</h2>
+  <ul class="divide-y divide-gray-100 text-sm">
+    {% for t in titulos %}
+    <li class="py-2.5"><a class="link code" href="{% url 'finance:titulo_detalhe' t.pk %}">{{ t.code }}</a> <span class="text-gray-600">· {{ t.get_component_display }} · {{ t.payee.name|default:"favorecido a definir" }} · vence {{ t.due_date|date:"d/m/Y" }} · {{ t.amount|brl }}</span></li>
     {% endfor %}
   </ul>
 </section>

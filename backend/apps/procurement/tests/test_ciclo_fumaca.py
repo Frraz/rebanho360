@@ -25,5 +25,7 @@ def test_do_compromisso_ao_titulo(acerto, aprovar, compromisso):
     assert compra.animal_value == 43200
     assert compra.freight_value == 500
     assert sum(e.quantity for e in HerdLedgerEntry.objects.filter(lot=compra.lot)) == 10
-    assert compra.invoices.count() == 2  # animais + frete
+    assert compra.code == "OP-000001/I1"  # o número da operação segue na compra
+    assert compra.invoices.count() == 1  # os animais
+    assert acerto.invoices.count() == 1  # o frete, por viagem
     assert selectors.etapa_do_compromisso(compromisso) == "ACERTO_APROVADO"

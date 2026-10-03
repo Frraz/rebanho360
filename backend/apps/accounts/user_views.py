@@ -17,7 +17,7 @@ from apps.accounts.forms import (
     UsuarioForm,
 )
 from apps.accounts.models import AccessRequest, AccessRequestStatus, Role
-from apps.accounts.permissions import GerenciaUsuariosMixin
+from apps.accounts.permissions import AprovaAcessosMixin, GerenciaUsuariosMixin
 from apps.audit.models import AuditEvent
 from apps.core.exceptions import BusinessError
 from apps.core.request_context import client_ip
@@ -471,7 +471,7 @@ class RedefinirSenhaView(AcaoUsuarioView):
 
 
 # --------------------------------------------------------------------------
-# Solicitações de acesso (administrador)
+# Solicitações de acesso (administrador e gestor)
 # --------------------------------------------------------------------------
 
 SITUACOES = (
@@ -482,7 +482,7 @@ SITUACOES = (
 )
 
 
-class SolicitacaoListView(GerenciaUsuariosMixin, View):
+class SolicitacaoListView(AprovaAcessosMixin, View):
     por_pagina = 25
 
     def get(self, request):
@@ -506,7 +506,7 @@ class SolicitacaoListView(GerenciaUsuariosMixin, View):
         )
 
 
-class SolicitacaoDecisaoBase(GerenciaUsuariosMixin, View):
+class SolicitacaoDecisaoBase(AprovaAcessosMixin, View):
     def get_solicitacao(self, pk) -> AccessRequest:
         return get_object_or_404(AccessRequest, pk=pk)
 
@@ -536,14 +536,18 @@ class AprovarSolicitacaoView(SolicitacaoDecisaoBase):
         if solicitacao.status != AccessRequestStatus.PENDENTE:
             return self.ja_decidida(request, solicitacao)
         return self._render(
-            request, solicitacao, UsuarioForm(modo="aprovar", solicitacao=solicitacao)
+            request,
+            solicitacao,
+            UsuarioForm(modo="aprovar", solicitacao=solicitacao, ator=request.user),
         )
 
     def post(self, request, pk):
         solicitacao = self.get_solicitacao(pk)
         if solicitacao.status != AccessRequestStatus.PENDENTE:
             return self.ja_decidida(request, solicitacao)
-        form = UsuarioForm(request.POST, modo="aprovar", solicitacao=solicitacao)
+        form = UsuarioForm(
+            request.POST, modo="aprovar", solicitacao=solicitacao, ator=request.user
+        )
         if not form.is_valid():
             return self._render(request, solicitacao, form)
         dados = form.cleaned_data

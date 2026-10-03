@@ -13,6 +13,11 @@ urlpatterns = [
         name="2fa_status",
     ),
     path(
+        "2fa/adiar-lembrete/",
+        views.AdiarLembreteDoSegundoFatorView.as_view(),
+        name="2fa_adiar_lembrete",
+    ),
+    path(
         "2fa/configurar/",
         views.ConfigurarSegundoFatorView.as_view(),
         name="2fa_configurar",

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if ciclo %}Corrigir {{ ciclo.code }}{% else %}Novo ciclo reprodutivo{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% if ciclo %}{% url 'reproduction:detalhe' ciclo.pk %}{% else %}{% url 'reproduction:lista' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if ciclo %}{{ ciclo.code }}{% else %}Reprodução{% endif %}</a>
+    <h1 class="page-title">{% if ciclo %}Corrigir ciclo reprodutivo{% else %}Novo ciclo reprodutivo{% endif %}</h1>
+    <p class="page-subtitle max-w-3xl">Só o que você contou: fêmeas em monta e prenhes. Vazias, fertilidade e desmama são calculadas. Os nascimentos vêm do rebanho.</p>
+  </div>
+</header>
+
+<form method="post" class="card max-w-4xl pb-24 md:pb-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert-danger mb-5" role="alert">{% icon "circle-x" %}<div>{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div></div>{% endif %}
+
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Fazenda e safra</h2></header>
+    <div class="fields">
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.farm %}
+        {% include "partials/_field.html" with field=form.season %}
+        {% include "partials/_field.html" with field=form.breeding_months %}
+      </div>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Rebanho de fêmeas</h2></header>
+    <div class="fields">
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.females_total %}
+        {% include "partials/_field.html" with field=form.females_over_18m %}
+      </div>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Estação de monta</h2><p class="mt-1 text-sm text-gray-500">Fêmeas em monta e prenhes, por categoria.</p></header>
+    <div class="fields">
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.heifers_exposed %}
+        {% include "partials/_field.html" with field=form.heifers_pregnant %}
+        {% include "partials/_field.html" with field=form.challenge_heifers_exposed %}
+        {% include "partials/_field.html" with field=form.challenge_heifers_pregnant %}
+        {% include "partials/_field.html" with field=form.primiparous_exposed %}
+        {% include "partials/_field.html" with field=form.primiparous_pregnant %}
+        {% include "partials/_field.html" with field=form.cows_exposed %}
+        {% include "partials/_field.html" with field=form.cows_pregnant %}
+      </div>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Método e desmama</h2></header>
+    <div class="fields">
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.inseminated %}
+        {% include "partials/_field.html" with field=form.pregnant_by_ai %}
+        {% include "partials/_field.html" with field=form.pregnant_by_bull %}
+        {% include "partials/_field.html" with field=form.weaned_calves %}
+      </div>
+      {% include "partials/_field.html" with field=form.notes %}
+    </div>
+  </section>
+
+  {% if ciclo %}
+  <section class="form-section">
+    <header><h2 class="text-sm font-semibold text-gray-900">Motivo da correção</h2><p class="mt-1 text-sm text-gray-500">Obrigatório. Fica na auditoria.</p></header>
+    <div class="fields">{% include "partials/_field.html" with field=form.edit_reason %}</div>
+  </section>
+  {% endif %}
+
+  <div class="form-actions md:mt-2 md:border-t md:border-gray-200 md:pt-5">
+    <button type="submit" class="btn-primary">{% if ciclo %}Salvar correção{% else %}Registrar ciclo{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

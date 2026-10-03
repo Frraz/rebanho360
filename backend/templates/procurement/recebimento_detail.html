@@ -10,7 +10,6 @@
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% status_badge recebimento.status %}
         {% if recebimento.version > 1 %}<span class="badge-editada">Editado (v{{ recebimento.version }})</span>{% endif %}
-        {% if quebra.acima_do_limite %}<span class="badge-erro">Quebra acima do limite</span>{% endif %}
       </span>
     </h1>
   </div>
@@ -29,6 +28,7 @@
     <div><dt>Viagem</dt><dd><a class="link code" href="{% url 'procurement:viagem_detalhe' viagem.pk %}">{{ viagem.code }}</a></dd></div>
     <div><dt>Compromisso</dt><dd><a class="link code" href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}">{{ compromisso.code }}</a></dd></div>
     <div><dt>Cabeças recebidas</dt><dd>{{ cabecas }}</dd></div>
+    <div><dt>Quebra de viagem</dt><dd class="text-right">{{ recebimento.trip_loss_percent|quebra_percentual }}</dd></div>
     {% if recebimento.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Ocorrências</dt><dd>{{ recebimento.notes }}</dd></div>{% endif %}
   </dl>
 </section>
@@ -56,19 +56,16 @@
 
   <section class="card" aria-labelledby="titulo-quebra">
     <h2 id="titulo-quebra" class="card-title mb-2">Quebra de viagem</h2>
-    {% if quebra %}
     <div class="rows">
+      <div class="total"><span>Quebra informada</span> <span>{{ recebimento.trip_loss_percent|quebra_percentual }}</span></div>
+      {% if quebra and quebra.peso_origem_kg is not None %}
       <div><span>Peso de origem</span> <span>{{ quebra.peso_origem_kg|numero:0 }} kg</span></div>
       <div><span>Peso recebido</span> <span>{{ quebra.peso_recebido_kg|numero:0 }} kg</span></div>
-      <div><span>Quebra</span> <span>{{ quebra.quebra_kg|numero:0 }} kg</span></div>
-      <div class="total"><span>Percentual</span> <span>{{ quebra.quebra_percentual|quebra_percentual }}</span></div>
+      <div><span>Diferença de peso</span> <span>{{ quebra.diferenca_de_peso_kg|numero:0 }} kg</span></div>
+      {% endif %}
     </div>
-    {% if quebra.acima_do_limite %}<p class="alert-warning mt-3">{% icon "triangle-alert" %} Acima do limite de alerta. Confira o peso na origem e na chegada.</p>{% endif %}
-    {% if quebra.parcial %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Só as cargas com peso de origem e peso recebido entram na conta.</p>{% endif %}
-    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} A quebra só mede: não desconta nada do valor dos animais (pendência #23).</p>
-    {% else %}
-    <p class="text-sm text-gray-600">— Falta o peso de origem ou o peso recebido para calcular a quebra.</p>
-    {% endif %}
+    {% if quebra.parcial and quebra.peso_origem_kg is not None %}<p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} Só as cargas com peso de origem e peso recebido entram na soma dos pesos.</p>{% endif %}
+    <p class="mt-3 flex items-start gap-2 text-xs text-gray-500">{% icon "info" "icon-sm mt-px" %} A quebra é digitada por você. O sistema não a calcula, não alerta e não desconta nada do valor dos animais.</p>
   </section>
 </div>
 

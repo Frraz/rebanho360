@@ -67,18 +67,18 @@ Fonte primária. Esta é a operação real.
 | `PESAGENS E CONFERENCIA` | `Weighing` + `WeighingAnimal` | **Importar (5)** |
 | `Planilha9` | — | **Descartar.** Resíduo |
 
-> **Sobre `ADF E COMPRAS`:** controla ADF (autorização de compra) com status `PAGO/PENDENTE` e viagens `CONCLUIDA/PENDENTE`. Está inteiramente zerada — estrutura pronta, nunca usada. Não importar; é evidência de que a operação já sentiu falta de controlar programação e pagamento de compra, o que reforçou a Fase 4 — que agora existe. **A carga histórica não gera título** (já foi paga fora do sistema); o que ainda estiver em aberto se gera sob demanda em *Financeiro → Operações sem título* ([#18](../regras-negocio/99-pendencias.md)).
+> **Sobre `ADF E COMPRAS`:** controla ADF (autorização de compra) com status `PAGO/PENDENTE` e viagens `CONCLUIDA/PENDENTE`. Está inteiramente zerada — estrutura pronta, nunca usada. Não importar; é evidência de que a operação já sentiu falta de controlar programação e pagamento de compra, o que reforçou a Fase 4 — que agora existe. **A carga histórica não gera título** (já foi paga fora do sistema); o que ainda estiver em aberto se gera sob demanda em *Financeiro → Operações sem título* ([#18](../regras-negocio/99-pendencias-resolvidas.md)).
 
 ### Decisões de implementação da Fase 2 (o que a planilha real mostrou)
 
 Estas decisões não estavam na spec original; vieram de rodar o importador contra `CONTROLE PASTO…xlsx`.
 
 - **`SALDO ANTERIOR` é dado, não derivado.** O quadro-resumo das abas de fazenda (linhas 4-16) é "descartar" — menos a coluna `SALDO ANTERIOR` (São Francisco: 552 + 171 + 780 = 1.503). Ela vira `SALDO_INICIAL`, datado na abertura da safra. Sem ela, mortes e abates deixam o saldo negativo.
-- **`COMPRA` das abas de fazenda não é importada.** A compra entra uma vez, pela aba `COMPRA DE GADO` (importe as compras **antes** das movimentações). As linhas `COMPRA` ficam como "ignoradas", com o motivo. A prévia compara os totais e avisa a diferença ([#10](../regras-negocio/99-pendencias.md)).
+- **`COMPRA` das abas de fazenda não é importada.** A compra entra uma vez, pela aba `COMPRA DE GADO` (importe as compras **antes** das movimentações). As linhas `COMPRA` ficam como "ignoradas", com o motivo. A prévia compara os totais e avisa a diferença ([#10](../regras-negocio/99-pendencias-resolvidas.md)).
 - **A planilha não diz de qual lote saiu cada animal.** Saídas e transferências são debitadas de um lote "saldo anterior" por fazenda, criado na importação. A prévia simula o saldo e marca como erro, com a mensagem específica, a saída que deixaria o saldo negativo.
 - **Linha de custo com valor R$ 0,00 existe** (a "COMISSÃO CORRETOR" da linha 17) — o modelo exige valor > 0. Fica pendente; o usuário corrige o valor ou **ignora a linha**. Das 235 linhas reais, 234 viram lançamento; o total continua R$ 1.046.907,76.
-- **Prévia real de CUSTOS:** 128 prontas, 106 sem centro (R$ 411.132,64), 1 de valor zero — e, dentro das 106, 30 com ano digitado errado ([#11](../regras-negocio/99-pendencias.md)).
-- **Os −140** são 2 linhas `TRANSF. S` na aba `GOIANO`, sem `TRANSF. E` ([#2](../regras-negocio/99-pendencias.md)). Pareamento por data + categoria + quantidade, em abas diferentes; o que sobra é pendência — *ignorar* ou *definir origem e destino*.
+- **Prévia real de CUSTOS:** 128 prontas, 106 sem centro (R$ 411.132,64), 1 de valor zero — e, dentro das 106, 30 com ano digitado errado ([#11](../regras-negocio/99-pendencias-resolvidas.md)).
+- **Os −140** são 2 linhas `TRANSF. S` na aba `GOIANO`, sem `TRANSF. E` ([#2](../regras-negocio/99-pendencias-resolvidas.md)). Pareamento por data + categoria + quantidade, em abas diferentes; o que sobra é pendência — *ignorar* ou *definir origem e destino*.
 - **Serial de data:** `45840` = **2025-07-02** (a doc dizia 07-01). Origem 1899-12-30 está certa.
 - **Classe padrão:** 156 lançamentos vêm sem classe, e ela é obrigatória. A importação exige que o usuário **escolha** a classe padrão (e o lote guarda a escolha); sem escolher, essas linhas ficam pendentes. Nada é assumido em silêncio.
 - **`MÉDIA/CAB`, `MÊS` e `PESO MÉDIO` não são lidos.** O `ANO` é lido só para apontar data suspeita.
@@ -215,6 +215,6 @@ A importação só é aceita se estes números baterem:
 | Categorias animais | 11 |
 | Transferências não pareadas | listadas como pendência, **nunca importadas em silêncio** |
 
-Todos conferidos contra a planilha em 30/09/2026. Dois números dependem de decisão do produtor e **divergem de propósito** até lá: o saldo de São Francisco (2.080 contra 1.954 — [#10](../regras-negocio/99-pendencias.md)) e as transferências não pareadas (2 — [#2](../regras-negocio/99-pendencias.md)).
+Todos conferidos contra a planilha em 30/09/2026. Dois números dependem de decisão do produtor e **divergem de propósito** até lá: o saldo de São Francisco (2.080 contra 1.954 — [#10](../regras-negocio/99-pendencias-resolvidas.md)) e as transferências não pareadas (2 — [#2](../regras-negocio/99-pendencias-resolvidas.md)).
 
 Comando `python manage.py conferir_importacao` roda e imprime a tabela comparativa (16 verificações); sai com erro se qualquer número divergir. Ordem da carga: custos → compras → movimentações → **vendas** → **pesagens**.

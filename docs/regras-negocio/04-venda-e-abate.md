@@ -143,7 +143,7 @@ O que a spec acima não cobria e a planilha real obrigou a decidir (todas revers
 - **A venda pode adotar uma saída que já está no razão.** A aba da fazenda registra o abate como movimento e a aba `VENDAS` o registra como venda: são a *mesma* saída. `vincular_a_saida_existente` faz a venda ser o documento de origem do movimento, **sem debitar de novo** e sem mexer na data nem no peso dele — a diferença é aviso (#12). Só vale para venda em rascunho e movimento confirmado, de saída, de mesma fazenda, lote, categoria e quantidade, que ninguém reivindicou.
 - **Peso na venda × peso no razão:** a venda guarda o peso da aba `VENDAS` (é o documento comercial); o movimento mantém o dele; a tela da venda avisa quando diferem. Corrigir a venda depois sincroniza o movimento com ela.
 - **Nada depende de uma venda além do pagamento (Fase 4).** Devolver os animais ao lote só *acrescenta* saldo na data original: não há saldo posterior que possa ficar negativo. O "lote já usado em algo posterior" da F3-04 é pego na **edição** — reaplicar a saída confere o saldo sob trava e recusa com a mensagem específica. O gancho para "pagamento baixado" está em `Sale.bloqueios()` — **ligado na Fase 4**: recebimento baixado do título da venda bloqueia editar e excluir ([07](07-financeiro.md)).
-- **Escopo e papéis:** lançar e confirmar = `ADMIN`, `GESTOR`, `ESCRITORIO`; editar confirmada = os mesmos; excluir confirmada = `GESTOR`, `ADMIN` ([#9](99-pendencias.md)). `CAMPO` não lança venda.
+- **Escopo e papéis:** lançar e confirmar = `ADMIN`, `GESTOR`, `ESCRITORIO`; editar confirmada = os mesmos; excluir confirmada = `GESTOR`, `ADMIN` ([#9](99-pendencias-resolvidas.md)). `CAMPO` não lança venda.
 
 ## Pendências
 

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{% if uso %}Corrigir {{ uso.code }}{% else %}Lançar uso{% endif %} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'infrastructure:maquina_detalhe' maquina.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ maquina.name }}</a>
+    <h1 class="page-title">{% if uso %}Corrigir uso{% else %}Lançar uso da máquina{% endif %}</h1>
+    <p class="page-subtitle">Horas trabalhadas, combustível e manutenção do período. O custo por hora é calculado.</p>
+  </div>
+</header>
+<form method="post" class="card max-w-2xl space-y-5 pb-24 md:pb-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div></div>{% endif %}
+  {% for field in form.visible_fields %}{% include "partials/_field.html" %}{% endfor %}
+  <div class="form-actions md:border-t md:border-gray-200 md:pt-5">
+    <a href="{% url 'infrastructure:maquina_detalhe' maquina.pk %}" class="btn-secondary">Cancelar</a>
+    <button type="submit" class="btn-primary">{% if uso %}Salvar correção{% else %}Lançar uso{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

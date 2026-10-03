@@ -19,7 +19,7 @@ from apps.herd.permissions import tem_acesso_de_escrita_a_fazenda
 from apps.organizations.models import Season, SeasonStatus
 from apps.partners.models import PartnerRoleChoice
 from apps.procurement import selectors
-from apps.procurement.codes import proximo_codigo
+from apps.procurement.codes import codigo_da_etapa
 from apps.procurement.commitments import (
     bloqueio_do_acerto_aprovado,
     exigir_acerto_aberto,
@@ -37,11 +37,14 @@ CAMPOS_EDITAVEIS = (
     "pickup_date",
     "carrier",
     "driver_name",
+    "vehicle",
     "vehicle_plate",
+    "adf_number",
     "distance_km",
     "freight_criterion",
     "freight_rate",
     "freight_actual",
+    "freight_due_date",
     "notes",
 )
 
@@ -237,6 +240,8 @@ def criar_viagem(
     exigir_acerto_aberto(compromisso, "lançar uma viagem")
     dados = {campo: dados.get(campo) for campo in CAMPOS_EDITAVEIS} | {
         "driver_name": dados.get("driver_name") or "",
+        "vehicle": dados.get("vehicle") or "",
+        "adf_number": (dados.get("adf_number") or "").strip(),
         "vehicle_plate": (dados.get("vehicle_plate") or "").upper(),
         "freight_criterion": dados.get("freight_criterion") or "",
         "notes": dados.get("notes") or "",
@@ -247,7 +252,9 @@ def criar_viagem(
 
     season = Season.objects.select_for_update().get(pk=compromisso.season_id)
     viagem = Trip(**dados, commitment=compromisso, created_by=usuario)
-    viagem.code = proximo_codigo(Trip, "VG", season)
+    viagem.code = codigo_da_etapa(
+        Trip, compromisso=compromisso, sufixo="V", legado="VG", season=season
+    )
     viagem.save()
     _sincronizar_cargas(viagem, cargas, usuario=usuario)
     return reversible.confirmar(viagem, usuario=usuario)
@@ -265,6 +272,7 @@ def editar_viagem(
         campo: dados.get(campo, getattr(viagem, campo)) for campo in CAMPOS_EDITAVEIS
     }
     novos["vehicle_plate"] = (novos["vehicle_plate"] or "").upper()
+    novos["adf_number"] = (novos.get("adf_number") or "").strip()
     _validar_viagem(novos, viagem.commitment, usuario=usuario)
     viagem = reversible.editar(viagem, novos, usuario=usuario, motivo=motivo)
     if cargas is not None:

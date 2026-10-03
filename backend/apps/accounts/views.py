@@ -47,6 +47,10 @@ class LoginView(auth_views.LoginView):
     def form_valid(self, form):
         username = form.get_user().username
         account_services.limpar_tentativas(username=username, ip_address=self._ip)
+        # As tentativas falhas são contadas sob o texto digitado (usuário ou e-mail).
+        digitado = form.data.get("username", "")
+        if digitado and digitado != username:
+            account_services.limpar_tentativas(username=digitado, ip_address=self._ip)
         response = super().form_valid(form)
 
         user = form.get_user()
@@ -350,6 +354,24 @@ class VerificarSegundoFatorView(LoginRequiredMixin, View):
                 "de novo e gere códigos novos.",
             )
         return redirect(_destino_seguro(request))
+
+
+class AdiarLembreteDoSegundoFatorView(LoginRequiredMixin, View):
+    """ "Agora não" no aviso da tela de Início: o lembrete volta daqui a 14 dias.
+    Só POST (grava), com CSRF."""
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        two_factor.adiar_lembrete(request.user)
+        proximo = request.POST.get("next", "")
+        if not url_has_allowed_host_and_scheme(
+            proximo,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            proximo = reverse("dashboards:inicio")
+        return redirect(proximo)
 
 
 class StatusSegundoFatorView(LoginRequiredMixin, View):

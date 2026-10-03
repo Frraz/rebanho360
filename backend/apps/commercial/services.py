@@ -5,14 +5,24 @@ from django.db import transaction
 
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
-from apps.commercial.permissions import pode_gerenciar_o_comercial
+from apps.commercial.permissions import (
+    pode_cadastrar_condicoes,
+    pode_gerenciar_o_comercial,
+)
 from apps.core.exceptions import BusinessError
 from apps.core.serialization import diff_fields, snapshot
 
 
 @transaction.atomic
 def salvar_cadastro(instancia, *, usuario, criando: bool):
-    if not pode_gerenciar_o_comercial(usuario):
+    from apps.commercial.models import PaymentCondition
+
+    permitido = (
+        pode_cadastrar_condicoes
+        if isinstance(instancia, PaymentCondition)
+        else pode_gerenciar_o_comercial
+    )
+    if not permitido(usuario):
         raise BusinessError("Você não tem permissão para alterar o cadastro comercial.")
     antes = None if criando else snapshot(type(instancia).objects.get(pk=instancia.pk))
     instancia.save()

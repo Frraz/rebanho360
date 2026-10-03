@@ -39,6 +39,21 @@ urlpatterns = [
         views.ComissaoDefinirView.as_view(),
         name="comissao_definir",
     ),
+    path(
+        "<int:pk>/comissao/<int:comissao_id>/retirar/",
+        views.CompradorRetirarView.as_view(),
+        name="comprador_retirar",
+    ),
+    path(
+        "<int:pk>/encerrar/",
+        views.OperacaoEncerrarView.as_view(),
+        name="operacao_encerrar",
+    ),
+    path(
+        "<int:pk>/reabrir-operacao/",
+        views.OperacaoReabrirView.as_view(),
+        name="operacao_reabrir",
+    ),
     path("<int:pk>/viagens/nova/", views.ViagemNovaView.as_view(), name="viagem_nova"),
     path("<int:pk>/acerto/novo/", views.AcertoNovoView.as_view(), name="acerto_novo"),
     # Item e romaneio
@@ -93,6 +108,11 @@ urlpatterns = [
         "acertos/<int:pk>/linhas/",
         views.AcertoLinhasView.as_view(),
         name="acerto_linhas",
+    ),
+    path(
+        "acertos/<int:pk>/distribuicao/",
+        views.AcertoDistribuicaoView.as_view(),
+        name="acerto_distribuicao",
     ),
     path(
         "acertos/<int:pk>/notas/", views.AcertoNotasView.as_view(), name="acerto_notas"

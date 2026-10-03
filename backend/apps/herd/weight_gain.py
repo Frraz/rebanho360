@@ -130,11 +130,33 @@ def gmd_do_ultimo_trecho(lot) -> Decimal | None:
     return trechos[-1].gmd if trechos else None
 
 
+def rendimento_de_entrada_do_lote(lot) -> Decimal | None:
+    """O rendimento estimado de entrada que o usuário **informou nas compras** do
+    lote (cliente, 2026-10-03, #15a): média ponderada pelas cabeças. `None` se
+    nenhuma compra o informou — o sistema não escolhe um valor."""
+    from apps.purchases.models import Purchase
+
+    compras = [
+        c
+        for c in Purchase.objects.filter(lot=lot, status=Status.CONFIRMADA)
+        if c.entry_yield_percent is not None
+    ]
+    cabecas = sum(c.head_count for c in compras)
+    if not cabecas:
+        return None
+    return sum(
+        (c.entry_yield_percent * c.head_count for c in compras), Decimal("0")
+    ) / (cabecas)
+
+
 def desempenho_do_lote(lot, *, rendimento_entrada=None) -> DesempenhoDoLote:
-    """GMD e @ produzida do lote. `rendimento_entrada` em % (48 = 48%),
-    opcional: sem ele a @ produzida é `None`, com o motivo."""
+    """GMD e @ produzida do lote. `rendimento_entrada` em % (48 = 48%): o que
+    vem na chamada vale; sem ele, o informado nas compras do lote; sem nenhum,
+    a @ produzida é `None`, com o motivo."""
     pontos = pontos_de_peso(lot)
     motivos: list[str] = []
+    if rendimento_entrada is None:
+        rendimento_entrada = rendimento_de_entrada_do_lote(lot)
 
     gmd = dias = ganho = primeiro = ultimo = None
     desde_a_entrada = False

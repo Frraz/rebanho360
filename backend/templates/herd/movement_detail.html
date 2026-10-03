@@ -46,6 +46,7 @@
     {% if movimento.total_weight_kg %}<div><dt>Peso total</dt><dd>{{ movimento.total_weight_kg }} kg</dd></div>{% endif %}
     {% if movimento.origin_farm %}<div class="col-span-2"><dt>Origem</dt><dd>{{ movimento.origin_farm.name }} <span class="text-gray-500">· {{ movimento.origin_lot }} · {{ movimento.origin_category }}</span></dd></div>{% endif %}
     {% if movimento.destination_farm %}<div class="col-span-2"><dt>Destino</dt><dd>{{ movimento.destination_farm.name }} <span class="text-gray-500">· {{ movimento.destination_lot }} · {{ movimento.destination_category }}</span></dd></div>{% endif %}
+    {% if movimento.death_cause %}<div><dt>Causa da morte</dt><dd>{{ movimento.get_death_cause_display }}</dd></div>{% endif %}
     {% if movimento.reason %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Motivo</dt><dd>"{{ movimento.reason }}"</dd></div>{% endif %}
   </dl>
 </section>

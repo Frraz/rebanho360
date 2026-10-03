@@ -23,10 +23,18 @@
       {% include "partials/_field.html" with field=form.date %}
       {% include "partials/_field.html" with field=form.seller %}
       {% include "partials/_field.html" with field=form.destination_farm %}
-      {% include "partials/_field.html" with field=form.commissioned %}
-      {% include "partials/_field.html" with field=form.second_buyer %}
       {% include "partials/_field.html" with field=form.origin_property %}
       {% include "partials/_field.html" with field=form.origin_city %}
+    </div>
+  </section>
+
+  <section class="form-section">
+    <header>
+      <h2 class="text-sm font-semibold text-gray-900">Compradores e comissão</h2>
+      <p class="mt-1 text-sm text-gray-500">O comprador é o comissionado. Pode haver mais de um: cada um tem a sua comissão, informada aqui. O primeiro é o principal.</p>
+    </header>
+    <div class="fields">
+      {% include "procurement/_linhas.html" with formset=compradores rotulo="Comprador" %}
     </div>
   </section>
 
@@ -42,7 +50,10 @@
         {% include "partials/_field.html" with field=form.trucks %}
         {% include "partials/_field.html" with field=form.distance_km %}
       </div>
-      {% include "partials/_field.html" with field=form.payment_days %}
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "partials/_field.html" with field=form.payment_condition %}
+        {% include "partials/_field.html" with field=form.payment_days %}
+      </div>
     </div>
   </section>
 
@@ -78,7 +89,7 @@
     <button type="submit" class="btn-primary">Salvar correção</button>
     {% else %}
     <button type="submit" name="acao" value="rascunho" class="btn-secondary">Salvar em negociação</button>
-    <button type="submit" name="acao" value="aprovar" class="btn-primary">Aprovar compromisso</button>
+    {% if pode_aprovar %}<button type="submit" name="acao" value="aprovar" class="btn-primary">Aprovar compromisso</button>{% endif %}
     {% endif %}
   </div>
 </form>

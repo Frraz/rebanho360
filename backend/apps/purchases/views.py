@@ -43,7 +43,9 @@ def _initial_da_compra(compra: Purchase) -> dict:
         "commission_value": compra.commission_value,
         "tax_value": compra.tax_value,
         "lot": compra.lot_id,
+        "entry_yield_percent": compra.entry_yield_percent,
         "payment_days": compra.payment_days,
+        "payment_condition": compra.payment_condition_id,
         "partnership": compra.partnership,
         "notes": compra.notes,
     }

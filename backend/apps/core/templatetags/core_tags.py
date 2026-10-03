@@ -45,6 +45,13 @@ MENU = (
                     ("organizations:safra_lista", "Safras", "calendar", None),
                     ("properties:fazenda_lista", "Fazendas", "map", None),
                     ("properties:pasto_lista", "Áreas / Pastos", "map-pin", None),
+                    (
+                        "infrastructure:estrutura_lista",
+                        "Infraestrutura",
+                        "maximize-2",
+                        None,
+                    ),
+                    ("infrastructure:maquina_lista", "Máquinas", "settings", None),
                 ),
             ),
             (
@@ -63,6 +70,12 @@ MENU = (
                 "Comercial",
                 (
                     ("commercial:classe_lista", "Classes de carcaça", "beef", None),
+                    (
+                        "commercial:condicao_lista",
+                        "Condições de pagamento",
+                        "clock",
+                        None,
+                    ),
                     ("commercial:tributo_lista", "Tributos e taxas", "receipt", None),
                     (
                         "commercial:comissao_lista",
@@ -122,6 +135,7 @@ MENU = (
                     ("herd:posicao", "Posição", "layers", None),
                     ("herd:movimento_lista", "Movimentações", "arrow-left-right", None),
                     ("herd:pesagem_lista", "Pesagens", "scale", None),
+                    ("reproduction:lista", "Reprodução", "activity", None),
                     ("sales:lista", "Vendas e abates", "trending-up", None),
                     (
                         "herd:conciliacao_transferencias",
@@ -280,9 +294,11 @@ def _pode_ver(user, restricao) -> bool:
     if restricao == "staff":
         return bool(getattr(user, "is_staff", False))
     if restricao == "usuarios":
-        from apps.accounts.permissions import pode_gerenciar_usuarios
+        # O gestor decide pedidos de acesso, então também vê a entrada; a
+        # lista de usuários em si segue do administrador.
+        from apps.accounts.permissions import pode_aprovar_acessos
 
-        return pode_gerenciar_usuarios(user)
+        return pode_aprovar_acessos(user)
     if restricao == "financeiro":
         from apps.finance.permissions import pode_ver_titulos
 
@@ -317,6 +333,10 @@ def _linhas(user, itens):
             url = "#"
         linha = {"url": url, "rotulo": rotulo, "icone": icone, "ativo": False}
         if nome == "accounts:usuarios":
+            from apps.accounts.permissions import pode_gerenciar_usuarios
+
+            if user is not None and not pode_gerenciar_usuarios(user):
+                linha["url"] = reverse("accounts:solicitacoes")
             # Pedidos de acesso esperando decisão: o administrador vê no menu.
             from apps.accounts.selectors import contar_solicitacoes_pendentes
 

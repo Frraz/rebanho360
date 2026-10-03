@@ -69,12 +69,15 @@ def link_de_definir_senha(usuario: User, base_url: str) -> str:
 
 
 def destinatarios_dos_administradores() -> list[str]:
-    from apps.accounts.user_management import administradores_ativos
-
+    """Quem decide pedidos de acesso: administradores **e gestores** ativos com
+    e-mail (cliente, 2026-10-03), mais os endereços fixos do `.env`."""
     emails = list(
-        administradores_ativos()
+        User.objects.filter(
+            is_active=True,
+            deleted_at__isnull=True,
+            role__in=(Role.ADMIN, Role.GESTOR),
+        )
         .exclude(email="")
-        .filter(role=Role.ADMIN)
         .values_list("email", flat=True)
     )
     emails += list(getattr(settings, "ACCESS_REQUEST_NOTIFY_EMAILS", []))

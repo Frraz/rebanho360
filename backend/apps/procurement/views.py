@@ -31,16 +31,21 @@ from apps.procurement import (
     grading,
     receivings,
     selectors,
+    settlement,
     trips,
 )
 from apps.procurement.forms import (
+    AllocationFormSet,
+    BuyerFormSet,
     CommissionForm,
     CommitmentEditForm,
     CommitmentForm,
+    EncerrarOperacaoForm,
     FiscalNoteFormSet,
     GradingLineFormSet,
     ItemFormSet,
     LoadFormSet,
+    ReabrirOperacaoForm,
     ReasonForm,
     ReceivingForm,
     ReceivingLineFormSet,
@@ -48,6 +53,8 @@ from apps.procurement.forms import (
     TripEditForm,
     TripForm,
     cargas_iniciais,
+    compradores_do_formset,
+    compradores_iniciais,
     entradas_do_formset,
     itens_iniciais,
     linhas_de_recebimento_iniciais,
@@ -56,6 +63,7 @@ from apps.procurement.forms import (
     notas_iniciais,
 )
 from apps.procurement.models import (
+    Commission,
     Commitment,
     CommitmentItem,
     PriceBasis,
@@ -64,9 +72,12 @@ from apps.procurement.models import (
     Trip,
 )
 from apps.procurement.permissions import (
+    AprovaOCompromissoMixin,
     LancaNoCicloMixin,
     VeOCicloMixin,
     pode_aprovar_o_acerto,
+    pode_aprovar_o_compromisso,
+    pode_encerrar_a_operacao,
     pode_lancar_no_ciclo,
 )
 from apps.procurement.settlement import calcular_acerto
@@ -315,6 +326,10 @@ class CompromissoListView(VeOCicloMixin, TemplateView):
         return context
 
 
+def _formset_de_compradores(*, initial=None, data=None):
+    return BuyerFormSet(data, initial=initial, prefix="compradores")
+
+
 def _formset_de_itens(request, *, initial=None, data=None):
     return ItemFormSet(
         data,
@@ -324,8 +339,14 @@ def _formset_de_itens(request, *, initial=None, data=None):
     )
 
 
-def _contexto_do_compromisso(form, formset, **extra):
-    return {"form": form, "formset": formset, **extra}
+def _contexto_do_compromisso(form, formset, compradores, *, user=None, **extra):
+    return {
+        "form": form,
+        "formset": formset,
+        "compradores": compradores,
+        "pode_aprovar": user is not None and pode_aprovar_o_compromisso(user),
+        **extra,
+    }
 
 
 class CompromissoNovoView(LancaNoCicloMixin, View):
@@ -339,23 +360,38 @@ class CompromissoNovoView(LancaNoCicloMixin, View):
                 "destination_farm": ctx.current_farm(request, request.user),
             },
         )
-        formset = _formset_de_itens(request, initial=[{}])
+        formset = _formset_de_itens(request, initial=[{"entry_yield_percent": 50}])
+        compradores = _formset_de_compradores(initial=[{}])
         return render(
-            request, self.template_name, _contexto_do_compromisso(form, formset)
+            request,
+            self.template_name,
+            _contexto_do_compromisso(form, formset, compradores, user=request.user),
         )
 
     def post(self, request):
         form = CommitmentForm(request.POST, user=request.user)
         formset = _formset_de_itens(request, data=request.POST)
-        contexto = _contexto_do_compromisso(form, formset)
-        if not (form.is_valid() & formset.is_valid()):
+        compradores = _formset_de_compradores(data=request.POST)
+        contexto = _contexto_do_compromisso(
+            form, formset, compradores, user=request.user
+        )
+        if not (form.is_valid() & formset.is_valid() & compradores.is_valid()):
             return render(request, self.template_name, contexto)
 
         acao = request.POST.get("acao", "rascunho")
+        if acao == "aprovar" and not pode_aprovar_o_compromisso(request.user):
+            # Recusa antes de criar: o rascunho não nasce pela metade.
+            form.add_error(
+                None,
+                "Você não tem permissão para aprovar compromissos. Salve em "
+                "negociação: a aprovação é de administrador ou gestor.",
+            )
+            return render(request, self.template_name, contexto)
         try:
             compromisso = commitments.criar_compromisso(
                 usuario=request.user,
                 itens=entradas_do_formset(formset),
+                compradores=compradores_do_formset(compradores),
                 **form.dados_limpos(),
             )
             if acao == "aprovar":
@@ -386,11 +422,11 @@ class CompromissoEditarView(LancaNoCicloMixin, View):
         return {
             campo: (
                 getattr(c, f"{campo}_id", None)
-                if campo
-                in ("seller", "destination_farm", "commissioned", "second_buyer")
+                if campo in ("seller", "destination_farm", "payment_condition")
                 else getattr(c, campo)
             )
             for campo in commitments.CAMPOS_EDITAVEIS
+            if campo != "commissioned"
         }
 
     def dispatch(self, request, *args, **kwargs):
@@ -407,18 +443,20 @@ class CompromissoEditarView(LancaNoCicloMixin, View):
         c = _compromisso(request, pk)
         form = CommitmentEditForm(user=request.user, initial=self._initial(c))
         formset = _formset_de_itens(request, initial=itens_iniciais(c))
+        compradores = _formset_de_compradores(initial=compradores_iniciais(c) or [{}])
         return render(
             request,
             self.template_name,
-            _contexto_do_compromisso(form, formset, compromisso=c),
+            _contexto_do_compromisso(form, formset, compradores, compromisso=c),
         )
 
     def post(self, request, pk):
         c = _compromisso(request, pk)
         form = CommitmentEditForm(request.POST, user=request.user)
         formset = _formset_de_itens(request, data=request.POST)
-        contexto = _contexto_do_compromisso(form, formset, compromisso=c)
-        if not (form.is_valid() & formset.is_valid()):
+        compradores = _formset_de_compradores(data=request.POST)
+        contexto = _contexto_do_compromisso(form, formset, compradores, compromisso=c)
+        if not (form.is_valid() & formset.is_valid() & compradores.is_valid()):
             return render(request, self.template_name, contexto)
 
         dados = form.dados_limpos()
@@ -433,6 +471,7 @@ class CompromissoEditarView(LancaNoCicloMixin, View):
                 entradas_do_formset(formset),
                 usuario=request.user,
                 motivo=motivo,
+                compradores=compradores_do_formset(compradores),
             )
         except ERROS_DE_NEGOCIO as exc:
             form.add_error(None, str(exc))
@@ -475,19 +514,35 @@ class CompromissoDetalheView(VeOCicloMixin, TemplateView):
             )
         comissao = commitments.comissao_do(c)
         acerto = selectors.acerto_ativo(c)
+        valores_da_comissao = {x.commission.pk: x for x in calculo.comissoes}
+        comissoes = [
+            {
+                "comissao": x,
+                "valor": valores_da_comissao.get(x.pk),
+            }
+            for x in commitments.comissoes_do(c)
+        ]
         aprovado = c.status == Status.CONFIRMADA
         context.update(
             {
                 "compromisso": c,
                 "etapa": selectors.etapa_do_compromisso(c),
+                "situacao_financeira": selectors.situacao_financeira(c),
                 "calculo": calculo,
                 "itens": calculo.itens,
                 "viagens": linhas_de_viagem,
                 "comissao": comissao,
+                "comissoes": comissoes,
                 "acerto": acerto,
+                "pode_encerrar": aprovado
+                and not c.encerrada
+                and acerto is not None
+                and acerto.status == Status.CONFIRMADA
+                and pode_encerrar_a_operacao(user),
+                "pode_reabrir_operacao": c.encerrada and pode_encerrar_a_operacao(user),
                 "pode_lancar": pode_lancar_no_ciclo(user),
                 "pode_aprovar": c.status == Status.RASCUNHO
-                and pode_lancar_no_ciclo(user),
+                and pode_aprovar_o_compromisso(user),
                 "pode_editar": _pode_editar(user, c),
                 "pode_excluir": _pode_excluir(user, c),
                 "pode_restaurar": c.status == Status.EXCLUIDA
@@ -528,7 +583,7 @@ class ContratoGerarView(VeOCicloMixin, View):
         return redirect("documents:detalhe", document_id=documento.document_id)
 
 
-class CompromissoAprovarView(LancaNoCicloMixin, View):
+class CompromissoAprovarView(AprovaOCompromissoMixin, View):
     template_name = "procurement/compromisso_aprovar.html"
 
     def _efeitos(self, c):
@@ -573,6 +628,9 @@ class CompromissoAprovarView(LancaNoCicloMixin, View):
 
 
 class ComissaoDefinirView(LancaNoCicloMixin, View):
+    """Comissão de **um** comprador: corrige a existente (`?comprador=<id>`) ou
+    informa a de um comprador novo."""
+
     template_name = "procurement/comissao_form.html"
 
     def _contexto(self, form, c):
@@ -580,25 +638,33 @@ class ComissaoDefinirView(LancaNoCicloMixin, View):
             "form": form,
             "titulo": f"Comissão de {c.code}",
             "subtitulo": (
-                "Vale só para este compromisso. Corrigir a que já existe exige motivo."
+                "Vale só para este compromisso. Corrigir a que já existe exige "
+                "motivo; escolher outro comprador o acrescenta."
             ),
             "voltar": reverse("procurement:compromisso_detalhe", args=[c.pk]),
             "voltar_rotulo": c.code,
         }
 
+    def _atual(self, request, c):
+        quem = request.GET.get("comprador")
+        comissoes = commitments.comissoes_do(c)
+        if quem and quem.isdigit():
+            return next((x for x in comissoes if x.payee_id == int(quem)), None)
+        return commitments.comissao_do(c) if not quem else None
+
     def get(self, request, pk):
         c = _compromisso(request, pk)
-        atual = commitments.comissao_do(c)
+        atual = self._atual(request, c)
         initial = (
             {
                 "payee": atual.payee_id,
                 "type": atual.type,
-                "base": atual.base,
                 "value": atual.value,
                 "extra_amount": atual.extra_amount,
+                "due_date": atual.due_date,
             }
             if atual
-            else {"payee": c.commissioned_id, "type": "PERCENTUAL", "base": "BRUTO"}
+            else {"payee": None, "type": "PERCENTUAL"}
         )
         return render(
             request,
@@ -616,17 +682,141 @@ class ComissaoDefinirView(LancaNoCicloMixin, View):
             commitments.definir_comissao(
                 c,
                 tipo=d["type"],
-                base=d["base"],
                 valor=d["value"],
                 extra=d["extra_amount"] or 0,
                 favorecido=d["payee"],
+                vencimento=d["due_date"],
                 usuario=request.user,
                 motivo=d["reason"],
             )
         except ERROS_DE_NEGOCIO as exc:
             form.add_error(None, str(exc))
             return render(request, self.template_name, self._contexto(form, c))
-        messages.success(request, "✓ Comissão do compromisso atualizada.")
+        messages.success(request, f"✓ Comissão de {d['payee']} atualizada.")
+        return redirect("procurement:compromisso_detalhe", pk=c.pk)
+
+
+class CompradorRetirarView(LancaNoCicloMixin, View):
+    """Tira um comprador (e a comissão dele) do compromisso aprovado."""
+
+    template_name = "procurement/comissao_form.html"
+
+    def _contexto(self, form, c, comissao):
+        return {
+            "form": form,
+            "titulo": f"Retirar {comissao.payee or 'comprador'} de {c.code}",
+            "subtitulo": "A comissão dele sai do compromisso. Fica na auditoria.",
+            "voltar": reverse("procurement:compromisso_detalhe", args=[c.pk]),
+            "voltar_rotulo": c.code,
+            "salvar": "Retirar comprador",
+        }
+
+    def _comissao(self, c, comissao_id):
+        return get_object_or_404(Commission, pk=comissao_id, commitment=c)
+
+    def get(self, request, pk, comissao_id):
+        c = _compromisso(request, pk)
+        comissao = self._comissao(c, comissao_id)
+        return render(
+            request,
+            self.template_name,
+            self._contexto(ReabrirOperacaoForm(), c, comissao),
+        )
+
+    def post(self, request, pk, comissao_id):
+        c = _compromisso(request, pk)
+        comissao = self._comissao(c, comissao_id)
+        form = ReabrirOperacaoForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request, self.template_name, self._contexto(form, c, comissao)
+            )
+        try:
+            commitments.retirar_comprador(
+                c, comissao, usuario=request.user, motivo=form.cleaned_data["reason"]
+            )
+        except ERROS_DE_NEGOCIO as exc:
+            form.add_error(None, str(exc))
+            return render(
+                request, self.template_name, self._contexto(form, c, comissao)
+            )
+        messages.success(request, "✓ Comprador retirado do compromisso.")
+        return redirect("procurement:compromisso_detalhe", pk=c.pk)
+
+
+class OperacaoEncerrarView(LancaNoCicloMixin, View):
+    """Encerramento **manual** da operação (cliente, 2026-10-03)."""
+
+    template_name = "procurement/comissao_form.html"
+
+    def _contexto(self, form, c):
+        return {
+            "form": form,
+            "titulo": f"Encerrar a operação {c.code}",
+            "subtitulo": (
+                "O sistema não encerra sozinho: quem decide é você. Depois de "
+                "encerrada, a operação não recebe mais lançamentos — dá para "
+                "reabri-la, com motivo."
+            ),
+            "voltar": reverse("procurement:compromisso_detalhe", args=[c.pk]),
+            "voltar_rotulo": c.code,
+            "salvar": "Encerrar operação",
+        }
+
+    def get(self, request, pk):
+        c = _compromisso(request, pk)
+        return render(
+            request, self.template_name, self._contexto(EncerrarOperacaoForm(), c)
+        )
+
+    def post(self, request, pk):
+        c = _compromisso(request, pk)
+        form = EncerrarOperacaoForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, self._contexto(form, c))
+        try:
+            commitments.encerrar_operacao(
+                c, usuario=request.user, observacao=form.cleaned_data["note"]
+            )
+        except ERROS_DE_NEGOCIO as exc:
+            form.add_error(None, str(exc))
+            return render(request, self.template_name, self._contexto(form, c))
+        messages.success(request, f"✓ Operação {c.code} encerrada.")
+        return redirect("procurement:compromisso_detalhe", pk=c.pk)
+
+
+class OperacaoReabrirView(LancaNoCicloMixin, View):
+    template_name = "procurement/comissao_form.html"
+
+    def _contexto(self, form, c):
+        return {
+            "form": form,
+            "titulo": f"Reabrir a operação {c.code}",
+            "subtitulo": "Volta a receber lançamentos. O motivo fica na auditoria.",
+            "voltar": reverse("procurement:compromisso_detalhe", args=[c.pk]),
+            "voltar_rotulo": c.code,
+            "salvar": "Reabrir operação",
+        }
+
+    def get(self, request, pk):
+        c = _compromisso(request, pk)
+        return render(
+            request, self.template_name, self._contexto(ReabrirOperacaoForm(), c)
+        )
+
+    def post(self, request, pk):
+        c = _compromisso(request, pk)
+        form = ReabrirOperacaoForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, self._contexto(form, c))
+        try:
+            commitments.reabrir_operacao(
+                c, usuario=request.user, motivo=form.cleaned_data["reason"]
+            )
+        except ERROS_DE_NEGOCIO as exc:
+            form.add_error(None, str(exc))
+            return render(request, self.template_name, self._contexto(form, c))
+        messages.success(request, f"✓ Operação {c.code} reaberta.")
         return redirect("procurement:compromisso_detalhe", pk=c.pk)
 
 
@@ -726,7 +916,10 @@ class ViagemEditarView(LancaNoCicloMixin, View):
             "pickup_date": v.pickup_date,
             "carrier": v.carrier_id,
             "driver_name": v.driver_name,
+            "vehicle": v.vehicle,
             "vehicle_plate": v.vehicle_plate,
+            "adf_number": v.adf_number,
+            "freight_due_date": v.freight_due_date,
             "distance_km": v.distance_km,
             "freight_criterion": v.freight_criterion,
             "freight_rate": v.freight_rate,
@@ -837,22 +1030,17 @@ class RecebimentoNovoView(LancaNoCicloMixin, View):
                 viagem=v,
                 date=form.cleaned_data["date"],
                 notes=form.cleaned_data["notes"],
+                trip_loss_percent=form.cleaned_data["trip_loss_percent"],
                 linhas=entradas_do_formset(formset),
             )
         except ERROS_DE_NEGOCIO as exc:
             form.add_error(None, str(exc))
             return render(request, self.template_name, contexto)
         cabecas = receivings.cabecas_recebidas(recebimento)
-        quebra = receivings.quebra_da_viagem(recebimento)
-        aviso = (
-            " A quebra de viagem passou do limite: confira o peso."
-            if quebra and quebra.acima_do_limite
-            else ""
-        )
         messages.success(
             request,
-            f"✓ Recebimento {recebimento.code} registrado: {cabecas} cabeças."
-            f"{aviso} Próximo passo: lançar o romaneio e abrir o acerto.",
+            f"✓ Recebimento {recebimento.code} registrado: {cabecas} cabeças. "
+            "Próximo passo: lançar o romaneio e abrir o acerto.",
         )
         return redirect("procurement:recebimento_detalhe", pk=recebimento.pk)
 
@@ -897,7 +1085,13 @@ class RecebimentoEditarView(LancaNoCicloMixin, View):
                 request, "Este recebimento não pode ser editado por você agora."
             )
             return redirect("procurement:recebimento_detalhe", pk=r.pk)
-        form = ReceivingForm(initial={"date": r.date, "notes": r.notes})
+        form = ReceivingForm(
+            initial={
+                "date": r.date,
+                "notes": r.notes,
+                "trip_loss_percent": r.trip_loss_percent,
+            }
+        )
         formset = _formset_de_recebimento(
             r.trip, initial=linhas_de_recebimento_iniciais(r)
         )
@@ -936,6 +1130,7 @@ class RecebimentoEditarView(LancaNoCicloMixin, View):
                 {
                     "date": form.cleaned_data["date"],
                     "notes": form.cleaned_data["notes"],
+                    "trip_loss_percent": form.cleaned_data["trip_loss_percent"],
                 },
                 entradas_do_formset(formset),
                 usuario=request.user,
@@ -1095,6 +1290,9 @@ class AcertoDetalheView(VeOCicloMixin, TemplateView):
                 "linhas": a.lines.select_related("tax_type"),
                 "notas": a.fiscal_notes.all(),
                 "compras": compras,
+                "titulos": a.invoices.filter(status=Status.CONFIRMADA)
+                .select_related("payee")
+                .order_by("due_date", "id"),
                 "pode_editar": em_andamento and pode_lancar_no_ciclo(user),
                 "pode_aprovar": em_andamento and pode_aprovar_o_acerto(user),
                 "pode_reabrir": a.status == Status.CONFIRMADA
@@ -1234,6 +1432,100 @@ class AcertoLinhasView(_LinhasDoAcertoView):
 
     def salvar(self, a, entradas, *, usuario, motivo):
         closing.registrar_linhas(a, entradas, usuario=usuario, motivo=motivo)
+
+
+class AcertoDistribuicaoView(LancaNoCicloMixin, View):
+    """O que cada item recebe do frete, da comissão, dos tributos, dos descontos
+    e dos adiantamentos. **O sistema não rateia sozinho**: a tela vem
+    pré-preenchida com uma sugestão (por cabeça e por valor), e só vale depois
+    que o usuário confere e salva."""
+
+    template_name = "procurement/acerto_distribuicao.html"
+
+    def _recebidos(self, a):
+        calculo = calcular_acerto(a.commitment)
+        return calculo, [i for i in calculo.itens if i.recebido]
+
+    def _iniciais(self, a, calculo, recebidos):
+        salvas = {x.item_id: x for x in a.allocations.all()}
+        if salvas:
+            return [
+                {
+                    "item": i.item.pk,
+                    **{
+                        campo: (
+                            getattr(salvas[i.item.pk], campo)
+                            if i.item.pk in salvas
+                            else 0
+                        )
+                        for campo, _ in settlement.TOTAIS_A_DISTRIBUIR
+                    },
+                }
+                for i in recebidos
+            ], False
+        sugestao = settlement.sugerir_distribuicao(
+            recebidos,
+            frete=calculo.frete,
+            comissao=calculo.comissao_total,
+            tributos=calculo.tributos,
+            descontos=calculo.descontos,
+            abatimentos=calculo.adiantamentos + calculo.creditos,
+        )
+        return [{"item": i.item.pk, **sugestao[i.item.pk]} for i in recebidos], True
+
+    def _contexto(self, a, calculo, recebidos, formset, reason_form, sugerido):
+        totais = [
+            ("Descontos", calculo.descontos),
+            ("Adiantamentos e créditos", calculo.adiantamentos + calculo.creditos),
+            ("Frete", calculo.frete),
+            ("Comissão", calculo.comissao_total),
+            ("Tributos e taxas", calculo.tributos),
+        ]
+        itens = {i.item.pk: i.item for i in recebidos}
+        return {
+            "acerto": a,
+            "compromisso": a.commitment,
+            "formset": formset,
+            "calculo": calculo,
+            "linhas": [(f, itens.get(int(f["item"].value()))) for f in formset],
+            "reason_form": reason_form,
+            "totais": totais,
+            "sugerido": sugerido,
+            "voltar": reverse("procurement:acerto_detalhe", args=[a.pk]),
+            "voltar_rotulo": a.code,
+        }
+
+    def get(self, request, pk):
+        a = _acerto(request, pk)
+        calculo, recebidos = self._recebidos(a)
+        iniciais, sugerido = self._iniciais(a, calculo, recebidos)
+        formset = AllocationFormSet(initial=iniciais, prefix="distribuicao")
+        return render(
+            request,
+            self.template_name,
+            self._contexto(a, calculo, recebidos, formset, ReasonForm(), sugerido),
+        )
+
+    def post(self, request, pk):
+        a = _acerto(request, pk)
+        calculo, recebidos = self._recebidos(a)
+        formset = AllocationFormSet(request.POST, prefix="distribuicao")
+        reason_form = ReasonForm(request.POST)
+        contexto = self._contexto(a, calculo, recebidos, formset, reason_form, False)
+        if not (formset.is_valid() & reason_form.is_valid()):
+            return render(request, self.template_name, contexto)
+        try:
+            closing.registrar_distribuicao(
+                a,
+                [f.cleaned_data for f in formset.forms],
+                usuario=request.user,
+                motivo=reason_form.cleaned_data["reason"],
+            )
+        except ERROS_DE_NEGOCIO as exc:
+            reason_form.add_error(None, str(exc))
+            return render(request, self.template_name, contexto)
+        messages.success(request, "✓ Distribuição entre os itens salva.")
+        return redirect("procurement:acerto_detalhe", pk=a.pk)
 
 
 class AcertoNotasView(_LinhasDoAcertoView):

@@ -167,6 +167,19 @@ class TestSenha:
         assert evento.actor_id == gestor.pk
         assert "outra-senha" not in str(evento.__dict__)
 
+    @pytest.mark.parametrize("nova", ["0000", "1111", "abcde", "qwer"])
+    def test_qualquer_senha_com_4_ou_mais_caracteres_vale(self, cliente, gestor, nova):
+        resposta = self._trocar(cliente, nova=nova)
+        assert resposta.status_code == 302
+        gestor.refresh_from_db()
+        assert gestor.check_password(nova)
+
+    def test_senha_com_menos_de_4_caracteres_e_recusada(self, cliente, gestor):
+        resposta = self._trocar(cliente, nova="123")
+        assert resposta.status_code == 200
+        gestor.refresh_from_db()
+        assert gestor.check_password(SENHA)  # não trocou
+
     def test_senha_atual_errada_reabre_a_conta_com_o_erro(self, cliente, gestor):
         resposta = self._trocar(cliente, antiga="errada-1234567")
         assert resposta.status_code == 200

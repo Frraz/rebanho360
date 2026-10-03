@@ -151,6 +151,7 @@ CONJUNTOS: tuple[Conjunto, ...] = (
     ),
     # ----------------------------------------------------------- Comercial
     Conjunto("classes-de-carcaca", "commercial.CarcassClass", COMERCIAL),
+    Conjunto("condicoes-de-pagamento", "commercial.PaymentCondition", COMERCIAL),
     Conjunto("tributos", "commercial.TaxType", COMERCIAL),
     Conjunto("regras-de-comissao", "commercial.CommissionRule", COMERCIAL),
     # -------------------------------------------------------------- Custos
@@ -284,6 +285,34 @@ CONJUNTOS: tuple[Conjunto, ...] = (
         data="weighing__date",
         pai_excluido="weighing__status",
     ),
+    Conjunto(
+        "estruturas-da-fazenda",
+        "infrastructure.FarmStructure",
+        REBANHO,
+        escopo=("farm",),
+    ),
+    Conjunto(
+        "maquinas",
+        "infrastructure.Machine",
+        REBANHO,
+        escopo=("farm",),
+    ),
+    Conjunto(
+        "uso-das-maquinas",
+        "infrastructure.MachineLog",
+        MOVIMENTACAO,
+        escopo=("machine__farm",),
+        data="date",
+        exclusao="status",
+    ),
+    Conjunto(
+        "ciclos-reprodutivos",
+        "reproduction.BreedingCycle",
+        MOVIMENTACAO,
+        escopo=("farm",),
+        safra="season",
+        exclusao="status",
+    ),
     # ------------------------------------------------------- Ciclo de compra
     Conjunto(
         "compromissos",
@@ -398,6 +427,17 @@ CONJUNTOS: tuple[Conjunto, ...] = (
         data="settlement__date",
         safra="settlement__commitment__season",
         exclusao="linhas",
+        pai_excluido="settlement__status",
+        permitido=pode_ver_o_ciclo,
+    ),
+    Conjunto(
+        "distribuicao-dos-acertos",
+        "procurement.SettlementAllocation",
+        CICLO,
+        rotulo="Distribuição do acerto por item",
+        escopo=("settlement__commitment__destination_farm",),
+        data="settlement__date",
+        safra="settlement__commitment__season",
         pai_excluido="settlement__status",
         permitido=pode_ver_o_ciclo,
     ),

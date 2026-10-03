@@ -45,8 +45,10 @@ def _initial_da_venda(venda: Sale) -> dict:
         "total_weight_kg": venda.total_weight_kg,
         "carcass_weight_kg": venda.carcass_weight_kg,
         "total_value": venda.total_value,
+        "reported_yield_percent": venda.reported_yield_percent,
         "sale_form": venda.sale_form,
         "payment_days": venda.payment_days,
+        "payment_condition": venda.payment_condition_id,
         "partnership": venda.partnership,
         "notes": venda.notes,
     }

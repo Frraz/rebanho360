@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
+from apps.commercial.payment import aplicar_condicao
 from apps.core import reversible
 from apps.core.exceptions import BlockingDependencyError, BusinessError
 from apps.core.formatting import numero_br
@@ -150,6 +151,8 @@ CAMPOS_EDITAVEIS = (
     "total_value",
     "sale_form",
     "payment_days",
+    "payment_condition",
+    "reported_yield_percent",
     "partnership",
     "notes",
 )
@@ -157,9 +160,10 @@ CAMPOS_EDITAVEIS = (
 
 def _completar(venda: Sale, dados: dict) -> dict:
     """Dados novos sobre os atuais: o que não veio, fica."""
-    return {
-        campo: dados.get(campo, getattr(venda, campo)) for campo in CAMPOS_EDITAVEIS
-    }
+    return aplicar_condicao(
+        {campo: dados.get(campo, getattr(venda, campo)) for campo in CAMPOS_EDITAVEIS},
+        atual=venda.payment_condition,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -177,6 +181,7 @@ def criar_venda(*, usuario, **dados) -> Sale:
         "partnership": dados.get("partnership") or "",
         "notes": dados.get("notes") or "",
     }
+    dados = aplicar_condicao(dados)
     season = _validar_dados(dados, usuario=usuario)
     season = Season.objects.select_for_update().get(pk=season.pk)
 

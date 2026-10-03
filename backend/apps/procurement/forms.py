@@ -11,7 +11,12 @@ from decimal import Decimal
 from django import forms
 from django.forms import BaseFormSet, formset_factory
 
-from apps.commercial.models import CarcassClass, TaxType
+from apps.commercial.models import (
+    CarcassClass,
+    CommissionType,
+    PaymentCondition,
+    TaxType,
+)
 from apps.core import context as ctx
 from apps.livestock.models import AnimalCategory, Lot
 from apps.partners.models import Partner, PartnerRoleChoice
@@ -76,27 +81,22 @@ class CommitmentForm(forms.Form):
     destination_farm = forms.ModelChoiceField(
         label="Fazenda de destino", queryset=Partner.objects.none()
     )
-    commissioned = forms.ModelChoiceField(
-        label="Comprador (comissionado)",
-        queryset=Partner.objects.none(),
-        required=False,
-        help_text="Quem negociou e recebe a comissão. A regra vigente é gravada na aprovação.",
-    )
-    second_buyer = forms.ModelChoiceField(
-        label="Comprador adicional",
-        queryset=Partner.objects.none(),
-        required=False,
-        help_text="Só informativo: não divide a comissão.",
-    )
     origin_property = forms.CharField(
         label="Propriedade de origem", max_length=150, required=False
     )
     origin_city = forms.CharField(
         label="Cidade de origem", max_length=100, required=False
     )
+    payment_condition = forms.ModelChoiceField(
+        label="Condição de pagamento",
+        queryset=PaymentCondition.objects.none(),
+        required=False,
+        empty_label="Informar o prazo em dias",
+        help_text="Cadastrada em Comercial. Dá o vencimento dos animais.",
+    )
     payment_days = _inteiro(
         "Prazo de pagamento (dias)",
-        ajuda="Dá o vencimento dos títulos gerados na aprovação do acerto.",
+        ajuda="Só se não escolher uma condição acima.",
     )
     pickup_date = forms.DateField(
         label="Data da retirada",
@@ -121,11 +121,8 @@ class CommitmentForm(forms.Form):
         self.fields["seller"].queryset = _parceiros(
             (PartnerRoleChoice.PRODUTOR, PartnerRoleChoice.FORNECEDOR)
         )
-        self.fields["commissioned"].queryset = _parceiros(
-            (PartnerRoleChoice.COMISSIONADO,)
-        )
-        self.fields["second_buyer"].queryset = _parceiros(
-            (PartnerRoleChoice.COMISSIONADO,)
+        self.fields["payment_condition"].queryset = PaymentCondition.objects.filter(
+            is_active=True
         )
         from apps.properties.models import Farm
 
@@ -135,6 +132,75 @@ class CommitmentForm(forms.Form):
 
     def dados_limpos(self) -> dict:
         return {k: v for k, v in self.cleaned_data.items() if k != "edit_reason"}
+
+
+class BuyerForm(forms.Form):
+    """Um comprador do compromisso, com a comissão dele. Não há limite de
+    compradores: o botão "+ Adicionar comprador" acrescenta linhas."""
+
+    partner = forms.ModelChoiceField(label="Comprador", queryset=Partner.objects.none())
+    type = forms.ChoiceField(
+        label="Comissão",
+        choices=CommissionType.choices,
+        initial=CommissionType.PERCENTUAL,
+    )
+    value = forms.DecimalField(
+        label="Valor",
+        required=False,
+        min_value=Decimal("0"),
+        max_digits=12,
+        decimal_places=4,
+        widget=forms.NumberInput(attrs={"inputmode": "decimal", "step": "0.0001"}),
+        help_text="% sobre o valor bruto dos animais, R$ por cabeça ou R$ direto. "
+        "Em branco: vale a regra cadastrada, gravada na aprovação.",
+    )
+    extra_amount = _decimal("Extra (R$)", ajuda="Somado ao valor, sem regra.")
+    due_date = forms.DateField(
+        label="Vencimento",
+        required=False,
+        widget=ISO_DATE,
+        input_formats=["%Y-%m-%d"],
+        help_text="Próprio da comissão. Vazio = a data do acerto.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["partner"].queryset = _parceiros((PartnerRoleChoice.COMISSIONADO,))
+
+
+BuyerFormSet = formset_factory(
+    BuyerForm, extra=0, can_delete=True, formset=LinhasFormSet
+)
+
+
+def compradores_iniciais(compromisso) -> list[dict]:
+    from apps.procurement.commitments import comissoes_do
+
+    return [
+        {
+            "partner": c.payee_id,
+            "type": c.type,
+            "value": c.value if (c.value or c.extra_amount) else None,
+            "extra_amount": c.extra_amount or None,
+            "due_date": c.due_date,
+        }
+        for c in comissoes_do(compromisso)
+        if c.payee_id
+    ]
+
+
+def compradores_do_formset(formset) -> list[dict]:
+    """Os compradores que ficam, na ordem da tela, no formato do serviço."""
+    return [
+        {
+            "partner": d["partner"],
+            "type": d["type"],
+            "value": d.get("value"),
+            "extra_amount": d.get("extra_amount"),
+            "due_date": d.get("due_date"),
+        }
+        for d in entradas_do_formset(formset)
+    ]
 
 
 class CommitmentEditForm(CommitmentForm):
@@ -178,6 +244,10 @@ class ItemForm(forms.Form):
         empty_value=None,
         required=False,
     )
+    entry_yield_percent = _decimal(
+        "Rendimento estimado de entrada (%)",
+        ajuda="Editável. Cerca de 50% é a referência de uso, não um valor fixo.",
+    )
     lot = forms.ModelChoiceField(
         label="Lote existente",
         queryset=Lot.objects.none(),
@@ -213,6 +283,7 @@ def itens_iniciais(compromisso) -> list[dict]:
             "price_band_5": i.price_band_5,
             "expected_arrobas": i.expected_arrobas,
             "expected_band": i.expected_band,
+            "entry_yield_percent": i.entry_yield_percent,
             "lot": i.lot_id,
             "product_code": i.product_code,
         }
@@ -221,32 +292,29 @@ def itens_iniciais(compromisso) -> list[dict]:
 
 
 class CommissionForm(forms.Form):
-    """Comissão informada neste compromisso, ou correção da gravada."""
+    """Comissão de um comprador, informada neste compromisso — ou correção da
+    gravada. Escolher um comprador que ainda não está no compromisso o acrescenta."""
 
-    payee = forms.ModelChoiceField(
-        label="Favorecido", queryset=Partner.objects.none(), required=False
-    )
-    type = forms.ChoiceField(
-        label="Tipo",
-        choices=[("PERCENTUAL", "Percentual"), ("POR_CABECA", "Valor por cabeça")],
-    )
-    base = forms.ChoiceField(
-        label="Base do percentual",
-        choices=[
-            ("BRUTO", "Valor bruto dos animais"),
-            ("LIQUIDO", "Valor líquido (sem frete e tributos)"),
-        ],
-        help_text="Só vale para percentual. Pendência #4: bruto ou líquido?",
-    )
+    payee = forms.ModelChoiceField(label="Comprador", queryset=Partner.objects.none())
+    type = forms.ChoiceField(label="Tipo", choices=CommissionType.choices)
     value = forms.DecimalField(
-        label="Valor (% ou R$ por cabeça)",
+        label="Valor (%, R$ por cabeça ou R$)",
         min_value=Decimal("0"),
         max_digits=12,
         decimal_places=4,
         widget=forms.NumberInput(attrs={"inputmode": "decimal", "step": "0.0001"}),
+        help_text="Percentual sobre o valor bruto dos animais, valor por cabeça ou "
+        "valor direto em reais.",
     )
     extra_amount = _decimal(
         "Comissão extra (R$)", ajuda="Somada ao valor calculado, sem regra."
+    )
+    due_date = forms.DateField(
+        label="Vencimento",
+        required=False,
+        widget=ISO_DATE,
+        input_formats=["%Y-%m-%d"],
+        help_text="Próprio da comissão. Vazio = a data do acerto.",
     )
     reason = forms.CharField(
         label="Motivo",
@@ -273,11 +341,18 @@ class TripForm(forms.Form):
         label="Transportador", queryset=Partner.objects.none(), required=False
     )
     driver_name = forms.CharField(label="Motorista", max_length=100, required=False)
+    vehicle = forms.CharField(label="Veículo", max_length=100, required=False)
     vehicle_plate = forms.CharField(
         label="Placa",
         max_length=10,
         required=False,
         widget=forms.TextInput(attrs={"autocapitalize": "characters"}),
+    )
+    adf_number = forms.CharField(
+        label="Número do ADF",
+        max_length=40,
+        required=False,
+        help_text="Só o número/código; não precisa anexar o documento.",
     )
     distance_km = _inteiro("Distância (km)")
     freight_criterion = forms.ChoiceField(
@@ -293,6 +368,14 @@ class TripForm(forms.Form):
     freight_actual = _decimal(
         "Frete realizado (R$)",
         ajuda="O que foi cobrado de fato. Sem ele, o acerto usa o previsto.",
+    )
+    freight_due_date = forms.DateField(
+        label="Vencimento do frete",
+        required=False,
+        widget=ISO_DATE,
+        input_formats=["%Y-%m-%d"],
+        help_text="Próprio do frete, independente do vencimento dos animais. "
+        "Vazio = a data do acerto.",
     )
     notes = forms.CharField(
         label="Observações", required=False, widget=forms.Textarea(attrs={"rows": 2})
@@ -349,6 +432,12 @@ def cargas_iniciais(viagem) -> list[dict]:
 class ReceivingForm(forms.Form):
     date = forms.DateField(
         label="Data do recebimento", widget=ISO_DATE, input_formats=["%Y-%m-%d"]
+    )
+    trip_loss_percent = _decimal(
+        "Quebra de viagem (%)",
+        casas="0.01",
+        ajuda="Digitada por você: o sistema não calcula, não alerta e não "
+        "desconta nada do valor dos animais.",
     )
     notes = forms.CharField(
         label="Ocorrências",
@@ -477,11 +566,29 @@ class SettlementLineForm(forms.Form):
         minimo=Decimal("0.01"),
         ajuda="Digitado: não há cálculo.",
     )
+    rate_percent = _decimal(
+        "Alíquota (%)", casas="0.0001", ajuda="Só registro: não calcula nada."
+    )
+    base_amount = _decimal("Base (R$)", ajuda="Só registro: não calcula nada.")
+    payee = forms.ModelChoiceField(
+        label="Favorecido",
+        queryset=Partner.objects.none(),
+        required=False,
+        help_text="Quem recebe o valor. O sistema não presume.",
+    )
+    due_date = forms.DateField(
+        label="Vencimento",
+        required=False,
+        widget=ISO_DATE,
+        input_formats=["%Y-%m-%d"],
+        help_text="Vazio = a data do acerto.",
+    )
     reference = forms.CharField(label="Documento", max_length=60, required=False)
     notes = forms.CharField(label="Observação", max_length=200, required=False)
 
     def __init__(self, *args, tipos=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["payee"].queryset = Partner.objects.filter(is_active=True)
         if tipos is not None:
             self.fields["tax_type"].queryset = tipos
             self.fields["tax_type"].label_from_instance = lambda t: (
@@ -500,11 +607,29 @@ def linhas_do_acerto_iniciais(acerto) -> list[dict]:
             "id": linha.pk,
             "tax_type": linha.tax_type_id,
             "amount": linha.amount,
+            "rate_percent": linha.rate_percent,
+            "base_amount": linha.base_amount,
+            "payee": linha.payee_id,
+            "due_date": linha.due_date,
             "reference": linha.reference,
             "notes": linha.notes,
         }
         for linha in acerto.lines.select_related("tax_type")
     ]
+
+
+class AllocationForm(forms.Form):
+    """O que um item recebe de cada total do acerto — informado pelo usuário."""
+
+    item = forms.IntegerField(widget=forms.HiddenInput)
+    discount_value = _decimal("Descontos (R$)")
+    abatement_value = _decimal("Adiantamentos e créditos (R$)")
+    freight_value = _decimal("Frete (R$)")
+    commission_value = _decimal("Comissão (R$)")
+    tax_value = _decimal("Tributos e taxas (R$)")
+
+
+AllocationFormSet = formset_factory(AllocationForm, extra=0)
 
 
 class FiscalNoteForm(forms.Form):
@@ -564,3 +689,21 @@ def entradas_do_formset(formset, *, descartar=("DELETE",)) -> list[dict]:
         dados["id"] = dados.get("id") or None
         entradas.append(dados)
     return entradas
+
+
+class EncerrarOperacaoForm(forms.Form):
+    note = forms.CharField(
+        label="Observação",
+        required=False,
+        max_length=300,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Opcional. Fica registrada com a data e quem encerrou.",
+    )
+
+
+class ReabrirOperacaoForm(forms.Form):
+    reason = forms.CharField(
+        label="Motivo",
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Obrigatório. Fica na auditoria.",
+    )

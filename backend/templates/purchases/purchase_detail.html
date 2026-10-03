@@ -34,6 +34,8 @@
     <div><dt>Cabeças</dt><dd>{{ compra.head_count }}</dd></div>
     <div><dt>Peso</dt><dd>{% if compra.total_weight_kg %}{{ compra.total_weight_kg|numero:0 }} kg <span class="text-gray-500">(médio {{ custo.peso_medio_kg|numero:1 }} kg)</span>{% else %}sem peso na entrada{% endif %}</dd></div>
     {% if compra.lot %}<div><dt>Lote</dt><dd><a class="link" href="{% url 'livestock:lote_detalhe' compra.lot.pk %}">{{ compra.lot.code }}</a></dd></div>{% endif %}
+    <div><dt>Condição de pagamento</dt><dd>{% if compra.payment_condition %}{{ compra.payment_condition.name }}{% elif compra.payment_days %}{{ compra.payment_days }} dias{% else %}à vista{% endif %}</dd></div>
+    {% if compra.entry_yield_percent %}<div><dt>Rendimento de entrada (estimado)</dt><dd>{{ compra.entry_yield_percent|numero:2 }}%</dd></div>{% endif %}
     {% if compra.partnership %}<div><dt>Parceria</dt><dd>{{ compra.partnership }}</dd></div>{% endif %}
     {% if compra.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ compra.notes }}</dd></div>{% endif %}
   </dl>

@@ -48,3 +48,6 @@ backups/
 # da pasta é versionado, para explicar o que ela guarda.
 docs/fontes/*
 !docs/fontes/README.md
+
+# Trava do atualizar.sh
+.atualizar.lock

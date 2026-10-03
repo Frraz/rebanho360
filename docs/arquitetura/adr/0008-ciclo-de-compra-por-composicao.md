@@ -38,7 +38,7 @@ Ao desenhar, três pontos do texto original não fecham com o código que existe
 
 **Estado `ACERTO_FECHADO` separado do bloqueio.** Duplica o que `bloqueios()` já faz para pagamento baixado e safra encerrada, e abre um segundo caminho de "exceção" ao "tudo é editável".
 
-**Entrada no rebanho a cada recebimento.** O texto funcional diz que "o recebimento alimenta o rebanho". O roadmap diz que `CONFIRMADA` vem depois do acerto. As duas frases só convivem com um intermediário (compra provisória por viagem), que reintroduz a compra de uma categoria só e o rateio por viagem. Fica como a pendência [#24](../../regras-negocio/99-pendencias.md): construído como o roadmap manda, reversível.
+**Entrada no rebanho a cada recebimento.** O texto funcional diz que "o recebimento alimenta o rebanho". O roadmap diz que `CONFIRMADA` vem depois do acerto. As duas frases só convivem com um intermediário (compra provisória por viagem), que reintroduz a compra de uma categoria só e o rateio por viagem. Fica como a pendência [#24](../../regras-negocio/99-pendencias-resolvidas.md): construído como o roadmap manda, reversível.
 
 **Tabela de alíquotas por tributo, com vigência.** Tecnicamente simples, e é exatamente o que o roadmap proíbe fazer sem o contador: regra tributária implementada por dedução.
 
@@ -52,4 +52,4 @@ Ao desenhar, três pontos do texto original não fecham com o código que existe
 
 *Uma compra nascida do acerto não se corrige direto.* Edição e exclusão diretas são recusadas com o caminho (a reabertura do acerto), como o movimento gerado por compra não se corrige direto.
 
-*Rateio de frete, comissão e tributos entre itens* é regra inventada ([#22](../../regras-negocio/99-pendencias.md)): por cabeça recebida, isolada em uma função.
+*Rateio de frete, comissão e tributos entre itens* é regra inventada ([#22](../../regras-negocio/99-pendencias-resolvidas.md)): por cabeça recebida, isolada em uma função.

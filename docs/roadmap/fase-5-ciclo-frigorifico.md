@@ -14,7 +14,7 @@
 |---|---|
 | **Gatilho** (comprar para terceiros, ser comprador comissionado ou vender por faixa) | ➖ superado: o ciclo de compra é escopo principal, não opção |
 | **Regra tributária confirmada com o contador** | ❌ não confirmada. **Nenhuma alíquota, base ou fórmula foi implementada**: tributos são valores digitados ([#21](../regras-negocio/99-pendencias.md)) |
-| **Pendências #4 e #8** | ❌ abertas. Construído com padrão reversível: comissão configurável com snapshot ([#4](../regras-negocio/99-pendencias.md)) e faixa só na compra ([#8](../regras-negocio/99-pendencias.md)) |
+| **Pendências #4 e #8** | ❌ abertas. Construído com padrão reversível: comissão configurável com snapshot ([#4](../regras-negocio/99-pendencias-resolvidas.md)) e faixa só na compra ([#8](../regras-negocio/99-pendencias-resolvidas.md)) |
 | **Reler os 5 relatórios legados** | ✅ relidos em 2026-10-02; são a especificação dos relatórios F5-14 a F5-17 |
 
 **Antes de usar de verdade:** responder #21 com o contador, e #24 e #25 com o produtor. As demais pendências (#20 a #26) têm padrão reversível e podem esperar.
@@ -82,7 +82,7 @@ Registrar #20 a #26, o ADR do desenho por composição e a regra [08](../regras-
 **Pronto quando:** não há campo de percentual nem de base de cálculo em `TaxType`, e há teste que trava isso.
 
 ### F5-04 · `commercial` — Regra de comissão e `CommissionService` — ✅ feita
-**Depende de:** — · **Estimativa:** 7h · **Spec:** [#4](../regras-negocio/99-pendencias.md)
+**Depende de:** — · **Estimativa:** 7h · **Spec:** [#4](../regras-negocio/99-pendencias-resolvidas.md)
 
 `CommissionRule` (comissionado, categoria, tipo, base, valor, vigência). `escolher_regra()` pela mais específica vigente. `calcular_comissao()` isolada em `apps/commercial/commission.py`: percentual sobre bruto **ou** líquido, ou valor por cabeça. `Decimal`, `ROUND_HALF_UP` só no fim, divisor zero devolve `None`.
 
@@ -110,7 +110,7 @@ Documento de compromisso (referência: `02_Contrato_Compra_Animais`), pelo `Gene
 **Pronto quando:** o frete previsto de cada critério confere com conta feita à mão, e embarcar acima do compromisso avisa.
 
 ### F5-08 · Recebimento e quebra de viagem — ✅ feita
-**Depende de:** F5-07 · **Estimativa:** 9h · **Spec:** [#23](../regras-negocio/99-pendencias.md)
+**Depende de:** F5-07 · **Estimativa:** 9h · **Spec:** [#23](../regras-negocio/99-pendencias-resolvidas.md)
 
 `Receiving` por viagem, com cabeças e peso recebidos, categoria recebida e ocorrências. **Quebra** = `(origem − recebido) ÷ origem`, calculada, com alerta acima do limite. Diferença de quantidade e de peso sempre visível.
 

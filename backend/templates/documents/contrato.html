@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-{# Contrato de compra para imprimir. CSS inline: o WeasyPrint não carrega o Tailwind. Sem dado bancário. #}
+{# Contrato de compra para imprimir. CSS inline: o WeasyPrint não carrega o Tailwind. Dado bancário só quando quem gerou pode vê-lo. #}
 {% load core_tags %}
 <html lang="pt-br">
 <head>
@@ -53,15 +53,27 @@
   {% if compromisso.seller.phone %}<dt>Telefone</dt><dd>{{ compromisso.seller.phone }}</dd>{% endif %}
 </dl>
 
+{% if com_dado_bancario %}
+<h2>Dados bancários do produtor</h2>
+{% if conta %}
+<dl>
+  <dt>Banco</dt><dd>{{ conta.bank_name|default:conta.bank_code|default:"—" }}</dd>
+  <dt>Agência</dt><dd>{{ conta.branch|default:"—" }}</dd>
+  <dt>Número da conta</dt><dd>{{ conta.account|default:"—" }}</dd>
+</dl>
+{% else %}
+<p class="nota">O produtor não tem conta bancária cadastrada.</p>
+{% endif %}
+{% endif %}
+
 <h2>Condições</h2>
 <dl>
   <dt>Data do movimento</dt><dd>{{ compromisso.date|date:"d/m/Y" }}</dd>
   <dt>Data da retirada</dt><dd>{% if compromisso.pickup_date %}{{ compromisso.pickup_date|date:"d/m/Y" }}{% else %}a combinar{% endif %}</dd>
   <dt>Data prevista do abate</dt><dd>{% if compromisso.slaughter_date %}{{ compromisso.slaughter_date|date:"d/m/Y" }}{% else %}a combinar{% endif %}</dd>
-  <dt>Condição de pagamento</dt><dd>{% if compromisso.payment_days %}{{ compromisso.payment_days }} dias{% else %}à vista{% endif %}</dd>
+  <dt>Condição de pagamento</dt><dd>{{ condicao }}</dd>
   <dt>Fazenda de destino</dt><dd>{{ compromisso.destination_farm.name }}</dd>
-  {% if compromisso.commissioned %}<dt>Comprador</dt><dd>{{ compromisso.commissioned.name }}</dd>{% endif %}
-  {% if compromisso.second_buyer %}<dt>Comprador adicional</dt><dd>{{ compromisso.second_buyer.name }}</dd>{% endif %}
+  {% for x in compradores %}{% if x.payee %}<dt>{% if forloop.first %}Comprador{% else %}Comprador {{ forloop.counter }}{% endif %}</dt><dd>{{ x.payee.name }}</dd>{% endif %}{% endfor %}
   {% if compromisso.distance_km %}<dt>Distância</dt><dd>{{ compromisso.distance_km }} km</dd>{% endif %}
   {% if compromisso.trucks %}<dt>Caminhões previstos</dt><dd>{{ compromisso.trucks }}</dd>{% endif %}
 </dl>

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Reprodução · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1 class="page-title">Reprodução</h1>
+    <p class="page-subtitle max-w-3xl">Um ciclo por fazenda e safra de nascimento: quantas fêmeas entraram na monta, quantas ficaram prenhes e quantos bezerros foram desmamados. Os índices são calculados dos números que você informa.</p>
+  </div>
+  <div class="page-actions">
+    {% if pode_lancar %}<a href="{% url 'reproduction:novo' %}" class="btn-primary">{% icon "plus" %} Novo ciclo</a>{% endif %}
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if linhas %}
+  <table class="table table-stack">
+    <thead>
+      <tr><th scope="col">Ciclo</th><th scope="col">Fazenda</th><th scope="col">Safra</th><th scope="col" class="num">Em monta</th><th scope="col" class="num">Prenhes</th><th scope="col" class="num">Fertilidade</th><th scope="col" class="num">Nascidos</th><th scope="col" class="num">Desmama</th><th scope="col">Situação</th></tr>
+    </thead>
+    <tbody>
+      {% for l in linhas %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'reproduction:detalhe' l.ciclo.pk %}" class="row-link code">{{ l.ciclo.code }}</a></td>
+        <td data-label="Fazenda">{{ l.ciclo.farm.name }}</td>
+        <td data-label="Safra">{{ l.ciclo.season.name }}</td>
+        <td data-label="Em monta" class="num">{{ l.ind.expostas }}</td>
+        <td data-label="Prenhes" class="num">{{ l.ind.prenhes }}</td>
+        <td data-label="Fertilidade" class="num nowrap">{% if l.ind.fertilidade_geral_pct is None %}—{% else %}{{ l.ind.fertilidade_geral_pct|numero:1 }}%{% endif %}</td>
+        <td data-label="Nascidos" class="num">{{ l.ind.nascidos }}</td>
+        <td data-label="Desmama" class="num nowrap">{% if l.ind.desmama_pct is None %}—{% else %}{{ l.ind.desmama_pct|numero:1 }}%{% endif %}</td>
+        <td data-label="Situação" class="cell-status">{% if l.ciclo.status == "EXCLUIDA" %}<span class="badge-excluida">Excluído</span>{% else %}<span class="badge-confirmada">Registrado</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'reproduction:novo' as url_nova %}
+  {% if pode_lancar %}
+  {% include "partials/_empty.html" with icone="activity" titulo="Nenhum ciclo reprodutivo" texto="Registre a estação de monta de uma fazenda para ver prenhez, nascimentos e desmama." url=url_nova acao="Novo ciclo" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="activity" titulo="Nenhum ciclo reprodutivo" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

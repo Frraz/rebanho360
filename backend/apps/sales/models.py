@@ -85,6 +85,23 @@ class Sale(ReversibleModel):
     payment_days = models.PositiveSmallIntegerField(
         "Prazo de recebimento (dias)", null=True, blank=True
     )
+    payment_condition = models.ForeignKey(
+        "commercial.PaymentCondition",
+        verbose_name="Condição de recebimento",
+        null=True,
+        blank=True,
+        related_name="+",
+        on_delete=models.PROTECT,
+    )
+    # Rendimento **oficial**, o que o frigorífico informa no romaneio (cliente,
+    # 2026-10-03, #7): prevalece sobre o calculado (carcaça ÷ peso vivo).
+    reported_yield_percent = models.DecimalField(
+        "Rendimento informado pelo frigorífico (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     # Texto livre, preservado e sem efeito em cálculo — pendência #3.
     partnership = models.CharField("Parceria", max_length=100, blank=True)
     notes = models.TextField("Observações", blank=True)

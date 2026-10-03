@@ -12,10 +12,10 @@ Comprar, engordar, abater, ver o resultado. Desenvolvida **durante os 30 dias de
 
 **O que a planilha real mostrou** — a spec não previa nenhum destes (detalhes em [99-pendencias](../regras-negocio/99-pendencias.md) e [migracao/01](../migracao/01-planilhas-e-importacao.md)):
 
-1. **A aba `SÃO FRANCISCO` já contém os 3 abates** (84 + 189 + 81 = 354) e o importador de movimentações da Fase 2 já os importa como saída. Importar `VENDAS` por cima **debitaria as 354 cabeças duas vezes**. A venda agora **adota** a saída que já existe (vínculo com decisão do usuário) em vez de debitar de novo; o saldo de São Francisco não muda ao importar as vendas — está num teste. Também reforça a [#5](../regras-negocio/99-pendencias.md): "São Francisco II" de `VENDAS` parece ser a mesma fazenda.
-2. **O peso vivo de saída diverge entre as abas** — `VENDAS`, aba da fazenda e `PESAGENS` dão pesos diferentes para os mesmos abates (abril: 45.000 × 47.878 kg, rendimento 56,79% × 53,37%). Nada é corrigido em silêncio: vira aviso. [#12](../regras-negocio/99-pendencias.md).
+1. **A aba `SÃO FRANCISCO` já contém os 3 abates** (84 + 189 + 81 = 354) e o importador de movimentações da Fase 2 já os importa como saída. Importar `VENDAS` por cima **debitaria as 354 cabeças duas vezes**. A venda agora **adota** a saída que já existe (vínculo com decisão do usuário) em vez de debitar de novo; o saldo de São Francisco não muda ao importar as vendas — está num teste. Também reforça a [#5](../regras-negocio/99-pendencias-resolvidas.md): "São Francisco II" de `VENDAS` parece ser a mesma fazenda.
+2. **O peso vivo de saída diverge entre as abas** — `VENDAS`, aba da fazenda e `PESAGENS` dão pesos diferentes para os mesmos abates (abril: 45.000 × 47.878 kg, rendimento 56,79% × 53,37%). Nada é corrigido em silêncio: vira aviso. [#12](../regras-negocio/99-pendencias-resolvidas.md).
 3. **`PESAGENS E CONFERENCIA` tem 9 blocos, não 8** (4.058 animais pesados). `SB` é *sem brinco* (591 + 18 animais), não um brinco repetido. 20 brincos se repetem com pesos diferentes no mesmo dia — todos importados, nenhum descartado.
-4. **A compra de 126 cabeças de 27/04/2026 não tem pesagem de entrada**, enquanto as outras três do mesmo dia (268 cabeças) têm — indício a favor da aba da fazenda, no [#10](../regras-negocio/99-pendencias.md). Só indício.
+4. **A compra de 126 cabeças de 27/04/2026 não tem pesagem de entrada**, enquanto as outras três do mesmo dia (268 cabeças) têm — indício a favor da aba da fazenda, no [#10](../regras-negocio/99-pendencias-resolvidas.md). Só indício.
 5. **A `COPERFRIGU` criada pela importação de movimentações não tem papel nenhum**, e a venda exige Frigorífico ou Comprador. O importador de vendas acrescenta o papel **por escolha do usuário**, nunca em silêncio.
 6. **`WeasyPrint 62.3` quebrava com a `pydyf` instalada (0.12.1)** — o PDF não gerava. Fixada `pydyf==0.10.0` em `requirements/base.txt`. Teria quebrado em produção.
 
@@ -24,7 +24,7 @@ Comprar, engordar, abater, ver o resultado. Desenvolvida **durante os 30 dias de
 - `Sale` é um `ReversibleModel` cujos efeitos são outros registros, como a compra: o movimento de saída e o encerramento do lote. Editar = desfazer + reaplicar na mesma transação; excluir devolve as cabeças **na data original** (linhas de compensação) e reabre o lote. `HerdMovement.origin_sale` criado; movimento gerado por venda não se edita direto.
 - Constraints no banco: carcaça só em `ABATE`, carcaça < peso vivo, quantidade, peso e valor > 0.
 - **Os derivados vivem em três serviços, e cada tela, relatório e o painel chamam o mesmo:** `CarcassService` (`apps/sales/carcass.py`), `SaleResultService` (`apps/sales/result.py`) e `WeightGainService` (`apps/herd/weight_gain.py`). Há testes que **trocam o serviço por um falso** e provam que o relatório mostra o valor do serviço — nenhum reimplementa uma conta.
-- **Peso de entrada nunca é estimado.** Sem duas pesagens em datas diferentes, GMD é `None` e a tela diz por quê. A @ produzida pede um rendimento de entrada que ninguém informou — sem ele é "—"; com ele, vem marcada como **estimativa** ([#15](../regras-negocio/99-pendencias.md)).
+- **Peso de entrada nunca é estimado.** Sem duas pesagens em datas diferentes, GMD é `None` e a tela diz por quê. A @ produzida pede um rendimento de entrada que ninguém informou — sem ele é "—"; com ele, vem marcada como **estimativa** ([#15](../regras-negocio/99-pendencias-resolvidas.md)).
 - Resultado do lote: custo/@ sobre a @ **vendida** (a conta fecha: `resultado = margem/@ × @`), lote aberto = resultado **parcial**, lote sem custo de aquisição = sem resultado ([#14](../regras-negocio/99-pendencias.md)).
 - Abate **confirma sem carcaça** (as cabeças já saíram) e vira pendência no painel ([#13](../regras-negocio/99-pendencias.md)).
 - `safe_div(int, int)` devolvia `float` — o oposto da regra nº 2. Agora devolve sempre `Decimal` (achado ao escrever o teste do resultado parcial).
@@ -39,8 +39,8 @@ Comprar, engordar, abater, ver o resultado. Desenvolvida **durante os 30 dias de
 - **F3-13 (deploy):** falta o VPS. Migrações novas: `sales` 0001, `herd` 0005, `imports` 0002, `documents` 0001. Há um passo novo no build: `pydyf` fixada — **a imagem precisa ser reconstruída**.
 - **"Programado × realizado"** (F3-10): não existe fonte do "programado" — a programação de abate é da Fase 5. Construir o relatório agora seria inventar um modelo de planejamento. Fica para quando houver o dado.
 - **Gráfico no painel:** o roadmap diz "só se mudar decisão", e nenhum mudou. Não foi feito.
-- **Rateio `POR_ARROBA_PRODUZIDA`** continua recusado (a mensagem diz isso): depende de um rendimento de entrada que ninguém definiu ([#15](../regras-negocio/99-pendencias.md)).
-- **Mortalidade "acima do normal":** o limite de 2% por safra e fazenda é palpite do desenvolvimento (`MORTALIDADE_LIMITE_PERCENTUAL`), registrado no [#15](../regras-negocio/99-pendencias.md).
+- **Rateio `POR_ARROBA_PRODUZIDA`** continua recusado (a mensagem diz isso): depende de um rendimento de entrada que ninguém definiu ([#15](../regras-negocio/99-pendencias-resolvidas.md)).
+- **Mortalidade "acima do normal":** o limite de 2% por safra e fazenda é palpite do desenvolvimento (`MORTALIDADE_LIMITE_PERCENTUAL`), registrado no [#15](../regras-negocio/99-pendencias-resolvidas.md).
 
 ---
 
@@ -183,7 +183,7 @@ Registrar `document_id`, `template_version`, quem gerou, quando e hash. Relatór
 
 > **Resolver nesta fase:** **[#7](../regras-negocio/99-pendencias.md)** — rendimento de carcaça é informado pelo frigorífico ou calculado? E o que mede o `SOMA RENDIMENTO`? *(Construída com o padrão reversível — calculado; o `SOMA RENDIMENTO` aparece no relatório de divergência da importação. A pergunta segue aberta.)*
 >
-> **Nasceram desta fase:** [#12](../regras-negocio/99-pendencias.md) (pesos de saída divergem entre as abas), [#13](../regras-negocio/99-pendencias.md) (abate sem carcaça confirma?), [#14](../regras-negocio/99-pendencias.md) (margem por @: denominador e lote parcial), [#15](../regras-negocio/99-pendencias.md) (rendimento de entrada e mortalidade normal).
+> **Nasceram desta fase:** [#12](../regras-negocio/99-pendencias-resolvidas.md) (pesos de saída divergem entre as abas), [#13](../regras-negocio/99-pendencias.md) (abate sem carcaça confirma?), [#14](../regras-negocio/99-pendencias.md) (margem por @: denominador e lote parcial), [#15](../regras-negocio/99-pendencias-resolvidas.md) (rendimento de entrada e mortalidade normal).
 
 ## Pós-fase: redesenho da interface (2026-10-01)
 

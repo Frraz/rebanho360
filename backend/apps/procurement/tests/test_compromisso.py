@@ -19,14 +19,14 @@ pytestmark = pytest.mark.django_db
 class TestCriar:
     def test_cria_em_negociacao_sem_afetar_nada(self, rascunho):
         assert rascunho.status == Status.RASCUNHO
-        assert rascunho.code.startswith("CM-2025/26-")
+        assert rascunho.code == "OP-000001"  # o número único da operação
         assert rascunho.items.count() == 1
         assert rascunho.approved_at is None
         assert not hasattr(rascunho, "commission") or not Commission.objects.exists()
 
     def test_codigo_sequencial_por_safra(self, criar_compromisso):
         a, b = criar_compromisso(), criar_compromisso()
-        assert (a.code, b.code) == ("CM-2025/26-0001", "CM-2025/26-0002")
+        assert (a.code, b.code) == ("OP-000001", "OP-000002")  # sequência global
 
     def test_cria_auditoria_do_compromisso_e_dos_itens(self, rascunho):
         eventos = AuditEvent.objects.filter(action=AuditAction.CREATE)
@@ -154,14 +154,31 @@ class TestItens:
 
 
 class TestAprovar:
-    def test_aprovar_registra_quem_e_quando(self, compromisso, escritorio):
+    def test_aprovar_registra_quem_e_quando(self, compromisso, gestor):
         assert compromisso.status == Status.CONFIRMADA
-        assert compromisso.approved_by == escritorio
+        assert compromisso.approved_by == gestor
         assert compromisso.approved_at is not None
 
-    def test_aprovar_duas_vezes_e_recusado(self, compromisso, escritorio):
+    def test_escritorio_lanca_mas_nao_aprova(self, rascunho, escritorio):
+        # Cliente, 2026-10-03: aprovam ADMIN e GESTOR.
+        with pytest.raises(BusinessError, match="administrador ou gestor"):
+            commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+
+    def test_quem_lancou_pode_aprovar_o_proprio_lancamento(
+        self, gestor, dados_compromisso
+    ):
+        """Sem segregação (cliente, 2026-10-03): a auditoria guarda quem lançou
+        e quem aprovou, mesmo sendo a mesma pessoa."""
+        dados = dict(dados_compromisso)
+        itens = dados.pop("itens")
+        c = commitments.criar_compromisso(usuario=gestor, itens=itens, **dados)
+        c = commitments.aprovar_compromisso(c, usuario=gestor)
+        assert c.created_by == c.approved_by == gestor
+        assert c.approved_at is not None
+
+    def test_aprovar_duas_vezes_e_recusado(self, compromisso, escritorio, gestor):
         with pytest.raises(BusinessError, match="já foi aprovado"):
-            commitments.aprovar_compromisso(compromisso, usuario=escritorio)
+            commitments.aprovar_compromisso(compromisso, usuario=gestor)
 
     def test_aprovar_audita_confirmacao(self, compromisso):
         assert AuditEvent.objects.filter(
@@ -176,9 +193,9 @@ class TestSnapshotDaComissao:
     """O coração do cuidado da fase: a operação de janeiro não vira a de março."""
 
     def test_aprovar_copia_a_regra_vigente(
-        self, rascunho, escritorio, regra_de_comissao, comissionado
+        self, rascunho, escritorio, regra_de_comissao, comissionado, gestor
     ):
-        compromisso = commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        compromisso = commitments.aprovar_compromisso(rascunho, usuario=gestor)
 
         comissao = compromisso.commission
         assert (comissao.type, comissao.base, comissao.value) == (
@@ -191,9 +208,9 @@ class TestSnapshotDaComissao:
         assert comissao.payee == comissionado
 
     def test_mudar_a_regra_depois_nao_muda_a_comissao_do_compromisso(
-        self, rascunho, escritorio, regra_de_comissao
+        self, rascunho, escritorio, regra_de_comissao, gestor
     ):
-        compromisso = commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        compromisso = commitments.aprovar_compromisso(rascunho, usuario=gestor)
 
         regra_de_comissao.value = D("1.5")
         regra_de_comissao.base = "LIQUIDO"
@@ -207,24 +224,24 @@ class TestSnapshotDaComissao:
         assert compromisso.commission.base == "BRUTO"
 
     def test_apagar_a_regra_nao_apaga_a_comissao(
-        self, rascunho, escritorio, regra_de_comissao
+        self, rascunho, escritorio, regra_de_comissao, gestor
     ):
-        compromisso = commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        compromisso = commitments.aprovar_compromisso(rascunho, usuario=gestor)
         regra_de_comissao.delete()
 
         comissao = Commission.objects.get(commitment=compromisso)
         assert comissao.rule is None and comissao.value == D("1")
 
     def test_aprovar_audita_a_gravacao_da_regra(
-        self, rascunho, escritorio, regra_de_comissao
+        self, rascunho, escritorio, regra_de_comissao, gestor
     ):
-        commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        commitments.aprovar_compromisso(rascunho, usuario=gestor)
         evento = AuditEvent.objects.get(entity_type="Commission")
         assert evento.action == AuditAction.CREATE
         assert "aprovação" in evento.reason
 
     def test_regra_do_comissionado_vence_a_geral(
-        self, rascunho, escritorio, regra_de_comissao, comissionado
+        self, rascunho, escritorio, regra_de_comissao, comissionado, gestor
     ):
         propria = CommissionRule.objects.create(
             commissioned=comissionado,
@@ -233,7 +250,7 @@ class TestSnapshotDaComissao:
             value=D("2"),
             valid_from=datetime.date(2025, 1, 1),
         )
-        compromisso = commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        compromisso = commitments.aprovar_compromisso(rascunho, usuario=gestor)
         assert compromisso.commission.rule == propria
 
     def test_regra_por_categoria_so_vale_se_todos_os_itens_tem_a_mesma(
@@ -242,6 +259,7 @@ class TestSnapshotDaComissao:
         escritorio,
         categoria_desmamados,
         categoria_vaca,
+        gestor,
     ):
         so_desmamados = CommissionRule.objects.create(
             category=categoria_desmamados,
@@ -252,42 +270,204 @@ class TestSnapshotDaComissao:
         misto = criar_compromisso(
             itens=[dados_item(categoria_desmamados), dados_item(categoria_vaca)]
         )
-        misto = commitments.aprovar_compromisso(misto, usuario=escritorio)
+        misto = commitments.aprovar_compromisso(misto, usuario=gestor)
         assert not Commission.objects.filter(commitment=misto).exists()
 
-        igual = commitments.aprovar_compromisso(criar_compromisso(), usuario=escritorio)
+        igual = commitments.aprovar_compromisso(criar_compromisso(), usuario=gestor)
         assert igual.commission.rule == so_desmamados
 
-    def test_trocar_o_comissionado_regrava_a_regra_dele(
-        self, compromisso, escritorio, regra_de_comissao, outro_comissionado
+    def test_comprador_sem_valor_informado_recebe_a_regra_dele_na_aprovacao(
+        self, criar_compromisso, gestor, comissionado, outro_comissionado
     ):
-        # o compromisso foi aprovado sem regra; agora há uma para o outro
-        propria = CommissionRule.objects.create(
+        CommissionRule.objects.create(
             commissioned=outro_comissionado,
             type="POR_CABECA",
             value=D("20"),
             valid_from=datetime.date(2025, 1, 1),
         )
-        commitments.definir_comissao(
-            compromisso,
-            tipo="PERCENTUAL",
-            base="BRUTO",
-            valor=D("1"),
-            favorecido=compromisso.commissioned,
-            usuario=escritorio,
+        rascunho = criar_compromisso(
+            compradores=[
+                {"partner": comissionado, "type": "PERCENTUAL", "value": D("1.5")},
+                {"partner": outro_comissionado, "type": "PERCENTUAL", "value": None},
+            ]
         )
-        # definir à mão marca MANUAL: trocar o comissionado não regrava
-        compromisso = commitments.editar_compromisso(
-            compromisso,
-            {"commissioned": outro_comissionado},
+        compromisso = commitments.aprovar_compromisso(rascunho, usuario=gestor)
+        por_comprador = {c.payee: c for c in commitments.comissoes_do(compromisso)}
+        # o que foi digitado vale e não é sobrescrito; quem ficou em branco recebe a regra
+        assert por_comprador[comissionado].source == "MANUAL"
+        assert por_comprador[comissionado].value == D("1.5")
+        assert por_comprador[outro_comissionado].source == "REGRA"
+        assert por_comprador[outro_comissionado].type == "POR_CABECA"
+        assert por_comprador[outro_comissionado].value == D("20")
+
+
+class TestVariosCompradores:
+    """Cliente, 2026-10-03: pode haver mais de um comprador, cada um com a sua
+    comissão, informada individualmente."""
+
+    def test_cada_comprador_tem_a_sua_comissao_e_o_primeiro_e_o_principal(
+        self, criar_compromisso, comissionado, outro_comissionado
+    ):
+        c = criar_compromisso(
+            compradores=[
+                {"partner": comissionado, "type": "PERCENTUAL", "value": D("1")},
+                {"partner": outro_comissionado, "type": "VALOR", "value": D("300")},
+            ]
+        )
+        assert c.commissioned == comissionado
+        linhas = commitments.comissoes_do(c)
+        assert [(x.payee, x.type, x.value, x.position) for x in linhas] == [
+            (comissionado, "PERCENTUAL", D("1"), 1),
+            (outro_comissionado, "VALOR", D("300"), 2),
+        ]
+
+    def test_sem_limite_de_dois_compradores(self, criar_compromisso, escritorio):
+        from apps.partners.models import PartnerRoleChoice
+        from apps.procurement.tests.conftest import _parceiro
+
+        quatro = [
+            {
+                "partner": _parceiro(f"Comprador {n}", PartnerRoleChoice.COMISSIONADO),
+                "type": "PERCENTUAL",
+                "value": D("1"),
+            }
+            for n in range(4)
+        ]
+        c = criar_compromisso(compradores=quatro)
+        assert len(commitments.comissoes_do(c)) == 4
+
+    def test_comprador_repetido_e_recusado(self, criar_compromisso, comissionado):
+        dado = {"partner": comissionado, "type": "PERCENTUAL", "value": D("1")}
+        with pytest.raises(BusinessError, match="mais de uma vez"):
+            criar_compromisso(compradores=[dado, dado])
+
+    def test_comprador_precisa_ser_comissionado(self, criar_compromisso, produtor):
+        with pytest.raises(BusinessError, match="Comissionado"):
+            criar_compromisso(
+                compradores=[
+                    {"partner": produtor, "type": "PERCENTUAL", "value": D("1")}
+                ]
+            )
+
+    def test_editar_o_rascunho_acrescenta_e_retira_compradores(
+        self, criar_compromisso, escritorio, comissionado, outro_comissionado
+    ):
+        c = criar_compromisso(
+            compradores=[
+                {"partner": comissionado, "type": "PERCENTUAL", "value": D("1")}
+            ]
+        )
+        commitments.editar_rascunho(
+            c,
+            {},
             None,
             usuario=escritorio,
-            motivo="Comprador trocado",
+            compradores=[
+                {"partner": outro_comissionado, "type": "VALOR", "value": D("50")},
+                {"partner": comissionado, "type": "PERCENTUAL", "value": D("1")},
+            ],
         )
-        compromisso.commission.refresh_from_db()
-        assert compromisso.commission.source == "MANUAL"
-        assert compromisso.commission.rule is None
-        assert propria.pk  # a regra existe, e não foi aplicada por cima do manual
+        c.refresh_from_db()
+        assert c.commissioned == outro_comissionado  # o primeiro da lista
+        assert [x.payee for x in commitments.comissoes_do(c)] == [
+            outro_comissionado,
+            comissionado,
+        ]
+        commitments.editar_rascunho(
+            c,
+            {},
+            None,
+            usuario=escritorio,
+            compradores=[
+                {"partner": comissionado, "type": "PERCENTUAL", "value": D("1")}
+            ],
+        )
+        assert [x.payee for x in commitments.comissoes_do(c)] == [comissionado]
+        assert AuditEvent.objects.filter(action=AuditAction.DELETE).exists()
+
+    def test_corrigir_os_compradores_do_aprovado_exige_motivo(
+        self, compromisso, escritorio, outro_comissionado
+    ):
+        with pytest.raises(BusinessError, match="(?i)motivo"):
+            commitments.editar_compromisso(
+                compromisso,
+                {},
+                None,
+                usuario=escritorio,
+                motivo="",
+                compradores=[
+                    {"partner": outro_comissionado, "type": "VALOR", "value": D("10")}
+                ],
+            )
+
+    def test_acrescentar_comprador_depois_de_aprovado_pela_comissao(
+        self, compromisso, escritorio, outro_comissionado
+    ):
+        commitments.definir_comissao(
+            compromisso,
+            tipo="VALOR",
+            valor=D("90"),
+            favorecido=outro_comissionado,
+            usuario=escritorio,
+        )
+        assert len(commitments.comissoes_do(compromisso)) >= 1
+        assert commitments.comissoes_do(compromisso)[-1].payee == outro_comissionado
+
+    def test_comprador_sem_valor_aguarda_a_regra_e_a_tela_diz_isso(
+        self, criar_compromisso, comissionado
+    ):
+        c = criar_compromisso(
+            compradores=[{"partner": comissionado, "type": "PERCENTUAL", "value": None}]
+        )
+        (linha,) = commitments.comissoes_do(c)
+        assert linha.aguarda_regra
+        assert "gravada na aprovação" in linha.regra_em_texto()
+
+    def test_acrescentar_comprador_na_correcao_do_aprovado_aplica_a_regra_dele(
+        self, compromisso, escritorio, gestor, outro_comissionado
+    ):
+        CommissionRule.objects.create(
+            commissioned=outro_comissionado,
+            type="POR_CABECA",
+            value=D("20"),
+            valid_from=datetime.date(2025, 1, 1),
+        )
+        commitments.editar_compromisso(
+            compromisso,
+            {},
+            None,
+            usuario=gestor,
+            motivo="Novo comprador entrou",
+            compradores=[
+                {"partner": outro_comissionado, "type": "PERCENTUAL", "value": None}
+            ],
+        )
+        linha = Commission.objects.get(commitment=compromisso, payee=outro_comissionado)
+        assert linha.source == "REGRA" and linha.type == "POR_CABECA"
+        assert linha.value == D("20")
+
+    def test_retirar_comprador_pede_motivo_e_audita(
+        self, compromisso, escritorio, comissionado, outro_comissionado
+    ):
+        commitments.definir_comissao(
+            compromisso,
+            tipo="VALOR",
+            valor=D("90"),
+            favorecido=outro_comissionado,
+            usuario=escritorio,
+        )
+        linha = Commission.objects.get(commitment=compromisso, payee=outro_comissionado)
+        with pytest.raises(BusinessError, match="motivo"):
+            commitments.retirar_comprador(
+                compromisso, linha, usuario=escritorio, motivo=""
+            )
+        commitments.retirar_comprador(
+            compromisso, linha, usuario=escritorio, motivo="Saiu da negociação"
+        )
+        assert not Commission.objects.filter(pk=linha.pk).exists()
+        assert AuditEvent.objects.filter(
+            action=AuditAction.DELETE, reason="Saiu da negociação"
+        ).exists()
 
 
 class TestComissaoManual:
@@ -368,9 +548,9 @@ class TestEtapaDerivada:
     def test_aprovado_com_programacao_e_programado(self, compromisso):
         assert selectors.etapa_do_compromisso(compromisso) == "PROGRAMADO"
 
-    def test_aprovado_sem_programacao(self, criar_compromisso, escritorio):
+    def test_aprovado_sem_programacao(self, criar_compromisso, escritorio, gestor):
         c = criar_compromisso(pickup_date=None, slaughter_date=None)
-        c = commitments.aprovar_compromisso(c, usuario=escritorio)
+        c = commitments.aprovar_compromisso(c, usuario=gestor)
         assert selectors.etapa_do_compromisso(c) == "APROVADO"
 
     def test_viagem_sem_recebimento_esta_em_viagem(self, compromisso, viagem):
@@ -548,7 +728,7 @@ class TestEditarExcluirRestaurar:
         compromisso.refresh_from_db()
         commitments.restaurar_compromisso(compromisso, usuario=gestor)
         compromisso.refresh_from_db()
-        assert compromisso.approved_by == escritorio
+        assert compromisso.approved_by == gestor
 
 
 class TestTravaDoAcertoAprovado:

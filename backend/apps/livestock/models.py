@@ -53,6 +53,15 @@ class LotStatus(models.TextChoices):
     EXCLUIDO = "EXCLUIDO", "Excluído"
 
 
+class LotRegime(models.TextChoices):
+    """Onde o lote é criado. O confinamento é controlado **de forma resumida**
+    (cliente, 2026-10-03): o lote é marcado, e o relatório de confinamento sai
+    das pesagens, do razão e dos custos que o sistema já tem."""
+
+    PASTO = "PASTO", "Pasto"
+    CONFINAMENTO = "CONFINAMENTO", "Confinamento"
+
+
 class Lot(models.Model):
     """Lote: unidade de custeio e de desempenho. Quantidade, peso e
     categoria **não são campos** — saem do razão (`HerdLedgerEntry`),
@@ -106,6 +115,9 @@ class Lot(models.Model):
         on_delete=models.PROTECT,
     )
     notes = models.TextField("Observações", blank=True)
+    regime = models.CharField(
+        "Regime", max_length=14, choices=LotRegime.choices, default=LotRegime.PASTO
+    )
     status = models.CharField(
         "Situação", max_length=10, choices=LotStatus.choices, default=LotStatus.ABERTO
     )

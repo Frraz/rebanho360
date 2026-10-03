@@ -30,7 +30,16 @@ TEMPLATE_VERSION = "relatorio-v1"
 
 #: Relatórios que percorrem lote a lote (rateio de custo, pesagens) e podem
 #: demorar: vão para a fila em vez de segurar o navegador.
-RELATORIOS_PESADOS = frozenset({"resultado-do-lote", "desempenho-do-lote", "pesagens"})
+RELATORIOS_PESADOS = frozenset(
+    {
+        "resultado-do-lote",
+        "desempenho-do-lote",
+        "pesagens",
+        "inventario-valorizado",
+        "tir-da-safra",
+        "confinamento",
+    }
+)
 
 LARGURA_PARA_PAISAGEM = 7  # colunas
 
@@ -75,6 +84,8 @@ def _extras_a_partir_dos_parametros(params: dict, user) -> dict:
         )
     if params.get("rendimento_entrada"):
         extras["rendimento_entrada"] = Decimal(params["rendimento_entrada"])
+    if params.get("preco_arroba"):
+        extras["preco_arroba"] = Decimal(params["preco_arroba"])
     return extras
 
 

@@ -14,7 +14,7 @@ from apps.core.exceptions import BlockingDependencyError, BusinessError, Depende
 from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmado
 from apps.herd import selectors, services
 from apps.herd.forms import MovementEditForm, MovementForm, WeighingForm
-from apps.herd.models import HerdMovement, Weighing
+from apps.herd.models import HerdMovement, MovementType, Weighing
 from apps.herd.permissions import LancaMovimentoMixin
 from apps.properties.models import Farm
 
@@ -83,6 +83,7 @@ class MovementCreateView(LancaMovimentoMixin, TemplateView):
                 destination_category=dados["destination_category"],
                 partner=dados["partner"],
                 reason=dados["reason"],
+                death_cause=dados["death_cause"],
                 notes=dados["notes"],
             )
         except BusinessError as exc:
@@ -196,6 +197,9 @@ class MovementUpdateView(LoginRequiredMixin, TemplateView):
             "destination_category": dados["destination_category"],
             "partner": dados["partner"],
             "reason": dados["reason"],
+            "death_cause": (
+                dados["death_cause"] if dados["type"] == MovementType.MORTE else ""
+            ),
             "notes": dados["notes"],
         }
         try:
@@ -229,6 +233,7 @@ def _movimento_para_form(movimento):
         "destination_category": movimento.destination_category_id,
         "partner": movimento.partner_id,
         "reason": movimento.reason,
+        "death_cause": movimento.death_cause,
         "notes": movimento.notes,
     }
 

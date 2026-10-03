@@ -16,6 +16,7 @@ Segurança, em ordem de importância:
 """
 
 import base64
+import datetime
 import hashlib
 import hmac
 import secrets
@@ -122,13 +123,36 @@ def dispositivo_confirmado(usuario: User) -> TOTPDevice | None:
 
 def precisa_de_segundo_fator(usuario: User) -> bool:
     """O segundo fator é **opcional**, mas recomendado a todos: quem o ativou
-    sempre confirma a cada entrada; quem não ativou entra só com a senha."""
-    return dispositivo_confirmado(usuario) is not None
+    sempre confirma a cada entrada; quem não ativou entra só com a senha.
+
+    Com `TWO_FACTOR_OBRIGATORIO` ligado (pendência #19), vale para todos:
+    quem ainda não ativou é levado à configuração antes de usar o sistema."""
+    return (
+        bool(settings.TWO_FACTOR_OBRIGATORIO)
+        or dispositivo_confirmado(usuario) is not None
+    )
+
+
+#: De quanto em quanto tempo o aviso volta, depois de "Agora não".
+DIAS_DO_LEMBRETE = 14
 
 
 def recomenda_segundo_fator(usuario: User) -> bool:
-    """Quem ainda não ativou: a tela de Início sugere, sem cobrar."""
-    return dispositivo_confirmado(usuario) is None
+    """Quem ainda não ativou: a tela de Início sugere, sem cobrar — e, depois de
+    "Agora não", só volta a sugerir passadas `DIAS_DO_LEMBRETE` dias. Quando o
+    segundo fator é obrigatório, não há o que sugerir: o sistema já cobra."""
+    if settings.TWO_FACTOR_OBRIGATORIO or dispositivo_confirmado(usuario) is not None:
+        return False
+    adiado_ate = usuario.two_factor_reminder_until
+    return adiado_ate is None or timezone.now() >= adiado_ate
+
+
+def adiar_lembrete(usuario: User) -> None:
+    """ "Agora não": esconde o aviso por `DIAS_DO_LEMBRETE` dias."""
+    usuario.two_factor_reminder_until = timezone.now() + datetime.timedelta(
+        days=DIAS_DO_LEMBRETE
+    )
+    usuario.save(update_fields=["two_factor_reminder_until"])
 
 
 def sessao_verificada(request) -> bool:

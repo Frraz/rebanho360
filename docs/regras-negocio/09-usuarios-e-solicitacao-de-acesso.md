@@ -10,7 +10,7 @@ Tela: **Sistema → Usuários e acessos** (`/contas/usuarios/`), só para `ADMIN
 
 | Ação | O que acontece | Trava |
 |---|---|---|
-| **Criar** | Cadastra nome, e-mail, telefone, papel e fazendas. Dois jeitos de dar o primeiro acesso: **convite por e-mail** (a pessoa define a própria senha) ou **senha temporária** (o administrador repassa; a pessoa é obrigada a trocar ao entrar) | Sem e-mail, só senha temporária. Papel sem acesso amplo exige ao menos uma fazenda |
+| **Criar** | Cadastra nome, e-mail, telefone, papel e fazendas. Dois jeitos de dar o primeiro acesso: **convite por e-mail** (a pessoa define a própria senha) ou **senha temporária** (o administrador repassa; a pessoa é obrigada a trocar ao entrar) | **E-mail obrigatório** para todo usuário (cliente, 2026-10-03): identifica a conta — dá para entrar por usuário **ou** e-mail —, recebe o convite e redefine a senha. Papel sem acesso amplo exige ao menos uma fazenda |
 | **Editar** | Nome, e-mail, telefone, papel, fazendas (por fazenda: *só consulta* ou *consulta e lançamento*) | **Motivo obrigatório**. O `username` não muda. Não muda o próprio papel |
 | **Redefinir senha** | Link por e-mail, ou senha temporária (derruba as sessões abertas dele) | Nunca a própria — para isso há a seção *Senha* da [Conta](#conta-o-próprio-usuário) |
 | **Encerrar sessões** | Derruba as sessões abertas; a conta segue ativa | — |
@@ -35,7 +35,7 @@ Menu do avatar → **Conta** (`/contas/conta/`, `accounts:conta`). Qualquer pape
 | **Segundo fator** | Vê o estado, ativa e gera novos códigos de recuperação | Ativar e regenerar seguem as telas e regras do 2FA (código do aplicativo para regenerar) |
 
 - **CPF:** só dígitos no banco; confere os dígitos verificadores e rejeita sequência repetida; **um CPF, uma conta** (constraint parcial que ignora o vazio e o excluído). Na auditoria entra **mascarado** (`***.***.***-25`). Só o dono o vê inteiro; não vai para a exportação nem para a tela do administrador.
-- **E-mail é somente leitura** para o próprio usuário: é por ele que a senha se recupera, então a troca passa pelo administrador (pendência [#46](99-pendencias.md#46--troca-de-e-mail-pelo-próprio-usuário-fase-0)).
+- **E-mail é somente leitura** para o próprio usuário: é por ele que a senha se recupera, então a troca passa pelo administrador (pendência [#46](99-pendencias-resolvidas.md#46--troca-de-e-mail-pelo-próprio-usuário-fase-0)).
 - Código: `ContaView` e `PasswordChangeView` em `views.py`, `ContaForm` em `forms.py`, `atualizar_propria_conta` e `auditar_troca_de_senha` em `user_management.py`, `validar_cpf` em `apps/core/validators.py`.
 
 ---
@@ -45,8 +45,8 @@ Menu do avatar → **Conta** (`/contas/conta/`, `accounts:conta`). Qualquer pape
 `/contas/solicitar-acesso/`, com link na tela de entrada. Quem ainda não tem conta informa **nome completo, e-mail, telefone (opcional) e quem é / por que precisa de acesso**. Não escolhe papel, fazenda, usuário nem senha.
 
 1. O pedido nasce **Pendente** (`AccessRequest`) e fica na aba **Solicitações de acesso**, com contagem no menu e na aba.
-2. Os administradores ativos com e-mail cadastrado recebem um e-mail com os dados e o link da tela. `ACCESS_REQUEST_NOTIFY_EMAILS` (no `.env`) acrescenta destinatários.
-3. O administrador **aprova** — escolhe usuário (sugerido a partir do e-mail), papel e fazendas — ou **recusa**, com motivo.
+2. Os administradores **e gestores** ativos com e-mail cadastrado recebem um e-mail com os dados e o link da tela. `ACCESS_REQUEST_NOTIFY_EMAILS` (no `.env`) acrescenta destinatários.
+3. Um **administrador ou gestor** **aprova** — escolhe usuário (sugerido a partir do e-mail), papel e fazendas — ou **recusa**, com motivo. O gestor não concede o papel de Administrador, e a lista de usuários segue só do administrador.
 4. **Aprovar** cria a conta **sem senha** e envia ao e-mail do pedido a confirmação: usuário, papel e o link para **definir a senha** (vale 3 dias, uma vez). **Recusar** avisa por e-mail se o administrador deixar marcado, **sem o motivo** (anotação interna).
 
 O e-mail da conta é sempre o do pedido: é para ele que o link vai, e só o dono do e-mail consegue definir a senha — é assim que o endereço é confirmado. O pedido nunca é apagado.
@@ -75,4 +75,4 @@ Envio pela fila (Celery), **só depois do commit**; se o broker estiver fora, te
 - `access_request_decision_matches_status`: pedido decidido tem data de decisão; pendente não tem.
 - O último administrador ativo é protegido com `select_for_update` nos administradores antes de contar: duas desativações simultâneas não passam juntas.
 
-Pendências deste módulo: [#41](99-pendencias.md#41--quem-aprova-os-pedidos-de-acesso-e-quem-é-avisado-fase-0), [#42](99-pendencias.md#42--o-que-o-pedido-de-acesso-deve-conter-e-como-confirmar-quem-pede-fase-0) e [#43](99-pendencias.md#43--exclusão-de-usuário-e-senha-temporária-fase-0).
+Pendências deste módulo: [#41](99-pendencias-resolvidas.md#41--quem-aprova-os-pedidos-de-acesso-e-quem-é-avisado-fase-0), [#42](99-pendencias.md#42--o-que-o-pedido-de-acesso-deve-conter-e-como-confirmar-quem-pede-fase-0) e [#43](99-pendencias-resolvidas.md#43--exclusão-de-usuário-e-senha-temporária-fase-0).

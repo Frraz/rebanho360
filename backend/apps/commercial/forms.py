@@ -8,7 +8,9 @@ from apps.commercial.models import (
     CarcassClass,
     CommissionRule,
     CommissionType,
+    PaymentCondition,
     TaxType,
+    parse_prazos,
 )
 from apps.livestock.models import AnimalCategory
 from apps.partners.models import Partner, PartnerRoleChoice
@@ -29,7 +31,7 @@ class CarcassClassForm(forms.ModelForm):
 class TaxTypeForm(forms.ModelForm):
     class Meta:
         model = TaxType
-        fields = ["name", "nature", "display_order", "is_active"]
+        fields = ["name", "nature", "effect", "display_order", "is_active"]
 
 
 class CommissionRuleForm(forms.ModelForm):
@@ -63,9 +65,15 @@ class CommissionRuleForm(forms.ModelForm):
         self.fields["category"].queryset = AnimalCategory.objects.filter(is_active=True)
         self.fields["valid_from"].input_formats = ["%Y-%m-%d"]
         self.fields["valid_to"].input_formats = ["%Y-%m-%d"]
-        self.fields["base"].help_text = (
-            "Só vale para percentual. Pendência #4: bruto ou líquido?"
-        )
+        # Respostas do cliente (2026-10-03): a base do percentual é o valor bruto
+        # dos animais; e o valor direto (R$) é informado na operação, não em regra.
+        self.fields["base"].choices = [
+            (v, r) for v, r in self.fields["base"].choices if v == "BRUTO"
+        ]
+        self.fields["base"].help_text = "Percentual × valor bruto dos animais."
+        self.fields["type"].choices = [
+            (v, r) for v, r in self.fields["type"].choices if v != CommissionType.VALOR
+        ]
 
     def clean(self):
         dados = super().clean()
@@ -82,3 +90,19 @@ class CommissionRuleForm(forms.ModelForm):
         ):
             self.add_error("value", "Um percentual não passa de 100.")
         return dados
+
+
+class PaymentConditionForm(forms.ModelForm):
+    class Meta:
+        model = PaymentCondition
+        fields = ["name", "days", "display_order", "is_active"]
+
+    def clean_days(self):
+        texto = self.cleaned_data["days"].replace(" ", "")
+        try:
+            prazos = parse_prazos(texto)
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+        if prazos[-1] > 3650:
+            raise forms.ValidationError("O prazo máximo é de 3.650 dias.")
+        return ",".join(str(p) for p in prazos)

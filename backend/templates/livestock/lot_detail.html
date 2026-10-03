@@ -22,6 +22,7 @@
     <div><dt>Entrada</dt><dd>{{ lote.entry_date|date:"d/m/Y" }}</dd></div>
     <div><dt>Safra</dt><dd>{{ lote.season.name }}</dd></div>
     <div><dt>Raça</dt><dd>{{ lote.breed.name|default:"—" }}</dd></div>
+    <div><dt>Regime</dt><dd>{{ lote.get_regime_display }}</dd></div>
   </dl>
 </section>
 

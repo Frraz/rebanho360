@@ -93,6 +93,11 @@
       {{ form.reason|add_class:"field-input" }}
       {% include "partials/_errors.html" with field=form.reason %}
     </div>
+    <div x-show="tipo === 'MORTE'" x-cloak>
+      <label class="field-label" for="id_death_cause">{{ form.death_cause.label }} <span class="font-normal text-gray-500">(se souber)</span></label>
+      {{ form.death_cause|add_class:"field-input" }}
+      {% include "partials/_errors.html" with field=form.death_cause %}
+    </div>
     <div>
       <label class="field-label" for="id_notes">{{ form.notes.label }} <span class="font-normal text-gray-500">(opcional)</span></label>
       {{ form.notes|add_class:"field-input" }}

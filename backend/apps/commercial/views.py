@@ -7,10 +7,22 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 
 from apps.commercial import selectors, services
-from apps.commercial.forms import CarcassClassForm, CommissionRuleForm, TaxTypeForm
-from apps.commercial.models import CarcassClass, CommissionRule, TaxType
+from apps.commercial.forms import (
+    CarcassClassForm,
+    CommissionRuleForm,
+    PaymentConditionForm,
+    TaxTypeForm,
+)
+from apps.commercial.models import (
+    CarcassClass,
+    CommissionRule,
+    PaymentCondition,
+    TaxType,
+)
 from apps.commercial.permissions import (
+    CadastraCondicoesMixin,
     GerenciaOComercialMixin,
+    pode_cadastrar_condicoes,
     pode_gerenciar_o_comercial,
 )
 from apps.core.exceptions import BusinessError
@@ -157,3 +169,40 @@ class CommissionRuleUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateVi
     success_message = "✓ Regra de comissão atualizada."
     subtitulo = "Compromissos já aprovados não mudam: guardam a regra que valia."
     voltar_rotulo = "Regras de comissão"
+
+
+# --- Condições de pagamento -------------------------------------------------
+
+
+class PaymentConditionListView(LoginRequiredMixin, ListView):
+    template_name = "commercial/condicao_list.html"
+    context_object_name = "condicoes"
+
+    def get_queryset(self):
+        return selectors.listar_condicoes()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["pode_gerenciar"] = pode_cadastrar_condicoes(self.request.user)
+        return context
+
+
+class PaymentConditionCreateView(CadastraCondicoesMixin, _CadastroMixin, CreateView):
+    model = PaymentCondition
+    form_class = PaymentConditionForm
+    success_url = reverse_lazy("commercial:condicao_lista")
+    success_message = "✓ Condição cadastrada."
+    titulo_novo = "Nova condição de pagamento"
+    subtitulo = "À vista, 4 dias, 30 dias, parcelado… Crie a que a operação precisar."
+    voltar_rotulo = "Condições de pagamento"
+
+
+class PaymentConditionUpdateView(CadastraCondicoesMixin, _CadastroMixin, UpdateView):
+    model = PaymentCondition
+    form_class = PaymentConditionForm
+    success_url = reverse_lazy("commercial:condicao_lista")
+    success_message = "✓ Condição atualizada."
+    subtitulo = (
+        "Operações já lançadas guardam o prazo que valia: mudar aqui não as altera."
+    )
+    voltar_rotulo = "Condições de pagamento"

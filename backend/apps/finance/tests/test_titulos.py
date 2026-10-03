@@ -129,7 +129,7 @@ def test_confirmacao_concorrente_gera_um_titulo_nao_dois():
     from apps.properties.models import Farm
 
     CostClass.objects.get_or_create(name="CUSTEIO")
-    for nome in ("DESPESA GADO", "COMISSÃO", "IMPOSTO E TAXAS"):
+    for nome in ("DESPESA GADO", "FRETE", "COMISSÃO", "IMPOSTO E TAXAS"):
         CostCenter.objects.get_or_create(name=nome)
     usuario = User.objects.create_user(username="dupla", password="x", role=Role.GESTOR)
     company = Company.objects.create(name="Fazendas Reunidas")

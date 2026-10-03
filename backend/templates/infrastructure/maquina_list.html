@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Máquinas · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1 class="page-title">Parque de máquinas</h1>
+    <p class="page-subtitle max-w-3xl">Cada máquina, o que trabalhou e o custo por hora — calculado do uso lançado (horas, combustível e manutenção).</p>
+  </div>
+  <div class="page-actions">
+    {% if pode_gerenciar %}<a href="{% url 'infrastructure:maquina_nova' %}" class="btn-primary">{% icon "plus" %} Nova máquina</a>{% endif %}
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if linhas %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Máquina</th><th scope="col">Fazenda</th><th scope="col">Tipo</th><th scope="col" class="num">Horas</th><th scope="col" class="num">Consumo (L/h)</th><th scope="col" class="num">Custo por hora</th><th scope="col">Situação</th></tr></thead>
+    <tbody>
+      {% for l in linhas %}
+      <tr class="is-link">
+        <td class="cell-title"><a href="{% url 'infrastructure:maquina_detalhe' l.maquina.pk %}" class="row-link">{{ l.maquina.name }}</a></td>
+        <td data-label="Fazenda">{{ l.maquina.farm.name }}</td>
+        <td data-label="Tipo">{{ l.maquina.get_kind_display }}</td>
+        <td data-label="Horas" class="num">{{ l.custo.horas|numero:1 }}</td>
+        <td data-label="Consumo (L/h)" class="num">{% if l.custo.consumo_l_h is None %}—{% else %}{{ l.custo.consumo_l_h|numero:2 }}{% endif %}</td>
+        <td data-label="Custo por hora" class="num nowrap">{{ l.custo.custo_hora|brl }}</td>
+        <td data-label="Situação" class="cell-status">{% if l.maquina.is_active %}<span class="badge-confirmada">Ativa</span>{% else %}<span class="badge-excluida">Inativa</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'infrastructure:maquina_nova' as url_nova %}
+  {% if pode_gerenciar %}
+  {% include "partials/_empty.html" with icone="settings" titulo="Nenhuma máquina cadastrada" texto="Cadastre os tratores e implementos para acompanhar horas e custo por hora." url=url_nova acao="Nova máquina" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="settings" titulo="Nenhuma máquina cadastrada" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

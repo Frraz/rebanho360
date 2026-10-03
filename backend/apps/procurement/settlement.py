@@ -1,15 +1,24 @@
 """O acerto: previsto × realizado e o consolidado até o líquido.
 
 **Tudo aqui é derivado** (regra 6): nada do que `calcular_acerto` devolve é
-gravado. A aprovação grava os **efeitos** (as compras), e eles guardam os
-números de quando foi aprovado; reabrir o acerto os desfaz.
+gravado. A aprovação grava os **efeitos** (as compras e os títulos), e eles
+guardam os números de quando foi aprovado; reabrir o acerto os desfaz.
 
-Duas decisões isoladas aqui, ambas com pendência aberta e padrão reversível:
+O cliente (2026-10-03) pediu um sistema de **registro**, não de dedução:
 
-- `TRATAMENTO_POR_NATUREZA` — o que cada natureza de linha faz com o dinheiro
-  (#21, aguarda o contador);
-- `ratear_extras` — como o frete, a comissão e os tributos do contrato inteiro
-  se dividem entre os itens que viram compras (#22).
+- os valores de tributos, taxas e descontos são **digitados** (alíquota e base
+  são só campos auxiliares);
+- **não há rateio automático** (#13): com mais de um item recebido, o usuário
+  informa quanto do frete, da comissão, dos tributos, dos descontos e dos
+  adiantamentos é de cada item (`SettlementAllocation`), e o acerto só é
+  aprovado quando a soma fecha com o total. `sugerir_distribuicao` existe só
+  para pré-preencher a tela — quem confirma é o usuário;
+- cada comprador tem a sua comissão (#30), calculada sobre o valor bruto dos
+  animais ou informada direto (#4).
+
+Uma decisão isolada aqui, com pendência aberta e padrão reversível:
+`TRATAMENTO_POR_NATUREZA` — o que cada natureza de linha faz com o dinheiro,
+quando o tipo não define o próprio efeito (#21).
 """
 
 import datetime
@@ -20,6 +29,7 @@ from django.db.models import Min
 
 from apps.commercial.commission import calcular_comissao
 from apps.commercial.models import TaxNature
+from apps.core.formatting import dinheiro_br
 from apps.core.money import quantize_money, safe_div
 from apps.core.reversible import Status
 from apps.costs.allocation import ratear_em_centavos
@@ -31,6 +41,7 @@ from apps.procurement.models import (
     CommitmentItem,
     PriceBasis,
     ReceivingLine,
+    SettlementAllocation,
     SettlementLine,
 )
 from apps.procurement.trips import frete_da_viagem
@@ -55,6 +66,12 @@ TRATAMENTO_POR_NATUREZA = {
     TaxNature.ADIANTAMENTO: Tratamento.ABATE_NO_LIQUIDO,
     TaxNature.CREDITO: Tratamento.ABATE_NO_LIQUIDO,
 }
+
+
+def efeito_da_linha(linha: SettlementLine) -> str:
+    """O que o valor da linha faz: o efeito definido no **tipo** (o usuário
+    decide, não o sistema) ou, sem ele, o padrão da natureza."""
+    return linha.tax_type.effect or TRATAMENTO_POR_NATUREZA[linha.tax_type.nature]
 
 
 # --------------------------------------------------------------------------
@@ -106,6 +123,31 @@ class RateioDoItem:
 
 
 @dataclass(frozen=True)
+class ComissaoDoComprador:
+    """A comissão de um comprador no acerto: o que o snapshot dá e o extra."""
+
+    commission: Commission
+    calculada: Decimal | None
+    extra: Decimal
+
+    @property
+    def total(self) -> Decimal:
+        return (self.calculada or ZERO) + self.extra
+
+    @property
+    def payee(self):
+        return self.commission.payee
+
+
+@dataclass(frozen=True)
+class FreteDaViagemNoAcerto:
+    viagem: object
+    valor: Decimal
+    favorecido: object
+    vencimento: datetime.date | None
+
+
+@dataclass(frozen=True)
 class Comparacao:
     rotulo: str
     previsto: object
@@ -132,10 +174,15 @@ class Acerto:
     comissao_calculada: Decimal | None
     comissao_extra: Decimal
     comissao_total: Decimal
+    comissoes: list[ComissaoDoComprador]
+    fretes: list[FreteDaViagemNoAcerto]
+    linhas: list
     custo_aquisicao: Decimal
     liquido_ao_produtor: Decimal
     transportador: object
     favorecido_da_comissao: object
+    #: o que falta distribuir entre os itens (só com mais de um item recebido)
+    distribuicao_pendente: dict
     rateios: dict[int, RateioDoItem]
     comparacoes: list[Comparacao]
     pendencias: list[str]
@@ -147,8 +194,19 @@ class Acerto:
 
 
 # --------------------------------------------------------------------------
-# Rateio (pendência #22)
+# Distribuição entre itens (pendência #22 / cliente 2026-10-03: sem rateio
+# automático)
 # --------------------------------------------------------------------------
+
+#: Os totais do acerto que, com mais de um item, o usuário reparte à mão —
+#: campo da `SettlementAllocation` → rótulo na mensagem.
+TOTAIS_A_DISTRIBUIR = (
+    ("discount_value", "Descontos"),
+    ("abatement_value", "Adiantamentos e créditos"),
+    ("freight_value", "Frete"),
+    ("commission_value", "Comissão"),
+    ("tax_value", "Tributos e taxas"),
+)
 
 
 def _ratear(total: Decimal, pesos: dict) -> dict:
@@ -159,7 +217,7 @@ def _ratear(total: Decimal, pesos: dict) -> dict:
     return {chave: rateado.get(chave, ZERO) for chave in pesos}
 
 
-def ratear_extras(
+def sugerir_distribuicao(
     itens: list[ItemDoAcerto],
     *,
     frete: Decimal,
@@ -167,21 +225,16 @@ def ratear_extras(
     tributos: Decimal,
     descontos: Decimal,
     abatimentos: Decimal,
-) -> dict[int, RateioDoItem]:
-    """Divide o que é do contrato inteiro entre os itens que viram compra.
-
-    - frete, comissão e tributos: por **cabeça recebida**;
-    - descontos: pelo **valor** dos animais — desconto de preço acompanha o preço;
-    - adiantamentos e créditos: pelo valor dos animais **já descontado**.
-
-    A soma dos pedaços é exatamente o total (`ratear_em_centavos`: o resto do
-    arredondamento vai, um centavo por vez, para quem tem a maior fração).
+) -> dict[int, dict[str, Decimal]]:
+    """**Só uma sugestão** para pré-preencher a tela de distribuição: por cabeça
+    recebida (frete, comissão, tributos) e por valor (descontos e abatimentos),
+    sem centavo perdido. O sistema **não aplica** isso sozinho: a distribuição
+    só vale depois que o usuário a confirma e salva.
     """
     if not itens:
         return {}
     por_cabeca = {i.item.pk: Decimal(i.cabecas_recebidas) for i in itens}
-    por_valor = {i.item.pk: i.valor_do_item for i in itens}
-
+    por_valor = {i.item.pk: (i.valor_do_item or ZERO) for i in itens}
     desconto_r = _ratear(descontos, por_valor)
     animais = {pk: por_valor[pk] - desconto_r[pk] for pk in por_valor}
     abatimento_r = _ratear(abatimentos, animais)
@@ -189,15 +242,46 @@ def ratear_extras(
     comissao_r = _ratear(comissao, por_cabeca)
     tributos_r = _ratear(tributos, por_cabeca)
     return {
-        pk: RateioDoItem(
-            animal_value=animais[pk],
-            freight_value=frete_r[pk],
-            commission_value=comissao_r[pk],
-            tax_value=tributos_r[pk],
-            abatimento=abatimento_r[pk],
-        )
+        pk: {
+            "discount_value": desconto_r[pk],
+            "abatement_value": abatimento_r[pk],
+            "freight_value": frete_r[pk],
+            "commission_value": comissao_r[pk],
+            "tax_value": tributos_r[pk],
+        }
         for pk in por_cabeca
     }
+
+
+def distribuicao_informada(
+    itens: list[ItemDoAcerto],
+    alocacoes: dict[int, SettlementAllocation],
+    totais: dict[str, Decimal],
+) -> tuple[dict[int, dict[str, Decimal]], dict[str, Decimal]]:
+    """O que cada item recebe de cada total, e quanto **falta** distribuir.
+
+    Com **um** item recebido não há o que repartir: ele fica com tudo.
+    Com mais de um, vale o que o usuário informou; `falta[campo]` é o total
+    menos a soma informada (positivo = falta, negativo = passou). Total zero
+    nunca falta.
+    """
+    if len(itens) == 1:
+        pk = itens[0].item.pk
+        return {pk: dict(totais)}, {}
+    distribuicao = {}
+    for i in itens:
+        a = alocacoes.get(i.item.pk)
+        distribuicao[i.item.pk] = {
+            campo: (getattr(a, campo) if a is not None else ZERO)
+            for campo, _ in TOTAIS_A_DISTRIBUIR
+        }
+    falta = {}
+    for campo, _ in TOTAIS_A_DISTRIBUIR:
+        informado = sum((d[campo] for d in distribuicao.values()), ZERO)
+        diferenca = quantize_money(totais[campo] - informado)
+        if diferenca:
+            falta[campo] = diferenca
+    return distribuicao, falta
 
 
 # --------------------------------------------------------------------------
@@ -360,13 +444,13 @@ def calcular_acerto(commitment: Commitment) -> Acerto:
             "nenhum animal foi recebido ainda: lance o recebimento das viagens."
         )
 
-    # ---- linhas digitadas, pelo tratamento da natureza -------------------
+    # ---- linhas digitadas, pelo efeito definido no tipo ou na natureza ----
     def _soma(tratamento, naturezas=None):
         return sum(
             (
                 linha.amount
                 for linha in linhas
-                if TRATAMENTO_POR_NATUREZA[linha.tax_type.nature] == tratamento
+                if efeito_da_linha(linha) == tratamento
                 and (naturezas is None or linha.tax_type.nature in naturezas)
             ),
             ZERO,
@@ -376,6 +460,17 @@ def calcular_acerto(commitment: Commitment) -> Acerto:
     descontos = _soma(Tratamento.DESCONTO_NO_ANIMAL)
     adiantamentos = _soma(Tratamento.ABATE_NO_LIQUIDO, {TaxNature.ADIANTAMENTO})
     creditos = _soma(Tratamento.ABATE_NO_LIQUIDO, {TaxNature.CREDITO})
+    # Efeito de abatimento em tipo que não é adiantamento nem crédito (o usuário
+    # escolheu o efeito no tipo): entra no mesmo balde dos abatimentos.
+    creditos += sum(
+        (
+            linha.amount
+            for linha in linhas
+            if efeito_da_linha(linha) == Tratamento.ABATE_NO_LIQUIDO
+            and linha.tax_type.nature not in (TaxNature.ADIANTAMENTO, TaxNature.CREDITO)
+        ),
+        ZERO,
+    )
 
     # ---- frete: o realizado quando existe; sem ele, o previsto -----------
     viagens = list(selectors.viagens_ativas(commitment).select_related("carrier"))
@@ -389,15 +484,32 @@ def calcular_acerto(commitment: Commitment) -> Acerto:
                 f"Viagem {viagem.code}: frete realizado não informado; "
                 "usando o previsto."
             )
-    transportadores = {v.carrier_id: v.carrier for v, f in fretes if f.final}
-    transportador = None
-    if len(transportadores) == 1 and None not in transportadores:
-        transportador = next(iter(transportadores.values()))
-    elif len(transportadores) > 1:
-        avisos.append(
-            "O frete tem mais de um transportador: o título de frete fica sem "
-            "favorecido, para o financeiro completar."
+    # O frete é pago ao transportador **da viagem**, um título por viagem, com
+    # vencimento próprio (cliente, 2026-10-03). Viagem com frete e sem
+    # transportador gera título sem favorecido, para completar.
+    fretes_do_acerto = []
+    for viagem, f in fretes:
+        if not f.final:
+            continue
+        fretes_do_acerto.append(
+            FreteDaViagemNoAcerto(
+                viagem=viagem,
+                valor=f.final,
+                favorecido=viagem.carrier,
+                vencimento=viagem.freight_due_date,
+            )
         )
+        if viagem.carrier_id is None:
+            avisos.append(
+                f"Viagem {viagem.code}: tem frete e não tem transportador; o "
+                "título de frete fica sem favorecido."
+            )
+    transportadores = {v.carrier_id: v.carrier for v, f in fretes if f.final}
+    transportador = (
+        next(iter(transportadores.values()))
+        if len(transportadores) == 1 and None not in transportadores
+        else None
+    )
 
     # ---- valor dos animais -----------------------------------------------
     valor_dos_itens = sum((i.valor_do_item for i in recebidos if i.valor_do_item), ZERO)
@@ -410,37 +522,89 @@ def calcular_acerto(commitment: Commitment) -> Acerto:
             "não sobra nada a pagar ao vendedor."
         )
 
-    # ---- comissão: do snapshot, sobre o que o acerto apurou ---------------
+    # ---- comissão: uma por comprador, do snapshot, sobre o valor bruto ----
     cabecas = sum(i.cabecas_recebidas for i in recebidos)
-    obj = (
-        Commission.objects.filter(commitment=commitment).select_related("payee").first()
-    )
-    comissao_calculada = None
-    extra = ZERO
-    if obj is not None:
-        extra = obj.extra_amount
-        comissao_calculada = calcular_comissao(
-            tipo=obj.type,
-            base=obj.base,
-            valor=obj.value,
-            valor_bruto=valor_dos_animais if recebidos else None,
-            deducoes=frete + tributos,
-            cabecas=cabecas,
+    comissoes = []
+    for obj in (
+        Commission.objects.filter(commitment=commitment)
+        .select_related("payee")
+        .order_by("position", "id")
+    ):
+        comissoes.append(
+            ComissaoDoComprador(
+                commission=obj,
+                calculada=calcular_comissao(
+                    tipo=obj.type,
+                    base=obj.base,
+                    valor=obj.value,
+                    valor_bruto=valor_dos_animais if recebidos else None,
+                    deducoes=frete + tributos,
+                    cabecas=cabecas,
+                ),
+                extra=obj.extra_amount,
+            )
         )
-    elif recebidos:
+    if not comissoes and recebidos:
         avisos.append("Sem comissão: nenhuma regra valia na aprovação do compromisso.")
-    comissao_total = (comissao_calculada or ZERO) + extra
+    for c in comissoes:
+        if c.payee is None and c.total:
+            avisos.append(
+                "Há comissão sem comprador definido: o título fica sem favorecido."
+            )
+    comissao_calculada = (
+        sum((c.calculada or ZERO) for c in comissoes) if comissoes else None
+    )
+    extra = sum((c.extra for c in comissoes), ZERO)
+    comissao_total = sum((c.total for c in comissoes), ZERO)
 
+    # ---- distribuição entre os itens: informada, nunca deduzida -----------
     rateios: dict[int, RateioDoItem] = {}
+    distribuicao_pendente: dict[str, Decimal] = {}
     if recebidos and not any(i.valor_do_item is None for i in recebidos):
-        rateios = ratear_extras(
-            recebidos,
-            frete=frete,
-            comissao=comissao_total,
-            tributos=tributos,
-            descontos=descontos,
-            abatimentos=adiantamentos + creditos,
+        alocacoes = (
+            {
+                a.item_id: a
+                for a in SettlementAllocation.objects.filter(settlement=settlement)
+            }
+            if settlement is not None
+            else {}
         )
+        totais = {
+            "discount_value": descontos,
+            "abatement_value": adiantamentos + creditos,
+            "freight_value": frete,
+            "commission_value": comissao_total,
+            "tax_value": tributos,
+        }
+        distribuicao, distribuicao_pendente = distribuicao_informada(
+            recebidos, alocacoes, totais
+        )
+        for campo, rotulo in TOTAIS_A_DISTRIBUIR:
+            falta = distribuicao_pendente.get(campo)
+            if falta is None:
+                continue
+            if falta > 0:
+                pendencias.append(
+                    f"{rotulo} ({dinheiro_br(totais[campo])}): faltam "
+                    f"{dinheiro_br(falta)} para distribuir entre os itens. "
+                    "Informe quanto é de cada item."
+                )
+            else:
+                pendencias.append(
+                    f"a distribuição de {rotulo.lower()} entre os itens passa do "
+                    f"total ({dinheiro_br(totais[campo])}) em {dinheiro_br(-falta)}."
+                )
+        rateios = {
+            i.item.pk: RateioDoItem(
+                animal_value=(i.valor_do_item or ZERO)
+                - distribuicao[i.item.pk]["discount_value"],
+                freight_value=distribuicao[i.item.pk]["freight_value"],
+                commission_value=distribuicao[i.item.pk]["commission_value"],
+                tax_value=distribuicao[i.item.pk]["tax_value"],
+                abatimento=distribuicao[i.item.pk]["abatement_value"],
+            )
+            for i in recebidos
+        }
         for pk, rateio in rateios.items():
             if rateio.animal_value <= 0 or rateio.titulo_dos_animais <= 0:
                 pendencias.append(
@@ -512,10 +676,14 @@ def calcular_acerto(commitment: Commitment) -> Acerto:
         comissao_calculada=comissao_calculada,
         comissao_extra=extra,
         comissao_total=comissao_total,
+        comissoes=comissoes,
+        fretes=fretes_do_acerto,
+        linhas=linhas,
         custo_aquisicao=custo,
         liquido_ao_produtor=liquido,
         transportador=transportador,
-        favorecido_da_comissao=obj.payee if obj is not None else None,
+        favorecido_da_comissao=(comissoes[0].payee if comissoes else None),
+        distribuicao_pendente=distribuicao_pendente,
         rateios=rateios,
         comparacoes=comparacoes,
         pendencias=pendencias,
@@ -533,9 +701,13 @@ def preco_medio_por_cabeca(acerto: Acerto) -> Decimal | None:
 
 
 def ajustes_financeiros_da_compra(compra) -> dict:
-    """O que o acerto muda nos títulos da compra que ele gerou: o **favorecido**
-    do frete e da comissão (que, na compra direta, ficam "a definir") e o valor
-    do título dos animais, que sai **líquido** de adiantamentos e créditos.
+    """O que o acerto muda nos títulos da compra que ele gerou.
+
+    A compra de um acerto só gera o título **dos animais** — pelo valor
+    **líquido** de adiantamentos e créditos. Frete, comissão e tributos têm
+    título próprio, com favorecido e vencimento próprios, gerados pelo acerto
+    (`finance.services.gerar_titulos_do_acerto`): `somente_animais` diz isso ao
+    financeiro.
 
     Devolve `{}` para a compra que não nasceu de um acerto — a compra direta
     segue exatamente como era.
@@ -545,10 +717,7 @@ def ajustes_financeiros_da_compra(compra) -> dict:
         return {}
     acerto = calcular_acerto(item.commitment)
     rateio = acerto.rateios.get(item.pk)
-    ajustes = {
-        "FRETE": {"payee": acerto.transportador},
-        "COMISSAO": {"payee": acerto.favorecido_da_comissao},
-    }
+    ajustes = {"somente_animais": True}
     if rateio is not None:
         ajustes["ANIMAIS"] = {"amount": rateio.titulo_dos_animais}
     return ajustes

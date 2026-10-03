@@ -43,6 +43,22 @@ class MovementType(models.TextChoices):
     AJUSTE_INVENTARIO = "AJUSTE_INVENTARIO", "Ajuste de inventário"
 
 
+class DeathCause(models.TextChoices):
+    """Causa da morte, **quando informada** (cliente, 2026-10-03). Lista curta;
+    a descrição livre continua no motivo. Sem causa = não informada."""
+
+    DOENCA = "DOENCA", "Doença"
+    PARASITOSE = "PARASITOSE", "Parasitose / verminose"
+    TIMPANISMO = "TIMPANISMO", "Timpanismo"
+    INTOXICACAO = "INTOXICACAO", "Intoxicação"
+    PICADA_DE_COBRA = "PICADA_DE_COBRA", "Picada de cobra"
+    ONCA = "ONCA", "Ataque de onça / predador"
+    ACIDENTE = "ACIDENTE", "Acidente"
+    RAIO = "RAIO", "Raio"
+    PARTO = "PARTO", "Problema de parto"
+    OUTRA = "OUTRA", "Outra"
+
+
 #: Geram 2 linhas no razão — a origem e o destino, soma zero (ADR 0002).
 TWO_LINE_TYPES = frozenset(
     {
@@ -169,6 +185,13 @@ class HerdMovement(ReversibleModel):
         on_delete=models.PROTECT,
     )
     reason = models.TextField("Motivo", blank=True)
+    death_cause = models.CharField(
+        "Causa da morte",
+        max_length=20,
+        choices=DeathCause.choices,
+        blank=True,
+        help_text="Só em morte, e só se souber. Alimenta o relatório de mortalidade.",
+    )
     notes = models.TextField("Observação", blank=True)
 
     class Meta:

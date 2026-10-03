@@ -76,11 +76,14 @@ class TestTelaPublica:
         assert "/contas/solicitacoes/" in mensagem.body
         assert "não foi confirmado" in mensagem.body
 
-    def test_nao_avisa_inativo_nem_quem_nao_e_admin(
+    def test_avisa_administradores_e_gestores_mas_nao_inativo_nem_outros_papeis(
         self, client, admin, mailoutbox, django_capture_on_commit_callbacks
     ):
         User.objects.create_user(
             username="g", password="s", role=Role.GESTOR, email="g@x.com"
+        )
+        User.objects.create_user(
+            username="esc", password="s", role=Role.ESCRITORIO, email="esc@x.com"
         )
         User.objects.create_user(
             username="velho",
@@ -91,7 +94,7 @@ class TestTelaPublica:
         )
         with django_capture_on_commit_callbacks(execute=True):
             _enviar(client)
-        assert mailoutbox[0].to == ["admin1@fazenda.com.br"]
+        assert sorted(mailoutbox[0].to) == ["admin1@fazenda.com.br", "g@x.com"]
 
     def test_emails_extras_das_settings_tambem_recebem(
         self, client, settings, mailoutbox, django_capture_on_commit_callbacks
@@ -194,24 +197,70 @@ class TestListaEDecisao:
             in cliente_admin.get(reverse("accounts:solicitacoes")).content.decode()
         )
 
-    def test_so_admin_decide(self, client, pedido):
-        gestor = User.objects.create_user(username="g", password="s", role=Role.GESTOR)
-        client.force_login(gestor)
-        assert (
-            client.get(
-                reverse("accounts:solicitacao_aprovar", args=[pedido.pk])
-            ).status_code
-            == 403
-        )
-        assert (
-            client.post(
-                reverse("accounts:solicitacao_recusar", args=[pedido.pk]),
-                {"motivo": "x"},
-            ).status_code
-            == 403
-        )
+    def test_so_admin_e_gestor_decidem(self, client, pedido):
+        """Cliente, 2026-10-03 (#41): aprovam novos acessos ADMIN e GESTOR."""
+        for papel in (Role.ESCRITORIO, Role.CAMPO, Role.FINANCEIRO, Role.CONSULTA):
+            usuario = User.objects.create_user(
+                username=f"u-{papel}", password="s", role=papel
+            )
+            client.force_login(usuario)
+            assert (
+                client.get(
+                    reverse("accounts:solicitacao_aprovar", args=[pedido.pk])
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    reverse("accounts:solicitacao_recusar", args=[pedido.pk]),
+                    {"motivo": "x"},
+                ).status_code
+                == 403
+            )
         pedido.refresh_from_db()
         assert pedido.status == AccessRequestStatus.PENDENTE
+
+    def test_gestor_aprova_o_pedido_e_fica_registrado(self, client, fazenda_a, pedido):
+        gestor = User.objects.create_user(
+            username="g", password="s", role=Role.GESTOR, email="g@x.com"
+        )
+        client.force_login(gestor)
+        resposta = client.post(
+            reverse("accounts:solicitacao_aprovar", args=[pedido.pk]),
+            {
+                "username": "carlos",
+                "first_name": "Carlos",
+                "role": Role.CAMPO,
+                f"farm_{fazenda_a.pk}": "lancar",
+            },
+        )
+        assert resposta.status_code == 302
+        pedido.refresh_from_db()
+        assert pedido.status == AccessRequestStatus.APROVADA
+        assert pedido.decided_by == gestor
+        assert User.objects.get(username="carlos").role == Role.CAMPO
+
+    def test_gestor_nao_concede_o_papel_de_administrador(self, client, pedido):
+        gestor = User.objects.create_user(
+            username="g", password="s", role=Role.GESTOR, email="g@x.com"
+        )
+        client.force_login(gestor)
+        resposta = client.post(
+            reverse("accounts:solicitacao_aprovar", args=[pedido.pk]),
+            {"username": "carlos", "first_name": "Carlos", "role": Role.ADMIN},
+        )
+        assert resposta.status_code in (200, 403)
+        assert not User.objects.filter(username="carlos").exists()
+        pedido.refresh_from_db()
+        assert pedido.status == AccessRequestStatus.PENDENTE
+
+    def test_gestor_nao_ve_a_lista_de_usuarios(self, client):
+        gestor = User.objects.create_user(
+            username="g", password="s", role=Role.GESTOR, email="g@x.com"
+        )
+        client.force_login(gestor)
+        assert client.get(reverse("accounts:usuarios")).status_code == 403
+        assert client.get(reverse("accounts:solicitacoes")).status_code == 200
 
     def test_aprovar_cria_a_conta_e_envia_a_confirmacao(
         self,

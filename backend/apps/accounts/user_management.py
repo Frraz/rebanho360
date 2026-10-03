@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from apps.accounts import emails, two_factor
 from apps.accounts.models import Role, User, UserFarmAccess
-from apps.accounts.permissions import pode_gerenciar_usuarios
+from apps.accounts.permissions import pode_aprovar_acessos, pode_gerenciar_usuarios
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
 from apps.core.exceptions import BusinessError
@@ -84,6 +84,18 @@ def usuario_em_uso(username: str) -> bool:
 def _exigir_permissao(ator) -> None:
     if not pode_gerenciar_usuarios(ator):
         raise PermissionDenied("Só o administrador gerencia usuários.")
+
+
+def _exigir_permissao_de_acesso(ator, papel) -> None:
+    """Aprovar um pedido de acesso é de `ADMIN` e `GESTOR` (cliente, 2026-10-03).
+    O `GESTOR` não concede `ADMIN`: quem aprova não se eleva nem eleva outro ao
+    topo do sistema."""
+    if not pode_aprovar_acessos(ator):
+        raise PermissionDenied("Só administrador ou gestor aprova pedidos de acesso.")
+    if papel == Role.ADMIN and not pode_gerenciar_usuarios(ator):
+        raise PermissionDenied(
+            "Só o administrador pode conceder o papel de Administrador."
+        )
 
 
 def _motivo(motivo: str) -> str:
@@ -200,11 +212,12 @@ def criar_usuario(
     """Cria a conta. Sem `senha_temporaria`, a conta nasce sem senha utilizável
     e o usuário recebe por e-mail o link para definir a dele; com ela, o
     administrador a repassa por fora e a pessoa troca no primeiro acesso."""
-    _exigir_permissao(ator)
-    if not senha_temporaria and not dados.get("email"):
-        raise BusinessError(
-            "Sem e-mail não há como enviar o convite: defina uma senha temporária."
-        )
+    if veio_de_solicitacao:
+        _exigir_permissao_de_acesso(ator, dados.get("role"))
+    else:
+        _exigir_permissao(ator)
+    if not (dados.get("email") or "").strip():
+        raise BusinessError("Todo usuário precisa de e-mail: informe o endereço.")
     if usuario_em_uso(dados["username"]):
         raise BusinessError(f"O usuário '{dados['username']}' já existe.")
     if email_em_uso(dados.get("email", "")):
@@ -279,6 +292,8 @@ def editar_usuario(
         )
         if deixa_de_administrar:
             _garantir_outro_administrador(usuario)
+    if not (dados.get("email") or "").strip():
+        raise BusinessError("Todo usuário precisa de e-mail: informe o endereço.")
     if email_em_uso(dados.get("email", ""), exceto_pk=usuario.pk):
         raise BusinessError(f"Já existe uma conta com o e-mail {dados['email']}.")
 

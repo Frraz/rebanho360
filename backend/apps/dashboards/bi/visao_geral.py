@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.conf import settings
 from django.urls import reverse
 
 from apps.dashboards import selectors as painel_selectors
@@ -177,7 +176,6 @@ def tabela_por_fazenda(e: Escopo) -> Tabela:
         colunas += ["Comprado", "Vendido", "Custos", "Custo/cabeça"]
     colunas += ["Mortalidade"]
     linhas, marcas, cabecas = [], {}, []
-    limite = Decimal(settings.MORTALIDADE_LIMITE_PERCENTUAL)
     fazendas = e.fazendas()
     for i, f in enumerate(fazendas):
         cb = saldos.get(f.pk, 0)
@@ -195,12 +193,6 @@ def tabela_por_fazenda(e: Escopo) -> Tabela:
             ]
         taxa = m.por_fazenda[f].taxa
         linha.append(specs.formatar(taxa, "pct"))
-        if taxa is not None:
-            marcas[(i, len(linha) - 1)] = (
-                ("ruim", "acima do limite")
-                if taxa > limite
-                else ("bom", "dentro do limite")
-            )
         linhas.append(linha)
         cabecas.append(cb)
     t = Tabela(

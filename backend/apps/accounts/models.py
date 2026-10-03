@@ -40,6 +40,12 @@ class User(AbstractUser):
     # Exclusão lógica (regra 5): o usuário sai da operação, nunca do banco — a
     # auditoria e os registros que ele lançou continuam apontando para ele.
     deleted_at = models.DateTimeField("Excluído em", null=True, blank=True)
+    # "Agora não" no aviso do segundo fator: o lembrete some até esta data e volta
+    # depois (`two_factor.adiar_lembrete`). Guardado no usuário, não no navegador:
+    # vale em qualquer aparelho e sobrevive a limpar o histórico.
+    two_factor_reminder_until = models.DateTimeField(
+        "Lembrete do segundo fator adiado até", null=True, blank=True
+    )
 
     class Meta:
         verbose_name = "Usuário"

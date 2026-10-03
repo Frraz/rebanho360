@@ -273,6 +273,6 @@ E a parte que costuma ser pulada: **restaurar o dump em container descartável e
 
 **Para fechar a fase por completo:** provisionar o VPS, rodar `deploy/deploy.sh` pela primeira vez (F0-17) e depois `deploy/backup.sh` + uma restauração real anotada em `deploy/restore-log.md` (F0-18). Tudo o que não depende de infraestrutura física está pronto e testado.
 
-> **Antes de começar a Fase 1:** resolver a pendência **[#5](../regras-negocio/99-pendencias.md)** — São Francisco e São Francisco II são a mesma fazenda? Bloqueia a carga histórica, e desmembrar depois significa reprocessar todo o razão.
+> **Antes de começar a Fase 1:** resolver a pendência **[#5](../regras-negocio/99-pendencias-resolvidas.md)** — São Francisco e São Francisco II são a mesma fazenda? Bloqueia a carga histórica, e desmembrar depois significa reprocessar todo o razão.
 
 **Próxima:** [Fase 1 — Cadastros e rebanho](fase-1-cadastros-e-rebanho.md)

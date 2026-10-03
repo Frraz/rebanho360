@@ -12,7 +12,7 @@ from apps.procurement import closing, commitments
 from apps.procurement.models import FiscalNote, Settlement, SettlementLine
 from apps.procurement.settlement import (
     calcular_acerto,
-    ratear_extras,
+    sugerir_distribuicao,
 )
 from apps.procurement.tests.conftest import DATA_ACERTO, D, tipo
 
@@ -37,7 +37,7 @@ def linha(nome, valor, **extra):
 class TestCriarAcerto:
     def test_cria_em_andamento(self, acerto):
         assert acerto.status == Status.RASCUNHO
-        assert acerto.code == "AC-2025/26-0001"
+        assert acerto.code == "OP-000001/AC1"  # o número único da operação
 
     def test_so_depois_de_aprovar_o_compromisso(self, escritorio, criar_compromisso):
         with pytest.raises(BusinessError, match="depois da aprovação"):
@@ -245,8 +245,13 @@ class TestAvisos:
             cargas=[{"item": primeiro, "planned_qty": 1}],
         )
         calculo = calcular_acerto(compromisso_duplo)
+        # um título de frete **por viagem**, a cada transportador (cliente, 2026-10-03)
         assert calculo.transportador is None
-        assert any("mais de um transportador" in a for a in calculo.avisos)
+        assert len(calculo.fretes) == 2
+        assert {f.favorecido for f in calculo.fretes} == {
+            compromisso_duplo.trips.first().carrier,
+            outro_transportador,
+        }
 
 
 class TestPrevistoXRealizado:
@@ -276,7 +281,7 @@ class TestPrevistoXRealizado:
         assert por_rotulo["Frete"].previsto is None
 
     def test_item_por_arroba_sem_media_prevista_nao_inventa_valor_previsto(
-        self, escritorio, criar_compromisso, categoria_desmamados
+        self, gestor, criar_compromisso, categoria_desmamados
     ):
         c = commitments.aprovar_compromisso(
             criar_compromisso(
@@ -286,7 +291,7 @@ class TestPrevistoXRealizado:
                     ).dados_item(categoria_desmamados, expected_arrobas=None)
                 ]
             ),
-            usuario=escritorio,
+            usuario=gestor,
         )
         assert calcular_acerto(c).itens[0].valor_previsto is None
 
@@ -387,8 +392,10 @@ class TestComissaoNoAcerto:
         assert c.comissao_total == D("582.00")
 
 
-class TestRateio:
-    """Frete, comissão e tributos são do contrato; as compras são por item."""
+class TestSugestaoDeDistribuicao:
+    """O sistema **não rateia sozinho** (cliente, 2026-10-03). O que sobrou do
+    antigo rateio é só a sugestão que pré-preenche a tela: por cabeça e por
+    valor, sem centavo perdido."""
 
     def _itens(self, cabecas, valores):
         class Falso:
@@ -401,7 +408,7 @@ class TestRateio:
 
     def test_soma_dos_pedacos_e_exatamente_o_total_sem_centavo_perdido(self):
         itens = self._itens([1, 1, 1], [D("100"), D("100"), D("100")])
-        r = ratear_extras(
+        r = sugerir_distribuicao(
             itens,
             frete=D("100.00"),
             comissao=D("0.01"),
@@ -409,9 +416,9 @@ class TestRateio:
             descontos=D("0"),
             abatimentos=D("0"),
         )
-        assert sum(x.freight_value for x in r.values()) == D("100.00")
-        assert sum(x.commission_value for x in r.values()) == D("0.01")
-        assert sorted(x.freight_value for x in r.values()) == [
+        assert sum(x["freight_value"] for x in r.values()) == D("100.00")
+        assert sum(x["commission_value"] for x in r.values()) == D("0.01")
+        assert sorted(x["freight_value"] for x in r.values()) == [
             D("33.33"),
             D("33.33"),
             D("33.34"),
@@ -419,7 +426,7 @@ class TestRateio:
 
     def test_frete_vai_por_cabeca_e_desconto_por_valor(self):
         itens = self._itens([10, 30], [D("10000"), D("90000")])
-        r = ratear_extras(
+        r = sugerir_distribuicao(
             itens,
             frete=D("400"),
             comissao=D("0"),
@@ -427,13 +434,18 @@ class TestRateio:
             descontos=D("1000"),
             abatimentos=D("0"),
         )
-        assert (r[1].freight_value, r[2].freight_value) == (D("100.00"), D("300.00"))
-        # desconto acompanha o preço: 10% e 90% do valor
-        assert (r[1].animal_value, r[2].animal_value) == (D("9900.00"), D("89100.00"))
+        assert (r[1]["freight_value"], r[2]["freight_value"]) == (
+            D("100.00"),
+            D("300.00"),
+        )
+        assert (r[1]["discount_value"], r[2]["discount_value"]) == (
+            D("100.00"),
+            D("900.00"),
+        )
 
     def test_abatimento_vai_pelo_valor_ja_descontado(self):
         itens = self._itens([1, 1], [D("1000"), D("3000")])
-        r = ratear_extras(
+        r = sugerir_distribuicao(
             itens,
             frete=D("0"),
             comissao=D("0"),
@@ -441,12 +453,14 @@ class TestRateio:
             descontos=D("0"),
             abatimentos=D("400"),
         )
-        assert (r[1].abatimento, r[2].abatimento) == (D("100.00"), D("300.00"))
-        assert r[1].titulo_dos_animais == D("900.00")
+        assert (r[1]["abatement_value"], r[2]["abatement_value"]) == (
+            D("100.00"),
+            D("300.00"),
+        )
 
-    def test_sem_itens_nao_ha_rateio(self):
+    def test_sem_itens_nao_ha_sugestao(self):
         assert (
-            ratear_extras(
+            sugerir_distribuicao(
                 [],
                 frete=D("1"),
                 comissao=D("0"),
@@ -457,16 +471,118 @@ class TestRateio:
             == {}
         )
 
-    def test_acerto_com_dois_itens_rateia_o_frete_por_cabeca_recebida(
-        self, compromisso_duplo
+
+class TestDistribuicaoInformadaPeloUsuario:
+    """Com mais de um item, o frete, a comissão, os tributos, os descontos e os
+    adiantamentos são **informados** por item, e a soma tem de fechar."""
+
+    def _distribuir(self, acerto, calculo, usuario, **por_item):
+        primeiro, segundo = calculo.itens
+        closing.registrar_distribuicao(
+            acerto,
+            [
+                {"item": primeiro.item.pk, **por_item.get("primeiro", {})},
+                {"item": segundo.item.pk, **por_item.get("segundo", {})},
+            ],
+            usuario=usuario,
+        )
+
+    def test_sem_distribuir_o_acerto_aponta_o_que_falta(self, compromisso_duplo):
+        # compromisso_duplo: frete de R$ 1.000,00 e dois itens recebidos
+        acerto = closing.criar_acerto(
+            usuario=compromisso_duplo.created_by,
+            compromisso=compromisso_duplo,
+            date=DATA_ACERTO,
+        )
+        c = calcular_acerto(compromisso_duplo)
+        assert any(
+            "Frete (R$ 1.000,00)" in p and "faltam R$ 1.000,00" in p
+            for p in c.pendencias
+        )
+        assert not c.aprovavel
+        assert c.distribuicao_pendente["freight_value"] == D("1000.00")
+        assert acerto.allocations.count() == 0
+
+    def test_soma_que_nao_fecha_e_recusada_na_aprovacao(
+        self, compromisso_duplo, gestor
     ):
+        acerto = closing.criar_acerto(
+            usuario=gestor, compromisso=compromisso_duplo, date=DATA_ACERTO
+        )
+        c = calcular_acerto(compromisso_duplo)
+        self._distribuir(
+            acerto,
+            c,
+            gestor,
+            primeiro={"freight_value": D("300")},
+            segundo={"freight_value": D("600")},
+        )
+        c = calcular_acerto(compromisso_duplo)
+        assert c.distribuicao_pendente["freight_value"] == D("100.00")
+        with pytest.raises(BusinessError, match=r"faltam R\$ 100,00"):
+            closing.aprovar_acerto(acerto, usuario=gestor)
+
+    def test_passar_do_total_tambem_e_recusado(self, compromisso_duplo, gestor):
+        acerto = closing.criar_acerto(
+            usuario=gestor, compromisso=compromisso_duplo, date=DATA_ACERTO
+        )
+        c = calcular_acerto(compromisso_duplo)
+        self._distribuir(
+            acerto,
+            c,
+            gestor,
+            primeiro={"freight_value": D("700")},
+            segundo={"freight_value": D("500")},
+        )
+        c = calcular_acerto(compromisso_duplo)
+        assert any("passa do total" in p for p in c.pendencias)
+
+    def test_distribuicao_que_fecha_vira_o_rateio_das_compras(
+        self, compromisso_duplo, gestor
+    ):
+        acerto = closing.criar_acerto(
+            usuario=gestor, compromisso=compromisso_duplo, date=DATA_ACERTO
+        )
+        c = calcular_acerto(compromisso_duplo)
+        # o usuário escolhe uma divisão que **não** é por cabeça (344,83/655,17)
+        self._distribuir(
+            acerto,
+            c,
+            gestor,
+            primeiro={"freight_value": D("250")},
+            segundo={"freight_value": D("750")},
+        )
         c = calcular_acerto(compromisso_duplo)
         primeiro, segundo = c.itens
         r1, r2 = c.rateios[primeiro.item.pk], c.rateios[segundo.item.pk]
-        assert primeiro.cabecas_recebidas == 10 and segundo.cabecas_recebidas == 19
-        assert r1.freight_value + r2.freight_value == D("1000.00")
-        assert r1.freight_value == D("344.83")  # 1000 × 10/29
+        assert (r1.freight_value, r2.freight_value) == (D("250"), D("750"))
         assert r1.animal_value == D("43200.00") and r2.animal_value == D("57000.00")
+        assert not c.pendencias
+
+    def test_um_item_so_fica_com_tudo_sem_precisar_distribuir(
+        self, acerto, compromisso
+    ):
+        c = calcular_acerto(compromisso)
+        (rateio,) = c.rateios.values()
+        assert rateio.freight_value == c.frete == D("500.00")
+        assert not c.distribuicao_pendente
+
+    def test_a_sugestao_pre_preenche_mas_nao_vale_sozinha(
+        self, client, compromisso_duplo, gestor
+    ):
+        from django.urls import reverse
+
+        acerto = closing.criar_acerto(
+            usuario=gestor, compromisso=compromisso_duplo, date=DATA_ACERTO
+        )
+        client.force_login(gestor)
+        html = client.get(
+            reverse("procurement:acerto_distribuicao", args=[acerto.pk])
+        ).content.decode()
+        assert "sugestão" in html and "344.83" in html
+        # nada foi gravado só por abrir a tela
+        assert acerto.allocations.count() == 0
+        assert calcular_acerto(compromisso_duplo).distribuicao_pendente
 
 
 class TestLinhasEDocumentos:

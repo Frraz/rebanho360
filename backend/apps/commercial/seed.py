@@ -9,7 +9,7 @@ As naturezas dos tipos são **provisórias** (pendência #21): dependem do
 contador e do produtor, e mudam em Tipos de tributo e taxa, sem código.
 """
 
-from apps.commercial.models import CarcassClass, TaxNature, TaxType
+from apps.commercial.models import CarcassClass, PaymentCondition, TaxNature, TaxType
 
 CLASSES = [
     ("MAGRO", "Magro", 1),
@@ -35,7 +35,21 @@ TIPOS = [
 ]
 
 
+CONDICOES = [
+    ("À vista", "0"),
+    ("4 dias", "4"),
+    ("7 dias", "7"),
+    ("15 dias", "15"),
+    ("30 dias", "30"),
+    ("Parcelado em 30, 60 e 90 dias", "30,60,90"),
+]
+
+
 def garantir_cadastros_comerciais() -> None:
+    for ordem, (nome, dias) in enumerate(CONDICOES, start=1):
+        PaymentCondition.objects.get_or_create(
+            name=nome, defaults={"days": dias, "display_order": ordem}
+        )
     for codigo, nome, ordem in CLASSES:
         CarcassClass.objects.get_or_create(
             code=codigo, defaults={"name": nome, "display_order": ordem}

@@ -7,8 +7,7 @@ from django.urls import reverse
 
 from apps.accounts.models import Role, User, UserFarmAccess
 from apps.dashboards import selectors
-from apps.procurement import closing, receivings, trips
-from apps.procurement.tests.conftest import DATA_RECEBIMENTO, DATA_RETIRADA, D
+from apps.procurement import closing
 
 pytestmark = pytest.mark.django_db
 HOJE = datetime.date(2025, 9, 25)
@@ -68,50 +67,6 @@ class TestAcertoAAprovar:
     def test_volta_quando_o_acerto_e_reaberto(self, gestor, acerto_aprovado):
         closing.reabrir_acerto(acerto_aprovado, usuario=gestor, motivo="Corrigir")
         assert "acerto_a_aprovar" in pendencias(gestor)
-
-
-class TestQuebraAcimaDoLimite:
-    def _receber_com_peso(self, escritorio, compromisso, item, transportador, kg):
-        v = trips.criar_viagem(
-            usuario=escritorio,
-            compromisso=compromisso,
-            pickup_date=DATA_RETIRADA,
-            carrier=transportador,
-            cargas=[
-                {
-                    "item": item,
-                    "planned_qty": 10,
-                    "shipped_qty": 10,
-                    "origin_weight_kg": D("5000"),
-                }
-            ],
-        )
-        return receivings.criar_recebimento(
-            usuario=escritorio,
-            viagem=v,
-            date=DATA_RECEBIMENTO,
-            linhas=[
-                {"load": v.loads.get(), "received_qty": 10, "received_weight_kg": D(kg)}
-            ],
-        )
-
-    def test_aparece_quando_passa_do_limite(
-        self, gestor, escritorio, compromisso, item, transportador
-    ):
-        self._receber_com_peso(escritorio, compromisso, item, transportador, "4700")
-        p = pendencias(gestor)["quebra_acima_do_limite"]
-        assert p.quantidade == 1
-        assert "6,00%" in p.exemplos[0] and "5.000 kg → 4.700 kg" in p.exemplos[0]
-
-    def test_dentro_do_limite_nao_aparece(
-        self, gestor, escritorio, compromisso, item, transportador
-    ):
-        self._receber_com_peso(escritorio, compromisso, item, transportador, "4900")
-        assert "quebra_acima_do_limite" not in pendencias(gestor)
-
-    def test_sem_peso_nao_inventa_pendencia(self, gestor, compromisso, recebimento):
-        # o recebimento da fixture tem peso e 2%: dentro do limite
-        assert "quebra_acima_do_limite" not in pendencias(gestor)
 
 
 class TestNaTela:

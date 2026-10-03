@@ -151,6 +151,20 @@ class Invoice(ReversibleModel):
         related_name="invoices",
         on_delete=models.PROTECT,
     )
+    # Frete (por viagem), comissão (por comprador) e tributos (por linha) nascem
+    # do **acerto**, não da compra: cada obrigação tem favorecido e vencimento
+    # próprios (cliente, 2026-10-03, #17 e #18).
+    origin_settlement = models.ForeignKey(
+        "procurement.Settlement",
+        verbose_name="Acerto de origem",
+        null=True,
+        blank=True,
+        related_name="invoices",
+        on_delete=models.PROTECT,
+    )
+    # Distingue vários títulos do mesmo componente na mesma origem: `viagem:12`,
+    # `comissao:3`, `linha:7`, `parcela:2`. Vazio = o título único de sempre.
+    ref = models.CharField("Referência", max_length=30, blank=True, default="")
     document = models.CharField(
         "Documento",
         max_length=60,
@@ -209,21 +223,29 @@ class Invoice(ReversibleModel):
                 name="invoice_due_after_issue",
             ),
             models.CheckConstraint(
-                check=Q(origin_purchase__isnull=True) | Q(origin_sale__isnull=True),
+                # No máximo uma origem: compra, venda ou acerto.
+                check=(Q(origin_purchase__isnull=True) & Q(origin_sale__isnull=True))
+                | (Q(origin_purchase__isnull=True) & Q(origin_settlement__isnull=True))
+                | (Q(origin_sale__isnull=True) & Q(origin_settlement__isnull=True)),
                 name="invoice_single_origin",
             ),
             # A chave de idempotência (F4-02): uma obrigação por operação e
             # componente. Confirmar duas vezes — ou duas pessoas ao mesmo
             # tempo — não gera dois títulos; o banco é quem garante.
             models.UniqueConstraint(
-                fields=["origin_purchase", "component"],
+                fields=["origin_purchase", "component", "ref"],
                 condition=Q(origin_purchase__isnull=False),
                 name="uniq_invoice_purchase_component",
             ),
             models.UniqueConstraint(
-                fields=["origin_sale", "component"],
+                fields=["origin_sale", "component", "ref"],
                 condition=Q(origin_sale__isnull=False),
                 name="uniq_invoice_sale_component",
+            ),
+            models.UniqueConstraint(
+                fields=["origin_settlement", "component", "ref"],
+                condition=Q(origin_settlement__isnull=False),
+                name="uniq_invoice_settlement_component",
             ),
         ]
         indexes = [
@@ -279,7 +301,7 @@ class Invoice(ReversibleModel):
 
     @property
     def origem(self):
-        return self.origin_purchase or self.origin_sale
+        return self.origin_purchase or self.origin_sale or self.origin_settlement
 
     # ---- contrato ReversibleModel -------------------------------------
 

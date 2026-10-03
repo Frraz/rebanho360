@@ -36,6 +36,8 @@
     <div><dt>Cabeças</dt><dd>{{ venda.head_count }}</dd></div>
     <div><dt>Peso vivo</dt><dd>{{ venda.total_weight_kg|kg:0 }}</dd></div>
     {% if venda.carcass_weight_kg %}<div><dt>Carcaça</dt><dd>{{ venda.carcass_weight_kg|kg:2 }}</dd></div>{% endif %}
+    {% if venda.payment_condition %}<div><dt>Condição de recebimento</dt><dd>{{ venda.payment_condition.name }}</dd></div>{% endif %}
+    {% if venda.reported_yield_percent %}<div><dt>Rendimento informado pelo frigorífico</dt><dd>{{ venda.reported_yield_percent|numero:2 }}%</dd></div>{% endif %}
     {% if venda.partnership %}<div><dt>Parceria</dt><dd>{{ venda.partnership }}</dd></div>{% endif %}
     {% if venda.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ venda.notes }}</dd></div>{% endif %}
   </dl>

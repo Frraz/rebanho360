@@ -1,10 +1,8 @@
 """F5-08 — recebimento e quebra de viagem."""
 
 import datetime
-from decimal import Decimal
 
 import pytest
-from django.test import override_settings
 
 from apps.core.exceptions import BlockingDependencyError, BusinessError
 from apps.core.reversible import Status
@@ -35,7 +33,7 @@ def receber(escritorio, viagem):
 class TestCriar:
     def test_cria_recebimento_confirmado(self, recebimento):
         assert recebimento.status == Status.CONFIRMADA
-        assert recebimento.code == "RB-2025/26-0001"
+        assert recebimento.code == "OP-000001/R1"
         assert receivings.cabecas_recebidas(recebimento) == 10
 
     def test_recebimento_nao_escreve_no_razao(self, recebimento):
@@ -134,64 +132,39 @@ class TestCriar:
 
 
 class TestQuebraDeViagem:
-    def test_quebra_calculada(self, recebimento):
-        # saiu 5.000 kg, chegou 4.900: 100 kg = 2%
+    """Cliente, 2026-10-03 (#23): a quebra é **digitada**. O sistema não a
+    calcula, não alerta e não desconta nada do valor dos animais."""
+
+    def test_quebra_e_a_que_o_usuario_digitou(self, receber):
+        recebimento = receber(trip_loss_percent=D("2.5"))
+        quebra = receivings.quebra_da_viagem(recebimento)
+        assert quebra.quebra_percentual == D("2.5")
+
+    def test_nao_calcula_a_quebra_dos_pesos(self, recebimento):
+        # saiu 5.000 kg, chegou 4.900: os pesos aparecem lado a lado, mas o
+        # percentual não é inventado
         quebra = receivings.quebra_da_viagem(recebimento)
         assert quebra.peso_origem_kg == D("5000")
         assert quebra.peso_recebido_kg == D("4900")
-        assert quebra.quebra_kg == D("100")
-        assert quebra.quebra_percentual == D("2")
-        assert quebra.acima_do_limite is False and quebra.parcial is False
+        assert quebra.diferenca_de_peso_kg == D("100")
+        assert quebra.quebra_percentual is None
+        assert recebimento.trip_loss_percent is None
 
-    def test_acima_do_limite_alerta(self, receber, viagem):
-        recebimento = receber(
-            linhas=[
-                {
-                    "load": viagem.loads.get(),
-                    "received_qty": 10,
-                    "received_weight_kg": D("4800"),
-                }
-            ]
-        )
+    def test_nao_ha_alerta_percentual(self, receber):
+        recebimento = receber(trip_loss_percent=D("40"))
         quebra = receivings.quebra_da_viagem(recebimento)
-        assert quebra.quebra_percentual == D("4")
-        assert quebra.acima_do_limite is True  # limite de 3%
+        assert not hasattr(quebra, "acima_do_limite")
 
-    @override_settings(QUEBRA_ALERTA_PERCENTUAL=Decimal("5"))
-    def test_o_limite_vem_da_configuracao(self, receber, viagem):
-        recebimento = receber(
-            linhas=[
-                {
-                    "load": viagem.loads.get(),
-                    "received_qty": 10,
-                    "received_weight_kg": D("4800"),
-                }
-            ]
-        )
-        assert receivings.quebra_da_viagem(recebimento).acima_do_limite is False
+    def test_quebra_fora_de_0_a_100_e_recusada(self, receber):
+        with pytest.raises(BusinessError, match="entre 0 e 100"):
+            receber(trip_loss_percent=D("120"))
 
-    def test_chegou_mais_do_que_saiu_e_quebra_negativa_sem_alerta(
-        self, receber, viagem
-    ):
-        recebimento = receber(
-            linhas=[
-                {
-                    "load": viagem.loads.get(),
-                    "received_qty": 10,
-                    "received_weight_kg": D("5100"),
-                }
-            ]
-        )
-        quebra = receivings.quebra_da_viagem(recebimento)
-        assert quebra.quebra_percentual == D("-2")
-        assert quebra.acima_do_limite is False
-
-    def test_sem_peso_recebido_devolve_none_nao_zero(self, receber, viagem):
+    def test_sem_nada_informado_e_sem_pesos_devolve_none(self, receber, viagem):
         recebimento = receber(linhas=[{"load": viagem.loads.get(), "received_qty": 10}])
         assert receivings.quebra_da_viagem(recebimento) is None
 
-    def test_sem_peso_de_origem_devolve_none(
-        self, escritorio, compromisso, item, receber
+    def test_sem_peso_de_origem_so_vale_a_quebra_informada(
+        self, escritorio, compromisso, item
     ):
         from apps.procurement import trips
 
@@ -205,6 +178,7 @@ class TestQuebraDeViagem:
             usuario=escritorio,
             viagem=viagem,
             date=DATA_RECEBIMENTO,
+            trip_loss_percent=D("1.5"),
             linhas=[
                 {
                     "load": viagem.loads.get(),
@@ -213,16 +187,41 @@ class TestQuebraDeViagem:
                 }
             ],
         )
-        assert receivings.quebra_da_viagem(recebimento) is None
+        quebra = receivings.quebra_da_viagem(recebimento)
+        assert quebra.quebra_percentual == D("1.5")
+        assert quebra.peso_origem_kg is None and quebra.diferenca_de_peso_kg is None
+
+    def test_corrigir_a_quebra_audita(self, recebimento, escritorio):
+        from apps.audit.models import AuditAction, AuditEvent
+
+        receivings.editar_recebimento(
+            recebimento,
+            {"trip_loss_percent": D("3")},
+            None,
+            usuario=escritorio,
+            motivo="Quebra confirmada pelo transportador",
+        )
+        recebimento.refresh_from_db()
+        assert recebimento.trip_loss_percent == D("3")
+        assert AuditEvent.objects.filter(
+            entity_id=str(recebimento.pk), action=AuditAction.UPDATE
+        ).exists()
 
     def test_quebra_nao_desconta_nada_do_valor(
         self, recebimento, romaneio, compromisso
     ):
-        """Pendência #23: só mede e alerta. O valor sai do romaneio."""
         from apps.procurement.settlement import calcular_acerto
 
-        assert receivings.quebra_da_viagem(recebimento).quebra_kg == D("100")
-        assert calcular_acerto(compromisso).valor_dos_animais == D("43200.00")
+        antes = calcular_acerto(compromisso).valor_dos_animais
+        # a quebra só é informada depois: o valor não se mexe
+        receivings.editar_recebimento(
+            recebimento,
+            {"trip_loss_percent": D("9")},
+            None,
+            usuario=recebimento.created_by,
+            motivo="Informando a quebra",
+        )
+        assert calcular_acerto(compromisso).valor_dos_animais == antes == D("43200.00")
 
     def test_diferenca_de_cabecas(self, receber, viagem):
         recebimento = receber(linhas=[{"load": viagem.loads.get(), "received_qty": 9}])
@@ -274,7 +273,7 @@ class TestEditarExcluir:
     def test_pode_lancar_outro_depois_de_excluir(self, recebimento, receber, gestor):
         receivings.excluir_recebimento(recebimento, usuario=gestor, motivo="Errado")
         novo = receber()
-        assert novo.code == "RB-2025/26-0002"
+        assert novo.code == "OP-000001/R2"
 
     def test_nao_restaura_se_ja_ha_outro(self, recebimento, receber, gestor):
         excluido = receivings.excluir_recebimento(

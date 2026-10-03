@@ -147,7 +147,10 @@ class TestReabrir:
         compra = compra_do(compromisso)
         assert compra.status == Status.CONFIRMADA
         assert compra.animal_value == D("45900.00")  # 170 @ × R$ 270
-        assert compra.invoices.filter(status=Status.CONFIRMADA).count() == 2
+        assert compra.invoices.filter(status=Status.CONFIRMADA).count() == 1  # animais
+        assert (
+            acerto_aprovado.invoices.filter(status=Status.CONFIRMADA).count() == 1
+        )  # frete
 
     def test_reaprovar_nao_duplica_compra_nem_titulo(
         self, acerto_aprovado, compromisso, gestor
@@ -306,7 +309,7 @@ class TestDependentesDasCompras:
         impacto = analisar_impacto(acerto_aprovado)
         assert impacto.exige_cascata
         assert any(d.pk == venda.pk for d in impacto.dependentes)
-        assert any("a compra CP-" in e for e in impacto.efeitos)
+        assert any("a compra OP-" in e for e in impacto.efeitos)
 
 
 class TestExcluirERestaurar:
@@ -334,7 +337,7 @@ class TestExcluirERestaurar:
             compromisso=compromisso,
             date=datetime.date(2025, 9, 21),
         )
-        assert novo.code == "AC-2025/26-0002"
+        assert novo.code == "OP-000001/AC2"
 
     def test_restaurar_aprovado_reaprova_com_os_valores_de_agora(
         self, acerto_aprovado, compromisso, gestor

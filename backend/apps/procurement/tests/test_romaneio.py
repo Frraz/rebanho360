@@ -195,7 +195,7 @@ class TestRegistrar:
             grading.registrar_romaneio(item, [linha(classe)], usuario=escritorio)
 
     def test_item_por_cabeca_nao_tem_romaneio(
-        self, escritorio, criar_compromisso, categoria_desmamados, classe
+        self, escritorio, gestor, criar_compromisso, categoria_desmamados, classe
     ):
         from apps.procurement import commitments
 
@@ -210,7 +210,7 @@ class TestRegistrar:
                     )
                 ]
             ),
-            usuario=escritorio,
+            usuario=gestor,
         )
         with pytest.raises(BusinessError, match="por cabeça"):
             grading.registrar_romaneio(

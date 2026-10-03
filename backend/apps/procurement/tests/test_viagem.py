@@ -39,7 +39,7 @@ def nova_viagem(escritorio, compromisso, item, transportador):
 class TestCriar:
     def test_cria_viagem_confirmada_com_cargas(self, viagem):
         assert viagem.status == Status.CONFIRMADA
-        assert viagem.code == "VG-2025/26-0001"
+        assert viagem.code == "OP-000001/V1"  # o número da operação + a etapa
         assert viagem.loads.count() == 1
         assert viagem.distance_km == 100  # herdada do compromisso
 
@@ -80,11 +80,11 @@ class TestCriar:
             nova_viagem(cargas=[])
 
     def test_item_de_outro_compromisso_e_recusado(
-        self, nova_viagem, criar_compromisso, escritorio
+        self, nova_viagem, criar_compromisso, gestor
     ):
         from apps.procurement import commitments
 
-        outro = commitments.aprovar_compromisso(criar_compromisso(), usuario=escritorio)
+        outro = commitments.aprovar_compromisso(criar_compromisso(), usuario=gestor)
         with pytest.raises(BusinessError, match="não pertence"):
             nova_viagem(cargas=[{"item": outro.items.get(), "planned_qty": 5}])
 
@@ -115,7 +115,7 @@ class TestCriar:
 
     def test_um_compromisso_pode_ter_varias_viagens(self, nova_viagem):
         a, b = nova_viagem(), nova_viagem()
-        assert (a.code, b.code) == ("VG-2025/26-0001", "VG-2025/26-0002")
+        assert (a.code, b.code) == ("OP-000001/V1", "OP-000001/V2")
 
 
 class TestFretePrevisto:

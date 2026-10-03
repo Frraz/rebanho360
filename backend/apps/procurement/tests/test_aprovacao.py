@@ -22,13 +22,6 @@ from apps.purchases.models import Purchase
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def acerto_duplo(escritorio, compromisso_duplo):
-    return closing.criar_acerto(
-        usuario=escritorio, compromisso=compromisso_duplo, date=DATA_ACERTO
-    )
-
-
 class TestAprovar:
     def test_aprovar_gera_uma_compra_por_item_recebido(
         self, acerto_duplo, aprovar, compromisso_duplo
@@ -58,7 +51,7 @@ class TestAprovar:
             D("57000.00"),
             D("10400"),
         )
-        # o frete do contrato inteiro, dividido por cabeça recebida
+        # o frete do contrato inteiro, como o usuário o distribuiu
         assert (a.freight_value, b.freight_value) == (D("344.83"), D("655.17"))
         assert a.freight_value + b.freight_value == D("1000.00")
 
@@ -81,7 +74,14 @@ class TestAprovar:
             ).count()
             == 2
         )  # animais + frete
-        assert Invoice.objects.filter(origin_purchase=compra).count() == 2  # títulos
+        # a compra só gera o título dos animais; o frete tem título próprio, do acerto
+        assert Invoice.objects.filter(origin_purchase=compra).count() == 1
+        assert (
+            Invoice.objects.filter(
+                origin_settlement=acerto_aprovado, component="FRETE"
+            ).count()
+            == 1
+        )
         assert compra.lot.origin_purchase_id == compra.pk
 
     def test_o_gado_so_entra_no_rebanho_na_aprovacao(
@@ -107,7 +107,7 @@ class TestAprovar:
             criar_compromisso(
                 itens=[dados_item(categoria_desmamados, lot=lote_sao_francisco)]
             ),
-            usuario=escritorio,
+            usuario=gestor,
         )
         item = c.items.get()
         v = trips.criar_viagem(
@@ -225,50 +225,148 @@ class TestAprovar:
 
 
 class TestComissaoEFavorecidos:
+    """Frete por **viagem**, comissão por **comprador**, tributo por **linha**:
+    cada um com favorecido e vencimento próprios, gerados pelo acerto."""
+
     def test_comissao_vira_titulo_com_favorecido(
         self, acerto, aprovar, compromisso, escritorio, comissionado, transportador
     ):
         commitments.definir_comissao(
             compromisso,
             tipo="PERCENTUAL",
-            base="BRUTO",
             valor=D("1"),
             favorecido=comissionado,
             usuario=escritorio,
         )
         aprovar(acerto)
         compra = compromisso.items.get().purchase
-        titulos = {
-            t.component: t for t in Invoice.objects.filter(origin_purchase=compra)
+        do_acerto = {
+            t.component: t for t in Invoice.objects.filter(origin_settlement=acerto)
         }
 
-        assert compra.commission_value == D("432.00")
-        assert titulos["COMISSAO"].payee == comissionado
-        assert titulos["COMISSAO"].amount == D("432.00")
-        assert titulos["FRETE"].payee == transportador
-        assert titulos["ANIMAIS"].payee == compromisso.seller
+        assert compra.commission_value == D("432.00")  # o custo do lote
+        assert do_acerto["COMISSAO"].payee == comissionado
+        assert do_acerto["COMISSAO"].amount == D("432.00")
+        assert do_acerto["FRETE"].payee == transportador
+        animais = Invoice.objects.get(origin_purchase=compra)
+        assert animais.component == "ANIMAIS" and animais.payee == compromisso.seller
 
-    def test_frete_com_um_so_transportador_tem_favorecido_sem_comissao_tambem(
-        self, acerto_aprovado, compromisso, transportador
+    def test_cada_comprador_tem_o_proprio_titulo_e_vencimento(
+        self, acerto, aprovar, compromisso, escritorio, comissionado, outro_comissionado
     ):
-        titulo = Invoice.objects.get(
-            origin_purchase=compromisso.items.get().purchase, component="FRETE"
+        commitments.definir_comissao(
+            compromisso,
+            tipo="PERCENTUAL",
+            valor=D("1"),
+            favorecido=comissionado,
+            vencimento=datetime.date(2025, 10, 10),
+            usuario=escritorio,
         )
-        assert titulo.payee == transportador and titulo.amount == D("500.00")
-
-    def test_tributo_vira_titulo_de_impostos_sem_favorecido(
-        self, acerto, aprovar, compromisso, escritorio
-    ):
-        closing.registrar_linhas(
-            acerto,
-            [{"tax_type": tipo("Funrural"), "amount": D("300")}],
+        commitments.definir_comissao(
+            compromisso,
+            tipo="VALOR",
+            valor=D("250"),
+            favorecido=outro_comissionado,
             usuario=escritorio,
         )
         aprovar(acerto)
+        titulos = Invoice.objects.filter(
+            origin_settlement=acerto, component="COMISSAO"
+        ).order_by("amount")
+
+        assert [(t.payee, t.amount) for t in titulos] == [
+            (outro_comissionado, D("250.00")),
+            (comissionado, D("432.00")),
+        ]
+        # vencimento próprio: o de um comprador não é o do outro
+        assert titulos[1].due_date == datetime.date(2025, 10, 10)
+        assert titulos[0].due_date == acerto.date
+        # o custo do lote soma as duas comissões
+        assert compromisso.items.get().purchase.commission_value == D("682.00")
+
+    def test_frete_e_um_titulo_por_viagem_ao_transportador_dela(
+        self, acerto_aprovado, compromisso, transportador
+    ):
         titulo = Invoice.objects.get(
-            origin_purchase=compromisso.items.get().purchase, component="IMPOSTOS"
+            origin_settlement=acerto_aprovado, component="FRETE"
         )
-        assert titulo.amount == D("300.00") and titulo.payee is None
+        assert titulo.payee == transportador and titulo.amount == D("500.00")
+        assert titulo.ref.startswith("viagem:")
+
+    def test_tributo_vira_titulo_com_o_favorecido_que_o_usuario_informou(
+        self, acerto, aprovar, compromisso, escritorio, outro_comissionado
+    ):
+        closing.registrar_linhas(
+            acerto,
+            [
+                {
+                    "tax_type": tipo("Funrural"),
+                    "amount": D("300"),
+                    "rate_percent": D("1.5"),
+                    "base_amount": D("20000"),
+                    "payee": outro_comissionado,
+                    "due_date": datetime.date(2025, 10, 20),
+                },
+                {"tax_type": tipo("GTA"), "amount": D("40")},
+            ],
+            usuario=escritorio,
+        )
+        aprovar(acerto)
+        titulos = {
+            t.amount: t
+            for t in Invoice.objects.filter(
+                origin_settlement=acerto, component="IMPOSTOS"
+            )
+        }
+        # o sistema não presume alíquota nem favorecido: usa o que foi digitado
+        assert titulos[D("300.00")].payee == outro_comissionado
+        assert titulos[D("300.00")].due_date == datetime.date(2025, 10, 20)
+        assert titulos[D("40.00")].payee is None
+        assert len(titulos) == 2
+
+    def test_reabrir_cancela_os_titulos_do_acerto_e_aprovar_de_novo_nao_duplica(
+        self, acerto, aprovar, compromisso, escritorio, gestor
+    ):
+        aprovar(acerto)
+        antes = Invoice.objects.filter(
+            origin_settlement=acerto, status=Status.CONFIRMADA
+        ).count()
+        assert antes == 1  # o frete
+        closing.reabrir_acerto(acerto, usuario=gestor, motivo="conferência")
+        assert not Invoice.objects.filter(
+            origin_settlement=acerto, status=Status.CONFIRMADA
+        ).exists()
+        acerto.refresh_from_db()
+        closing.aprovar_acerto(acerto, usuario=gestor)
+        assert (
+            Invoice.objects.filter(
+                origin_settlement=acerto, status=Status.CONFIRMADA
+            ).count()
+            == 1
+        )
+        assert Invoice.objects.filter(origin_settlement=acerto).count() == 1
+
+    def test_pagamento_de_titulo_do_acerto_bloqueia_a_reabertura(
+        self, acerto_aprovado, gestor, financeiro
+    ):
+        from apps.finance import services as fin
+
+        frete = Invoice.objects.get(
+            origin_settlement=acerto_aprovado, component="FRETE"
+        )
+        hoje = datetime.date.today()
+        fin.programar_titulo(frete, usuario=gestor, data=hoje)
+        fin.aprovar_titulo(frete, usuario=gestor)
+        fin.baixar_titulo(
+            frete,
+            usuario=financeiro,
+            date=hoje,
+            amount=frete.amount,
+            method="TED",
+            document="TED-FRETE-1",
+        )
+        with pytest.raises(BlockingDependencyError, match="pagamento"):
+            closing.reabrir_acerto(acerto_aprovado, usuario=gestor, motivo="x")
 
     def test_adiantamento_e_credito_reduzem_so_o_titulo_dos_animais(
         self, acerto, aprovar, compromisso, escritorio
@@ -334,7 +432,8 @@ class TestComissaoEFavorecidos:
         compra = compras.criar_compra(usuario=escritorio, **dados_compra_direta)
         compras.confirmar_compra(compra, usuario=escritorio)
         titulos = {t.component: t for t in compra.invoices.all()}
-        assert titulos["FRETE"].payee is None  # "a definir", como na Fase 4
+        assert titulos["FRETE"].payee is None  # "a definir", como na Fase 4: só o
+        # acerto sabe a quem pagar o frete
         assert titulos["ANIMAIS"].amount == dados_compra_direta["animal_value"]
 
 

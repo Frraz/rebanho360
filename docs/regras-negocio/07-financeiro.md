@@ -46,11 +46,11 @@ Confirmar **compra** gera um título a pagar por valor preenchido:
 | `ANIMAIS` | o vendedor | `animal_value` |
 | `FRETE`, `COMISSAO`, `IMPOSTOS` | **a definir** | `freight_value`, `commission_value`, `tax_value` |
 
-Confirmar **venda** gera um título a receber (`VENDA`) do comprador. Vencimento = data da operação + `payment_days` (campo novo, opcional; vazio = vence na data). Ver [#16](99-pendencias.md#16--prazo-e-parcelamento-do-pagamento-fase-4) e [#17](99-pendencias.md#17--quem-recebe-o-frete-a-comissão-e-os-impostos-e-quem-aprova-e-paga-fase-4).
+Confirmar **venda** gera um título a receber (`VENDA`) do comprador. Vencimento = data da operação + o prazo da **condição de recebimento** escolhida (ou `payment_days`; vazio = vence na data). Condição **parcelada** gera um título por parcela (`ref` = `parcela:1`, `parcela:2`…), com a soma exata em centavos. As condições são **cadastro do usuário** (`commercial.PaymentCondition`). Ver [#16](99-pendencias-resolvidas.md#16--prazo-e-parcelamento-do-pagamento-fase-4) e [#17](99-pendencias-resolvidas.md#17--quem-recebe-o-frete-a-comissão-e-os-impostos-e-quem-aprova-e-paga-fase-4).
 
 **Idempotente.** A chave é `(operação, componente)`, com `UNIQUE` no banco. Confirmar duas vezes, ou duas pessoas ao mesmo tempo, gera um título por componente — há teste de concorrência. A confirmação é uma transação: se o título falhar, a compra não confirma.
 
-**O histórico não gera título.** O importador passa `gerar_titulos=False`: o que a planilha traz já foi pago fora do sistema, e títulos de 2025 apareceriam todos como vencidos. Para as compras e vendas já confirmadas, a tela **Operações sem título** (e o botão no detalhe da operação) gera sob demanda — decisão de quem conhece o caso. Ver [#18](99-pendencias.md).
+**O histórico não gera título.** O importador passa `gerar_titulos=False`: o que a planilha traz já foi pago fora do sistema, e títulos de 2025 apareceriam todos como vencidos. Para as compras e vendas já confirmadas, a tela **Operações sem título** (e o botão no detalhe da operação) gera sob demanda — decisão de quem conhece o caso. Ver [#18](99-pendencias-resolvidas.md).
 
 ### Corrigir, excluir e restaurar a operação
 
@@ -61,6 +61,10 @@ Os títulos são **efeitos** da compra/venda, como o movimento e os custos:
 - **Excluir a operação** cancela os títulos na mesma cascata (mesma `cascade_root`). **Restaurar** traz de volta os que saíram *com ela* (`voided_with_origin`); título que alguém cancelou à mão continua cancelado.
 - Compra do histórico (sem título) não ganha título por ter sido corrigida.
 
+## Títulos do acerto (cliente, 2026-10-03)
+
+Os títulos de **frete, comissão e tributos** de uma operação do ciclo de compra nascem do **acerto aprovado**, não da compra: **um título por viagem** (ao transportador dela), **um por comprador** e **um por linha de tributo** (ao favorecido que o usuário informou), cada um com **vencimento próprio** — vazio, a data do acerto. A chave de idempotência é `(origem, componente, ref)`: `ref` = `viagem:12`, `comissao:3`, `linha:7` ou `parcela:2`; vazio é o título único de sempre. A compra do ciclo só gera o título dos animais. Reabrir o acerto cancela esses títulos na mesma cascata; baixa em qualquer um deles bloqueia a reabertura. A **previsão** de pagamento antes do acerto não entra no fluxo de caixa. Ver [08](08-ciclo-de-compra.md).
+
 ## Programar e aprovar (F4-03)
 
 **Quem aprova não é quem executa.** Duas permissões distintas:
@@ -70,12 +74,12 @@ Os títulos são **efeitos** da compra/venda, como o movimento e os custos:
 | Ver títulos | — | `ADMIN`, `GESTOR`, `FINANCEIRO`, `ESCRITORIO`, `CONSULTA` (só das fazendas do escopo) |
 | Ver dado bancário | — | `ADMIN`, `GESTOR`, `FINANCEIRO` |
 | Lançar, corrigir, programar | — | `ADMIN`, `GESTOR`, `FINANCEIRO`, `ESCRITORIO` |
-| **Aprovar** | `finance.approve_payment` | `ADMIN`, `GESTOR`, `FINANCEIRO` |
-| **Dar baixa** | `finance.execute_payment` | `ADMIN`, `FINANCEIRO` |
+| **Aprovar** | `finance.approve_payment` | `ADMIN`, `GESTOR` (cliente, 2026-10-03: aprova quem autoriza) |
+| **Dar baixa** | `finance.execute_payment` | `FINANCEIRO` (e `ADMIN`, perfil superior) |
 | **Desfazer baixa** | — | `ADMIN`, `FINANCEIRO` (com motivo) |
 | Cancelar / restaurar título | — | `GESTOR`, `ADMIN` (com motivo) |
 
-Além da permissão, o serviço recusa que **quem aprovou dê a baixa no mesmo título** quando há outro usuário ativo que possa fazê-lo (com acesso de escrita àquela fazenda): *"Quem aprova não é quem paga… Peça a outro usuário financeiro para dar a baixa (Maria)."* Se for o **único** usuário financeiro, a baixa passa — o sistema não tranca a operação — e fica na auditoria: *"Aprovação e baixa feitas pela mesma pessoa"*.
+Além da permissão — o `GESTOR` aprova e não paga; o `FINANCEIRO` paga e não aprova —, o serviço recusa que **quem aprovou (um `ADMIN`) dê a baixa no mesmo título** quando há outro usuário ativo que possa fazê-lo (com acesso de escrita àquela fazenda): *"Quem aprova não é quem paga… Peça a outro usuário financeiro para dar a baixa (Maria)."* Se for o **único** usuário financeiro, a baixa passa — o sistema não tranca a operação — e fica na auditoria: *"Aprovação e baixa feitas pela mesma pessoa"*.
 
 Pagar sem aprovação é recusado. Título sem favorecido não se programa. Tirar uma aprovação exige motivo e é de quem pode aprovar.
 

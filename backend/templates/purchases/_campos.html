@@ -46,7 +46,9 @@
       {% include "purchases/_campo_previa.html" with field=form.tax_value %}
     </div>
     {% include "purchases/_previa_custo.html" %}
+    {% include "partials/_field.html" with field=form.payment_condition %}
     {% include "partials/_field.html" with field=form.payment_days %}
+    {% include "partials/_field.html" with field=form.entry_yield_percent %}
   </div>
 </section>
 

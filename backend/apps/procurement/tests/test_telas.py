@@ -145,10 +145,13 @@ class TestFluxoPelasTelas:
                 "date": "2025-09-01",
                 "seller": produtor.pk,
                 "destination_farm": sao_francisco.pk,
-                "commissioned": comissionado.pk,
                 "pickup_date": "2025-09-03",
                 "payment_days": "30",
                 "acao": "aprovar",
+                **formset(
+                    "compradores",
+                    [{"partner": comissionado.pk, "type": "PERCENTUAL", "value": ""}],
+                ),
                 **formset(
                     "itens",
                     [
@@ -168,7 +171,9 @@ class TestFluxoPelasTelas:
         assert resposta.status_code == 302, resposta.content.decode()[:2000]
         compromisso = Commitment.objects.get()
         assert compromisso.status == Status.CONFIRMADA
-        assert compromisso.commission.value == D("1")  # regra gravada
+        assert compromisso.commission.value == D(
+            "1"
+        )  # a regra vigente, gravada na aprovação
         item = compromisso.items.get()
 
         # viagem
@@ -200,6 +205,7 @@ class TestFluxoPelasTelas:
             reverse("procurement:recebimento_novo", args=[viagem.pk]),
             {
                 "date": "2025-09-04",
+                "trip_loss_percent": "2",
                 **formset(
                     "linhas",
                     [
@@ -453,6 +459,7 @@ class TestFormularios:
                 "seller": produtor.pk,
                 "destination_farm": sao_francisco.pk,
                 "distance_km": "120",
+                **formset("compradores", []),
                 **formset(
                     "itens",
                     [
@@ -473,7 +480,7 @@ class TestFormularios:
         assert "Informe o motivo" in resposta.content.decode()
 
     def test_romaneio_de_item_por_cabeca_redireciona_com_mensagem(
-        self, client, escritorio, criar_compromisso, categoria_desmamados
+        self, client, escritorio, gestor, criar_compromisso, categoria_desmamados
     ):
         from apps.procurement import commitments
         from apps.procurement.tests.conftest import dados_item
@@ -489,7 +496,7 @@ class TestFormularios:
                     )
                 ]
             ),
-            usuario=escritorio,
+            usuario=gestor,
         )
         client.force_login(escritorio)
         resposta = client.get(

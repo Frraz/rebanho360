@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Infraestrutura · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1 class="page-title">Infraestrutura</h1>
+    <p class="page-subtitle max-w-3xl">Curral, cocho, bebedouro e o que mais a fazenda tem, de forma resumida. As razões por animal são calculadas do que você informa.</p>
+  </div>
+  <div class="page-actions">
+    {% if pode_gerenciar %}<a href="{% url 'infrastructure:estrutura_nova' %}" class="btn-primary">{% icon "plus" %} Nova estrutura</a>{% endif %}
+  </div>
+</header>
+
+<div class="table-wrap">
+  {% if estruturas %}
+  <table class="table table-stack">
+    <thead><tr><th scope="col">Estrutura</th><th scope="col">Fazenda</th><th scope="col" class="num">Área (m²)</th><th scope="col" class="num">Cocho (m)</th><th scope="col" class="num">Bebedouros</th><th scope="col" class="num">Animais</th><th scope="col" class="num">m² por animal</th><th scope="col" class="num">Cocho (cm/cab.)</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      {% for e in estruturas %}
+      <tr>
+        <td class="cell-title font-medium">{{ e }}</td>
+        <td data-label="Fazenda">{{ e.farm.name }}</td>
+        <td data-label="Área (m²)" class="num">{{ e.area_m2|numero:0|default:"—" }}</td>
+        <td data-label="Cocho (m)" class="num">{% if e.trough_m is not None %}{{ e.trough_m|numero:1 }}{% else %}—{% endif %}</td>
+        <td data-label="Bebedouros" class="num">{{ e.waterers|default_if_none:"—" }}</td>
+        <td data-label="Animais" class="num">{{ e.animals|default_if_none:"—" }}</td>
+        <td data-label="m² por animal" class="num">{% if e.area_por_animal is None %}—{% else %}{{ e.area_por_animal|numero:1 }}{% endif %}</td>
+        <td data-label="Cocho (cm/cab.)" class="num">{% if e.cocho_cm_por_cabeca is None %}—{% else %}{{ e.cocho_cm_por_cabeca|numero:0 }}{% endif %}</td>
+        <td data-label="Situação" class="cell-status">{% if e.is_active %}<span class="badge-confirmada">Ativa</span>{% else %}<span class="badge-excluida">Inativa</span>{% endif %}</td>
+        <td class="cell-actions num">{% if pode_gerenciar %}<a href="{% url 'infrastructure:estrutura_editar' e.pk %}" class="btn-ghost btn-sm">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {% url 'infrastructure:estrutura_nova' as url_nova %}
+  {% if pode_gerenciar %}
+  {% include "partials/_empty.html" with icone="building-2" titulo="Nenhuma estrutura cadastrada" texto="Cadastre o curral, os cochos e os bebedouros da fazenda." url=url_nova acao="Nova estrutura" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="building-2" titulo="Nenhuma estrutura cadastrada" %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

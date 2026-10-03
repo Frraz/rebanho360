@@ -9,7 +9,7 @@ tipo (docs/ux/01#formulário-de-campo).
 
 from django import forms
 
-from apps.herd.models import MovementType, WeighingReason
+from apps.herd.models import DeathCause, MovementType, WeighingReason
 from apps.livestock.models import AnimalCategory, Lot
 from apps.partners.models import Partner
 from apps.properties.models import Farm
@@ -62,6 +62,11 @@ class MovementForm(forms.Form):
     )
     reason = forms.CharField(
         label="Motivo", required=False, widget=forms.Textarea(attrs={"rows": 2})
+    )
+    death_cause = forms.ChoiceField(
+        label="Causa da morte",
+        required=False,
+        choices=[("", "Não informada")] + list(DeathCause.choices),
     )
     notes = forms.CharField(
         label="Observação", required=False, widget=forms.Textarea(attrs={"rows": 2})

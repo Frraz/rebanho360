@@ -44,6 +44,75 @@ class CarcassClass(models.Model):
         return self.name
 
 
+class PaymentCondition(models.Model):
+    """Condição de pagamento ou recebimento: à vista, 4 dias, 30 dias,
+    parcelado… **Cadastro do usuário** (cliente, 2026-10-03, pendências #16 e
+    #35): cada empresa cria as suas e escolhe na compra, no compromisso e na
+    venda. O sistema não presume uma regra única.
+
+    `days` guarda os dias após a data da operação, separados por vírgula: `0`
+    (à vista), `30` (prazo único) ou `30,60,90` (parcelado em três vezes).
+    """
+
+    name = models.CharField("Nome", max_length=80, unique=True)
+    days = models.CharField(
+        "Dias",
+        max_length=60,
+        default="0",
+        help_text="Dias depois da data da operação. Um número = à vista ou prazo "
+        "único; vários separados por vírgula = parcelado (ex.: 30,60,90).",
+    )
+    is_active = models.BooleanField("Ativa", default=True)
+    display_order = models.PositiveSmallIntegerField("Ordem", default=0)
+
+    class Meta:
+        verbose_name = "Condição de pagamento"
+        verbose_name_plural = "Condições de pagamento"
+        ordering = ["display_order", "name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def prazos(self) -> list[int]:
+        return parse_prazos(self.days)
+
+    @property
+    def parcelado(self) -> bool:
+        return len(self.prazos) > 1
+
+    @property
+    def primeiro_prazo(self) -> int:
+        return self.prazos[0]
+
+    @property
+    def resumo(self) -> str:
+        prazos = self.prazos
+        if prazos == [0]:
+            return "à vista"
+        if len(prazos) == 1:
+            return f"{prazos[0]} dias"
+        return f"{len(prazos)} parcelas: " + ", ".join(f"{d} dias" for d in prazos)
+
+
+def parse_prazos(texto: str) -> list[int]:
+    """`"30, 60,90"` → `[30, 60, 90]`. Levanta `ValueError` se não for número
+    inteiro não negativo ou se estiver fora de ordem."""
+    partes = [p.strip() for p in (texto or "").split(",") if p.strip()]
+    if not partes:
+        raise ValueError("Informe pelo menos um prazo.")
+    prazos = []
+    for parte in partes:
+        if not parte.isdigit():
+            raise ValueError(f"'{parte}' não é um número de dias.")
+        prazos.append(int(parte))
+    if prazos != sorted(prazos):
+        raise ValueError("Os prazos devem estar em ordem crescente.")
+    if len(set(prazos)) != len(prazos):
+        raise ValueError("Há prazos repetidos.")
+    return prazos
+
+
 class TaxNature(models.TextChoices):
     TRIBUTO = "TRIBUTO", "Tributo"
     TAXA = "TAXA", "Taxa"
@@ -65,6 +134,20 @@ class TaxType(models.Model):
     nature = models.CharField(
         "Natureza", max_length=14, choices=TaxNature.choices, default=TaxNature.TAXA
     )
+    # O que o valor faz no acerto. Vazio = o padrão da natureza (ver
+    # `procurement.settlement.TRATAMENTO_POR_NATUREZA`). O cliente não quer que
+    # o sistema presuma quem arca com cada item: aqui o usuário decide por tipo.
+    effect = models.CharField(
+        "Efeito no acerto",
+        max_length=20,
+        blank=True,
+        choices=[
+            ("CUSTO", "Soma ao custo de aquisição e gera título"),
+            ("DESCONTO_NO_ANIMAL", "Reduz o valor dos animais"),
+            ("ABATE_NO_LIQUIDO", "Reduz só o líquido a pagar ao vendedor"),
+        ],
+        help_text="Vazio = o padrão da natureza escolhida.",
+    )
     display_order = models.PositiveSmallIntegerField("Ordem", default=0)
     is_active = models.BooleanField("Ativo", default=True)
 
@@ -80,6 +163,9 @@ class TaxType(models.Model):
 class CommissionType(models.TextChoices):
     PERCENTUAL = "PERCENTUAL", "Percentual"
     POR_CABECA = "POR_CABECA", "Valor por cabeça"
+    # Só na comissão da operação (não em regra): negociação que não segue
+    # percentual — o valor é informado diretamente (cliente, 2026-10-03).
+    VALOR = "VALOR", "Valor informado (R$)"
 
 
 class CommissionBase(models.TextChoices):

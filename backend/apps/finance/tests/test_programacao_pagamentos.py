@@ -1,6 +1,7 @@
 """Programação de pagamentos (documento funcional, seções 4.3 e 10): o que há a
-pagar, com favorecido, vencimento, valor e conta — e o dado bancário só para
-quem pode vê-lo."""
+pagar, com favorecido, vencimento, valor e situação. **Sem dado bancário**:
+cliente, 2026-10-03 — banco, agência e conta só aparecem no contrato e na
+conferência do acerto."""
 
 import datetime
 from decimal import Decimal
@@ -47,32 +48,27 @@ def _titulo_manual(escritorio, sao_francisco, vencimento, valor="1000.00", **ext
     )
 
 
-def test_financeiro_ve_favorecido_conta_e_compra(
-    financeiro, sao_francisco, titulo, compra
-):
+def test_financeiro_ve_favorecido_e_compra(financeiro, sao_francisco, titulo, compra):
     relatorio = _montar(financeiro, sao_francisco)
     linha = _linha(relatorio, titulo.code)
 
     assert linha["compra"] == compra.code
     assert linha["favorecido"] == titulo.payee.name
-    assert linha["banco"] == "Banco do Brasil"
-    assert linha["agencia"] == "1234"
-    assert linha["conta"] == "98765-4"
     assert linha["atencao"] == ""
-    assert {"banco", "agencia", "conta"} <= {c.chave for c in relatorio.colunas}
 
 
-def test_quem_nao_ve_dado_bancario_nao_recebe_banco_agencia_nem_conta(
-    escritorio, sao_francisco, titulo
+@pytest.mark.parametrize("papel", ["financeiro", "gestor", "escritorio"])
+def test_nenhum_papel_recebe_banco_agencia_nem_conta(
+    request, papel, sao_francisco, titulo
 ):
-    relatorio = _montar(escritorio, sao_francisco)
+    usuario = request.getfixturevalue(papel)
+    relatorio = _montar(usuario, sao_francisco)
 
     chaves = {c.chave for c in relatorio.colunas}
     assert chaves.isdisjoint({"banco", "agencia", "conta"})
     # Nem escondido na linha: o CSV e o PDF montam a partir daqui.
     texto = services.csv_do_relatorio(relatorio)
     assert "98765-4" not in texto and "Banco do Brasil" not in texto
-    assert any("dado bancário" in n for n in relatorio.notas)
 
 
 def test_campo_recebe_403(client, campo_baixao, titulo):
@@ -196,7 +192,7 @@ def test_tela_csv_e_xlsx_abrem_para_o_financeiro(client, financeiro, titulo):
     assert client.get(url).status_code == 200
     csv = client.get(url, {"formato": "csv"})
     assert csv.status_code == 200
-    assert "98765-4" in csv.content.decode("utf-8-sig")
+    assert "98765-4" not in csv.content.decode("utf-8-sig")
     assert client.get(url, {"formato": "xlsx"}).status_code == 200
 
 

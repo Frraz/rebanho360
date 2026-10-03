@@ -11,12 +11,11 @@ from __future__ import annotations
 import datetime
 from decimal import Decimal
 
-from django.conf import settings
 from django.urls import reverse
 
 from apps.sales import carcass
 
-from . import compras, custos, financeiro, lotes, rebanho, specs, vendas
+from . import compras, custos, financeiro, lotes, specs, vendas
 from .escopo import Escopo, somar_mes
 from .specs import Insight
 
@@ -33,28 +32,6 @@ FRACAO_DO_GMD_MEDIO = Decimal("0.5")
 VARIACAO_DE_RENDIMENTO_PP = Decimal("1")
 
 ORDEM = {"alerta": 0, "atencao": 1, "info": 2, "positivo": 3}
-
-
-def _mortalidade(e: Escopo) -> Insight | None:
-    limite = Decimal(settings.MORTALIDADE_LIMITE_PERCENTUAL)
-    acima = [
-        (f, t)
-        for f, t in rebanho.mortalidade(e).por_fazenda.items()
-        if t.taxa is not None and t.taxa > limite
-    ]
-    if not acima:
-        return None
-    acima.sort(key=lambda ft: -ft[1].taxa)
-    f, t = acima[0]
-    resto = f" e mais {len(acima) - 1} fazenda(s)" if len(acima) > 1 else ""
-    return Insight(
-        "alerta",
-        "Mortalidade acima do limite",
-        f"{f.name}{resto}: {specs.formatar(t.taxa, 'pct')} na safra "
-        f"({t.mortes} morte(s)), contra o limite de {specs.formatar(limite, 'pct')}.",
-        reverse("herd:movimento_lista"),
-        "Ver movimentações",
-    )
 
 
 def _lotes_no_prejuizo(e: Escopo) -> Insight | None:
@@ -273,7 +250,6 @@ def _margem_positiva(e: Escopo) -> Insight | None:
 
 
 REGRAS = (
-    _mortalidade,
     _lotes_no_prejuizo,
     _vencidos,
     _concentracao_de_vendedor,

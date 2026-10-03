@@ -29,7 +29,10 @@
   <dl class="facts">
     <div><dt>Retirada</dt><dd>{{ viagem.pickup_date|date:"d/m/Y" }}</dd></div>
     <div><dt>Transportador</dt><dd>{{ viagem.carrier.name|default:"—" }}</dd></div>
-    <div><dt>Motorista · placa</dt><dd>{{ viagem.driver_name|default:"—" }}{% if viagem.vehicle_plate %} <span class="code">{{ viagem.vehicle_plate }}</span>{% endif %}</dd></div>
+    <div><dt>Motorista</dt><dd>{{ viagem.driver_name|default:"—" }}</dd></div>
+    <div><dt>Veículo · placa</dt><dd>{{ viagem.vehicle|default:"—" }}{% if viagem.vehicle_plate %} <span class="code">{{ viagem.vehicle_plate }}</span>{% endif %}</dd></div>
+    <div><dt>ADF</dt><dd>{% if viagem.adf_number %}<span class="code">{{ viagem.adf_number }}</span>{% else %}—{% endif %}</dd></div>
+    <div><dt>Vencimento do frete</dt><dd>{% if viagem.freight_due_date %}{{ viagem.freight_due_date|date:"d/m/Y" }}{% else %}na data do acerto{% endif %}</dd></div>
     <div><dt>Distância</dt><dd>{% if viagem.distance_km %}{{ viagem.distance_km }} km{% else %}—{% endif %}</dd></div>
     {% if viagem.notes %}<div class="col-span-2 sm:col-span-3 lg:col-span-4"><dt>Observações</dt><dd>{{ viagem.notes }}</dd></div>{% endif %}
   </dl>

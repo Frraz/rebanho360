@@ -1,8 +1,9 @@
 """`CommissionService` — escolher e calcular a comissão. **Isolado de propósito.**
 
-A pendência #4 (a comissão incide sobre o valor bruto ou o líquido?) está
-aberta. Tudo que depende da resposta mora neste arquivo, para ajustá-la sem
-tocar em nada mais (docs/regras-negocio/99-pendencias.md#4).
+Pendência #4, respondida pelo cliente em 2026-10-03: o percentual incide sobre
+o **valor bruto dos animais**; a comissão também pode ser informada
+diretamente (`VALOR`). Tudo que depende disso mora neste arquivo
+(docs/regras-negocio/99-pendencias-resolvidas.md#4).
 
 Não grava nada: devolve o valor, e quem chama decide onde ele vai. O que
 fica gravado na operação é o **snapshot da regra** (`procurement.Commission`),
@@ -57,14 +58,19 @@ def calcular_comissao(
 ) -> Decimal | None:
     """Valor da comissão em reais, ou `None` quando falta dado.
 
-    - `PERCENTUAL` sobre o **bruto** (valor dos animais) ou sobre o **líquido**
-      (bruto menos frete e tributos, `deducoes`; nunca negativo).
+    - `PERCENTUAL` sobre o **bruto** (valor dos animais; é a base que o cliente
+      confirmou em 2026-10-03). O **líquido** (bruto menos frete e tributos,
+      `deducoes`) segue só para regras antigas.
+    - `VALOR`: o valor em reais informado diretamente.
     - `POR_CABECA`: cabeças × valor.
 
     Arredonda **uma vez, no fim** (ADR 0005). Sem a base, devolve `None` — a
     tela mostra "—" e não "R$ 0,00".
     """
     valor = Decimal(valor)
+    if tipo == CommissionType.VALOR:
+        # Informada diretamente: a negociação não seguiu percentual.
+        return quantize_money(valor)
     if tipo == CommissionType.POR_CABECA:
         if not cabecas:
             return None

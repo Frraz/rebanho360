@@ -131,7 +131,7 @@ class TestPendencias:
     def test_lote_novo_sem_pesagem_ainda_nao_e_pendencia(self, gestor, lote_gordo):
         assert "sem_pesagem" not in chaves(gestor, hoje=datetime.date(2025, 8, 20))
 
-    def test_mortalidade_acima_do_limite(
+    def test_mortalidade_alta_nao_gera_pendencia_automatica(
         self, gestor, escritorio, lote_gordo, sao_francisco, categoria_25_36, season
     ):
         herd.registrar_movimento(
@@ -145,12 +145,11 @@ class TestPendencias:
             reason="Picada de cobra",
         )
 
-        p = chaves(gestor, season=season, hoje=datetime.date(2025, 7, 31))[
-            "mortalidade"
-        ]
-
-        assert p.texto == "1 fazenda com mortalidade acima do normal"
-        assert "São Francisco" in p.exemplos[0] and "limite 2%" in p.exemplos[0]
+        # Cliente, 2026-10-03 (#15): o sistema não define o que é "acima do
+        # normal" nem alerta por percentual de mortalidade.
+        assert "mortalidade" not in chaves(
+            gestor, season=season, hoje=datetime.date(2025, 7, 31)
+        )
 
     def test_mortalidade_dentro_do_limite_nao_aparece(
         self, gestor, escritorio, lote_gordo, sao_francisco, categoria_25_36, season

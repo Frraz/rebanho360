@@ -213,11 +213,11 @@ class TestFluxoPelaTela:
         assert "depois da aprovação" in resposta.content.decode()
 
     def test_quem_aprova_nao_paga_na_tela(
-        self, client, titulo, escritorio, financeiro, financeiro2
+        self, client, titulo, escritorio, admin_fin, financeiro
     ):
         programado(titulo, escritorio)
-        services.aprovar_titulo(titulo, usuario=financeiro)
-        client.force_login(financeiro)
+        services.aprovar_titulo(titulo, usuario=admin_fin)
+        client.force_login(admin_fin)
 
         resposta = client.post(
             reverse("finance:titulo_baixar", args=[titulo.pk]),

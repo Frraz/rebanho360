@@ -29,12 +29,12 @@ Pode esperar: até aqui os pagamentos continuam sendo controlados fora do sistem
 - Corrigir/excluir/restaurar a operação mexe nos títulos como efeitos dela; valor ou favorecido diferentes anulam a aprovação.
 - `Purchase.bloqueios()` olha também os pagamentos da **venda do lote** que a compra criou — o caso do documento.
 
-**Pendências abertas pela fase:** [#16](../regras-negocio/99-pendencias.md) (prazo/parcelas), [#17](../regras-negocio/99-pendencias.md) (a quem vão frete/comissão/impostos; quem aprova e paga), [#18](../regras-negocio/99-pendencias.md) (o histórico), [#19](../regras-negocio/99-pendencias.md) (troca de celular no 2FA). Tudo com padrão reversível.
+**Pendências abertas pela fase:** [#16](../regras-negocio/99-pendencias-resolvidas.md) (prazo/parcelas), [#17](../regras-negocio/99-pendencias-resolvidas.md) (a quem vão frete/comissão/impostos; quem aprova e paga), [#18](../regras-negocio/99-pendencias-resolvidas.md) (o histórico), [#19](../regras-negocio/99-pendencias.md) (troca de celular no 2FA). Tudo com padrão reversível.
 
 **O que não foi feito, e por quê**
 
 - **F4-10 (deploy):** falta o VPS. Há passos novos — **reconstruir a imagem** (`segno`), migrações `accounts` 0002, `audit` 0004, `purchases` 0002, `sales` 0002, `finance` 0001 — e a conferência do 2FA abaixo.
-- Sem parcelamento em títulos separados, sem conciliação bancária, sem remessa/arquivo de pagamento: nada disso foi pedido ([#16](../regras-negocio/99-pendencias.md)).
+- Sem parcelamento em títulos separados, sem conciliação bancária, sem remessa/arquivo de pagamento: nada disso foi pedido ([#16](../regras-negocio/99-pendencias-resolvidas.md)).
 
 **2FA no deploy (F4-10):** desde 03/10/2026 o segundo fator é **opcional** (não há mais `TWO_FACTOR_ENFORCED`). Rode `docker compose exec web python manage.py conferir_segundo_fator` para ver a **hora do servidor** (confira `timedatectl`: NTP ativo) e quem já usa; recomende a cada um ativar na página *Conta* e guardar os códigos de recuperação. Se alguém perder celular e códigos: `manage.py resetar_segundo_fator <usuário>` (ou outro `ADMIN`, pela tela de usuários).
 

@@ -53,7 +53,7 @@
 {% else %}
 <div class="table-wrap">
   {% if situacao == "PENDENTE" %}
-  {% include "partials/_empty.html" with icone="circle-check" titulo="Nenhuma solicitação pendente" texto="Quando alguém pedir acesso pela tela de entrada, o pedido aparece aqui e chega no e-mail dos administradores." %}
+  {% include "partials/_empty.html" with icone="circle-check" titulo="Nenhuma solicitação pendente" texto="Quando alguém pedir acesso pela tela de entrada, o pedido aparece aqui e chega no e-mail dos administradores e gestores." %}
   {% else %}
   {% include "partials/_empty.html" with icone="users" titulo="Nenhuma solicitação nesta situação" %}
   {% endif %}

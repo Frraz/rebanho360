@@ -1,6 +1,5 @@
 """Settings comuns. `dev.py` e `prod.py` herdam e sobrescrevem."""
 
-from decimal import Decimal
 from pathlib import Path
 
 import dj_database_url
@@ -32,6 +31,8 @@ INSTALLED_APPS = [
     "apps.partners",
     "apps.livestock",
     "apps.herd",
+    "apps.reproduction",
+    "apps.infrastructure",
     "apps.costs",
     "apps.purchases",
     "apps.sales",
@@ -91,17 +92,20 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.EmailOuUsuarioBackend"]
 
+# Política de senha **liberal, de propósito** (decisão de Warley, 2026-10-03): o
+# sistema é privado, o login tem limite de tentativas e o segundo fator é
+# opcional, então não se exige complexidade — vale qualquer senha com 4 ou mais
+# caracteres, inclusive `0000` ou `abcde`. Sem validador de semelhança com o
+# usuário, de senha comum nem de senha só numérica. Para endurecer, é só
+# acrescentar validadores aqui (e subir `min_length`).
+SENHA_TAMANHO_MINIMO = 4
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
-    },
-    {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 10},
+        "OPTIONS": {"min_length": SENHA_TAMANHO_MINIMO},
     },
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 PASSWORD_HASHERS = [
@@ -189,6 +193,11 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB (anexo)
 # perfis sensíveis: com o segundo fator ativo, a sessão deles morre ao fechar
 # o navegador.
 TWO_FACTOR_ROLES = ("ADMIN", "FINANCEIRO")
+# Pendência #19: o cliente ainda avalia se o segundo fator é sustentável na
+# operação. Se adotar, será obrigatório para **todos** os usuários (não só
+# `ADMIN` e `FINANCEIRO`): basta ligar esta variável — quem ainda não ativou é
+# levado direto à configuração no próximo acesso.
+TWO_FACTOR_OBRIGATORIO = config("TWO_FACTOR_OBRIGATORIO", default=False, cast=bool)
 TWO_FACTOR_ISSUER = "Rebanho360"
 # Passos de 30 s aceitos antes e depois do atual — tolera relógio de celular
 # levemente atrasado, sem abrir a janela demais.
@@ -236,12 +245,6 @@ LOGGING = {
     },
 }
 
-# --- Regras de negócio com número que o produtor ainda não confirmou ---
-# Mortalidade "acima do normal" no painel de pendências (por safra e fazenda).
-# Palpite do desenvolvimento, não regra do produtor: pendência #15.
-MORTALIDADE_LIMITE_PERCENTUAL = Decimal("2")
-
-# Quebra de viagem "acima do normal" (peso de origem × peso recebido). Só alerta,
-# não desconta nada. Palpite do desenvolvimento, não regra do produtor:
-# pendência #23.
-QUEBRA_ALERTA_PERCENTUAL = Decimal("3")
+# Mortalidade "acima do normal" e quebra de viagem "acima do normal" deixaram de
+# existir (cliente, 2026-10-03, pendências #15 e #23): o sistema registra e
+# mostra os números, mas não define o que é anormal nem gera alerta percentual.

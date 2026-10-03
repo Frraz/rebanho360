@@ -4,9 +4,11 @@ Cada geração é um `GeneratedDocument` próprio, com a **versão do template**
 hash do arquivo: o PDF guardado é a reprodução exata do que foi impresso, mesmo
 que o layout mude depois (docs/relatorios/01#documentos-gerados).
 
-**Dado bancário não vai no contrato.** O pagamento nasce do título, que aponta
-para a conta do favorecido; contrato impresso circula, e conta de terceiros não
-deve circular em papel (regra de segurança do projeto).
+**Dado bancário** (banco, agência e conta do produtor) **vai no contrato** — o
+cliente confirmou em 2026-10-03 que o modelo de contrato de compra já os traz
+(pendência #27). Mas só quando quem gera o PDF já pode ver dado bancário
+(`ADMIN`, `GESTOR`, `FINANCEIRO`): para os demais, o contrato sai sem os três
+campos, e a geração com dado bancário fica registrada na auditoria.
 """
 
 import hashlib
@@ -23,13 +25,16 @@ from apps.core import context as ctx
 from apps.core.exceptions import BusinessError
 from apps.core.reversible import Status
 from apps.documents.models import DocumentStatus, DocumentType, GeneratedDocument
+from apps.finance.permissions import pode_ver_dado_bancario
+from apps.finance.services import conta_padrao
+from apps.procurement import commitments
 from apps.procurement.models import Commitment, PriceBasis
 from apps.procurement.permissions import pode_ver_o_ciclo
 
 logger = logging.getLogger(__name__)
 
 #: Muda quando o layout do contrato muda. Fica gravada em cada documento.
-TEMPLATE_VERSION = "contrato-v1"
+TEMPLATE_VERSION = "contrato-v2"
 
 
 def contratos_do_compromisso(compromisso: Commitment):
@@ -40,12 +45,31 @@ def contratos_do_compromisso(compromisso: Commitment):
     ).select_related("generated_by")
 
 
-def renderizar_html(compromisso: Commitment, *, emitido_por: str, emitido_em) -> str:
+def conta_do_produtor(compromisso: Commitment):
+    """A conta padrão do produtor (ou a única que ele tem); `None` se não há."""
+    return conta_padrao(compromisso.seller)
+
+
+def renderizar_html(
+    compromisso: Commitment, *, emitido_por: str, emitido_em, com_dado_bancario=False
+) -> str:
     itens = list(compromisso.items.select_related("category").order_by("number"))
     return render_to_string(
         "documents/contrato.html",
         {
             "compromisso": compromisso,
+            "compradores": commitments.comissoes_do(compromisso),
+            "conta": conta_do_produtor(compromisso) if com_dado_bancario else None,
+            "com_dado_bancario": com_dado_bancario,
+            "condicao": (
+                compromisso.payment_condition.resumo
+                if compromisso.payment_condition_id
+                else (
+                    f"{compromisso.payment_days} dias"
+                    if compromisso.payment_days
+                    else "à vista"
+                )
+            ),
             "empresa": ctx.current_company(),
             "itens": itens,
             "por_arroba": PriceBasis.ARROBA,
@@ -83,7 +107,12 @@ def gerar_contrato(compromisso: Commitment, *, usuario) -> GeneratedDocument:
     try:
         import weasyprint
 
-        html = renderizar_html(compromisso, emitido_por=str(usuario), emitido_em=agora)
+        html = renderizar_html(
+            compromisso,
+            emitido_por=str(usuario),
+            emitido_em=agora,
+            com_dado_bancario=pode_ver_dado_bancario(usuario),
+        )
         pdf = weasyprint.HTML(string=html).write_pdf()
     except Exception:  # o usuário vê o motivo e o código, nunca um traceback
         logger.exception("Falha ao gerar o contrato %s", documento.document_id)
@@ -111,7 +140,8 @@ def gerar_contrato(compromisso: Commitment, *, usuario) -> GeneratedDocument:
         action=AuditAction.EXPORT,
         entity_type="Documento",
         entity_id=str(documento.document_id),
-        reason=f"{documento.title} · versão {compromisso.version} do compromisso",
+        reason=f"{documento.title} · versão {compromisso.version} do compromisso"
+        + (" · com dados bancários" if pode_ver_dado_bancario(usuario) else ""),
         actor=usuario,
     )
     registrar_operacao(

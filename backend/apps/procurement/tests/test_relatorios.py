@@ -126,13 +126,13 @@ class TestProgramacao:
         )
 
     def test_abate_traz_item_a_item_com_as_faixas_e_a_regra_gravada(
-        self, escritorio, season, rascunho, regra_de_comissao
+        self, escritorio, season, rascunho, regra_de_comissao, gestor
     ):
-        commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        commitments.aprovar_compromisso(rascunho, usuario=gestor)
         r = montar(escritorio, "programacao-de-abate", season)
         (linha,) = r.linhas
         assert linha["precos"] == "216,00 / 237,60 / 248,40 / 270,00 / 270,00"
-        assert linha["comissao"] == "1,00% sobre o bruto"
+        assert linha["comissao"] == "1,00% sobre o valor bruto dos animais"
         assert linha["pagamento"] == "30 dias" and linha["cabecas"] == 10
         assert linha["media_arrobas"] == D("17.00")
 
@@ -140,7 +140,7 @@ class TestProgramacao:
         assert montar(escritorio, "programacao-de-abate", season).linhas == []
 
     def test_abate_item_por_cabeca_mostra_o_preco_por_cabeca(
-        self, escritorio, season, criar_compromisso, categoria_desmamados
+        self, escritorio, gestor, season, criar_compromisso, categoria_desmamados
     ):
         from apps.procurement.tests.conftest import dados_item
 
@@ -155,7 +155,7 @@ class TestProgramacao:
                     )
                 ]
             ),
-            usuario=escritorio,
+            usuario=gestor,
         )
         linha = montar(escritorio, "programacao-de-abate", season).linhas[0]
         assert "por cabeça" in linha["precos"]
@@ -261,9 +261,9 @@ class TestConferenciaDoAcerto:
 
 class TestComissaoPorComprador:
     def test_mostra_a_regra_gravada_nao_a_do_cadastro_de_hoje(
-        self, escritorio, season, rascunho, regra_de_comissao, comissionado
+        self, escritorio, season, rascunho, regra_de_comissao, comissionado, gestor
     ):
-        compromisso = commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        compromisso = commitments.aprovar_compromisso(rascunho, usuario=gestor)
         regra_de_comissao.value = D("9")
         regra_de_comissao.base = "LIQUIDO"
         regra_de_comissao.save()
@@ -273,14 +273,16 @@ class TestComissaoPorComprador:
 
         r = montar(escritorio, "comissao-por-comprador", season)
         (linha,) = r.linhas
-        assert linha["regra"] == "1,00% sobre o bruto"  # a de janeiro, não a de hoje
+        assert (
+            linha["regra"] == "1,00% sobre o valor bruto dos animais"
+        )  # a de janeiro, não a de hoje
         assert linha["comprador"] == comissionado.name
         assert linha["compromisso"] == compromisso.code
 
     def test_comissao_so_aparece_com_animal_recebido(
-        self, escritorio, season, rascunho, regra_de_comissao
+        self, escritorio, season, rascunho, regra_de_comissao, gestor
     ):
-        commitments.aprovar_compromisso(rascunho, usuario=escritorio)
+        commitments.aprovar_compromisso(rascunho, usuario=gestor)
         linha = montar(escritorio, "comissao-por-comprador", season).linhas[0]
         assert linha["comissao"] is None and linha["cabecas"] is None  # "—", não 0
         assert linha["situacao"] == "Sem acerto"
@@ -333,14 +335,15 @@ class TestFretesEQuebra:
         assert linha["previsto"] == D("500.00") and linha["realizado"] == D("620")
         assert linha["diferenca"] == D("120.00")
         assert linha["origem"] == D("5000") and linha["recebido"] == D("4900")
-        assert linha["quebra"] == D("2") and linha["alerta"] == "Dentro do limite"
+        # a quebra não é calculada dos pesos: só vale a digitada (cliente, #23)
+        assert linha["quebra"] is None
 
     def test_sem_recebimento_a_quebra_e_none(self, escritorio, season, viagem):
         (linha,) = montar(escritorio, "fretes-e-quebra", season).linhas
-        assert linha["quebra"] is None and linha["alerta"] is None
+        assert linha["quebra"] is None
         assert linha["realizado"] is None and linha["diferenca"] is None
 
-    def test_quebra_acima_do_limite_sai_marcada(
+    def test_quebra_informada_sai_no_relatorio_sem_marca_de_limite(
         self, escritorio, season, compromisso, item, transportador
     ):
         from apps.procurement import receivings, trips
@@ -363,6 +366,7 @@ class TestFretesEQuebra:
             usuario=escritorio,
             viagem=v,
             date=datetime.date(2025, 9, 4),
+            trip_loss_percent=D("6"),
             linhas=[
                 {
                     "load": v.loads.get(),
@@ -371,8 +375,10 @@ class TestFretesEQuebra:
                 }
             ],
         )
-        (linha,) = montar(escritorio, "fretes-e-quebra", season).linhas
-        assert linha["quebra"] == D("6") and linha["alerta"] == "Acima do limite"
+        relatorio = montar(escritorio, "fretes-e-quebra", season)
+        (linha,) = relatorio.linhas
+        assert linha["quebra"] == D("6")
+        assert "alerta" not in linha
 
 
 class TestHistoricoPorPecuarista:
@@ -393,12 +399,9 @@ class TestHistoricoPorPecuarista:
         assert linha["pagamento"] == "30 dias" and linha["distancia"] == 100
 
     def test_item_por_cabeca_deixa_arroba_em_none(
-        self, escritorio, season, compromisso_duplo, gestor
+        self, escritorio, season, compromisso_duplo, acerto_duplo, gestor
     ):
-        acerto = closing.criar_acerto(
-            usuario=escritorio, compromisso=compromisso_duplo, date=DATA_ACERTO
-        )
-        closing.aprovar_acerto(acerto, usuario=gestor)
+        closing.aprovar_acerto(acerto_duplo, usuario=gestor)
         (linha,) = montar(escritorio, "historico-por-pecuarista", season).linhas
         assert linha["preco_arroba"] is None and linha["custo_arroba"] is None
         assert linha["media_arrobas"] is None

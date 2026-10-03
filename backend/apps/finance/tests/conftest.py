@@ -28,6 +28,13 @@ def financeiro(sao_francisco, baixao):
 
 
 @pytest.fixture
+def admin_fin():
+    """Administrador: aprova pagamento e, como perfil superior, também pode
+    executá-lo — mas não o que ele mesmo aprovou, havendo outro executor."""
+    return _usuario("admin_fin", Role.ADMIN)
+
+
+@pytest.fixture
 def financeiro2(sao_francisco, baixao):
     return _usuario("financeiro2", Role.FINANCEIRO, sao_francisco, baixao)
 

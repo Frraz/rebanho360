@@ -51,6 +51,12 @@
     <input type="text" inputmode="decimal" id="rendimento_entrada" name="rendimento_entrada" value="{{ rendimento_entrada }}" class="field-input" placeholder="ex.: 48">
   </div>
   {% endif %}
+  {% if aceita_preco_arroba %}
+  <div class="sm:col-span-2">
+    <label class="field-label" for="preco_arroba">Preço de mercado da @ viva (R$) — para valorizar o estoque</label>
+    <input type="text" inputmode="decimal" id="preco_arroba" name="preco_arroba" value="{{ preco_arroba }}" class="field-input" placeholder="ex.: 300">
+  </div>
+  {% endif %}
   <div class="flex justify-end sm:col-span-2">
     <button type="submit" class="btn-primary w-full sm:w-auto">Aplicar filtros</button>
   </div>

@@ -45,12 +45,11 @@ class TestPermissao:
     def test_so_o_admin_gerencia(self, client, papel):
         usuario = User.objects.create_user(username="x", password="s", role=papel)
         client.force_login(usuario)
-        for nome in (
-            "accounts:usuarios",
-            "accounts:usuario_novo",
-            "accounts:solicitacoes",
-        ):
+        for nome in ("accounts:usuarios", "accounts:usuario_novo"):
             assert client.get(reverse(nome)).status_code == 403
+        # Decidir pedidos de acesso é de ADMIN e GESTOR (cliente, 2026-10-03).
+        status = 200 if papel == Role.GESTOR else 403
+        assert client.get(reverse("accounts:solicitacoes")).status_code == status
 
     def test_is_staff_sozinho_nao_basta(self, client):
         staff = User.objects.create_user(
@@ -70,13 +69,23 @@ class TestPermissao:
         with pytest.raises(PermissionDenied):
             _criar(gestor, fazenda_a)
 
-    def test_menu_so_aparece_para_o_admin(self, cliente_admin, client, admin):
+    def test_menu_aparece_para_admin_e_gestor_e_nao_para_os_demais(
+        self, cliente_admin, client, admin
+    ):
         assert (
             "Usuários e acessos"
             in cliente_admin.get(reverse("dashboards:inicio")).content.decode()
         )
         gestor = User.objects.create_user(username="g", password="s", role=Role.GESTOR)
         client.force_login(gestor)
+        html = client.get(reverse("dashboards:inicio")).content.decode()
+        assert "Usuários e acessos" in html
+        # o gestor cai direto nas solicitações: a lista de usuários não é dele
+        assert f'href="{reverse("accounts:solicitacoes")}"' in html
+        escritorio = User.objects.create_user(
+            username="e", password="s", role=Role.ESCRITORIO
+        )
+        client.force_login(escritorio)
         assert (
             "Usuários e acessos"
             not in client.get(reverse("dashboards:inicio")).content.decode()
@@ -126,7 +135,7 @@ class TestCriar:
     ):
         usuario = gestao.criar_usuario(
             ator=admin,
-            dados={"username": "joao", **DADOS, "email": ""},
+            dados={"username": "joao", **DADOS},
             acessos={fazenda_a: True},
             senha_temporaria="temporaria-4321",
         )
@@ -153,18 +162,49 @@ class TestCriar:
         assert usuario.must_change_password is False
         assert client.get(reverse("dashboards:inicio")).status_code == 200
 
-    def test_sem_email_e_sem_senha_nao_cria(self, admin, fazenda_a):
-        with pytest.raises(BusinessError, match="senha temporária"):
-            _criar(admin, fazenda_a, email="")
+    @pytest.mark.parametrize("senha_temporaria", [None, "temporaria-4321"])
+    def test_todo_usuario_precisa_de_email(self, admin, fazenda_a, senha_temporaria):
+        """Cliente, 2026-10-03 (#31): e-mail obrigatório, com ou sem convite."""
+        with pytest.raises(BusinessError, match="precisa de e-mail"):
+            gestao.criar_usuario(
+                ator=admin,
+                dados={"username": "joao", **DADOS, "email": ""},
+                acessos={fazenda_a: True},
+                senha_temporaria=senha_temporaria,
+            )
 
-    def test_senha_fraca_e_recusada(self, admin, fazenda_a):
-        with pytest.raises(BusinessError):
+    def test_editar_nao_deixa_tirar_o_email(self, admin, fazenda_a):
+        usuario = _criar(admin, fazenda_a)
+        with pytest.raises(BusinessError, match="precisa de e-mail"):
+            gestao.editar_usuario(
+                usuario,
+                ator=admin,
+                dados={**DADOS, "email": ""},
+                acessos={fazenda_a: True},
+                motivo="teste",
+            )
+
+    def test_senha_curta_demais_e_recusada(self, admin, fazenda_a):
+        """Política liberal (2026-10-03): o único requisito é ter 4 caracteres."""
+        with pytest.raises(BusinessError, match="4 caracteres"):
             gestao.criar_usuario(
                 ator=admin,
                 dados={"username": "joao", **DADOS},
                 acessos={fazenda_a: True},
-                senha_temporaria="12345",
+                senha_temporaria="123",
             )
+
+    @pytest.mark.parametrize(
+        "senha", ["0000", "1111", "abcde", "senha", "ABCD", "a1b2"]
+    )
+    def test_senha_simples_e_aceita(self, admin, fazenda_a, senha):
+        usuario = gestao.criar_usuario(
+            ator=admin,
+            dados={"username": "joao", **DADOS},
+            acessos={fazenda_a: True},
+            senha_temporaria=senha,
+        )
+        assert usuario.check_password(senha)
 
     def test_email_repetido_ignora_maiusculas(self, admin, fazenda_a):
         _criar(admin, fazenda_a)
@@ -446,11 +486,9 @@ class TestSenhaESessoes:
         assert "/contas/senha/redefinir/" in mailoutbox[-1].body
 
     def test_link_de_senha_sem_email_explica_o_caminho(self, admin, fazenda_a):
-        usuario = gestao.criar_usuario(
-            ator=admin,
-            dados={"username": "sem", **DADOS, "email": ""},
-            acessos={fazenda_a: True},
-            senha_temporaria="temporaria-4321",
+        # conta antiga, de antes da regra de e-mail obrigatório
+        usuario = User.objects.create_user(
+            username="sem", password="temporaria-4321", role=Role.CAMPO, email=""
         )
         with pytest.raises(BusinessError, match="senha temporária"):
             gestao.enviar_link_de_senha(
@@ -577,7 +615,7 @@ class TestTelas:
     ):
         usuario = gestao.criar_usuario(
             ator=admin,
-            dados={"username": "joao", **DADOS, "email": ""},
+            dados={"username": "joao", **DADOS},
             acessos={fazenda_a: True},
             senha_temporaria="temporaria-4321",
         )

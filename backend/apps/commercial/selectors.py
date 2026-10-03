@@ -1,6 +1,11 @@
 """Leitura dos cadastros comerciais."""
 
-from apps.commercial.models import CarcassClass, CommissionRule, TaxType
+from apps.commercial.models import (
+    CarcassClass,
+    CommissionRule,
+    PaymentCondition,
+    TaxType,
+)
 
 
 def listar_classes():
@@ -21,3 +26,11 @@ def tipos_ativos():
 
 def listar_regras_de_comissao():
     return CommissionRule.objects.select_related("commissioned", "category")
+
+
+def listar_condicoes():
+    return PaymentCondition.objects.all()
+
+
+def condicoes_ativas():
+    return PaymentCondition.objects.filter(is_active=True)

@@ -81,6 +81,23 @@ class Purchase(ReversibleModel):
     payment_days = models.PositiveSmallIntegerField(
         "Prazo de pagamento (dias)", null=True, blank=True
     )
+    payment_condition = models.ForeignKey(
+        "commercial.PaymentCondition",
+        verbose_name="Condição de pagamento",
+        null=True,
+        blank=True,
+        related_name="+",
+        on_delete=models.PROTECT,
+    )
+    # Rendimento de carcaça estimado na entrada, informado (cliente, 2026-10-03):
+    # alimenta a @ produzida do lote. ~50% é referência de uso, não padrão fixo.
+    entry_yield_percent = models.DecimalField(
+        "Rendimento estimado de entrada (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     # Texto livre, preservado e sem efeito em cálculo — pendência #3.
     partnership = models.CharField("Parceria", max_length=100, blank=True)
     notes = models.TextField("Observações", blank=True)
@@ -173,7 +190,7 @@ class Purchase(ReversibleModel):
         )
         for campo, centro, rotulo in (
             ("animal_value", "DESPESA GADO", "animais"),
-            ("freight_value", "DESPESA GADO", "frete"),
+            ("freight_value", "FRETE", "frete"),
             ("commission_value", "COMISSÃO", "comissão"),
             ("tax_value", "IMPOSTO E TAXAS", "impostos"),
         ):

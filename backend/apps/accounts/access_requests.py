@@ -24,7 +24,7 @@ from django.utils import timezone
 from apps.accounts import emails
 from apps.accounts import user_management as usuarios
 from apps.accounts.models import AccessRequest, AccessRequestStatus, User
-from apps.accounts.permissions import pode_gerenciar_usuarios
+from apps.accounts.permissions import pode_aprovar_acessos
 from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
 from apps.core.exceptions import BusinessError
@@ -145,8 +145,8 @@ def aprovar_solicitacao(
 ) -> User:
     """Cria a conta com o papel e as fazendas que o administrador escolheu e
     envia ao solicitante o e-mail de confirmação com o link da senha."""
-    if not pode_gerenciar_usuarios(ator):
-        raise PermissionDenied("Só o administrador decide solicitações.")
+    if not pode_aprovar_acessos(ator):
+        raise PermissionDenied("Só administrador ou gestor decide solicitações.")
     solicitacao = _travar_pendente(solicitacao)
     # O e-mail é o do pedido: é para ele que o link de senha vai.
     usuario = usuarios.criar_usuario(
@@ -177,8 +177,8 @@ def aprovar_solicitacao(
 def recusar_solicitacao(
     solicitacao: AccessRequest, *, ator, motivo: str, avisar: bool
 ) -> None:
-    if not pode_gerenciar_usuarios(ator):
-        raise PermissionDenied("Só o administrador decide solicitações.")
+    if not pode_aprovar_acessos(ator):
+        raise PermissionDenied("Só administrador ou gestor decide solicitações.")
     motivo = (motivo or "").strip()
     if not motivo:
         raise BusinessError("Informe o motivo: ele fica registrado na auditoria.")

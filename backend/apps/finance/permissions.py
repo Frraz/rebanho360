@@ -8,6 +8,11 @@ permissões distintas (`finance.approve_payment` e `finance.execute_payment`
 da especificação), e o serviço ainda recusa que a mesma pessoa faça as duas no
 mesmo título quando há outro usuário que possa executar. Qualquer ajuste de
 quem pode o quê é uma linha aqui — pendência #17.
+
+Resposta do cliente (2026-10-03): **aprovam** `ADMIN` e `GESTOR`; **executam**
+o pagamento (a baixa) o `FINANCEIRO`. O `ADMIN`, perfil superior de controle,
+também pode executar; mas, havendo um `FINANCEIRO` ativo, não dá a baixa do que
+ele mesmo aprovou.
 """
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -31,7 +36,7 @@ PAPEIS_QUE_GERENCIAM_TITULOS = (
     Role.ESCRITORIO,
 )
 #: `finance.approve_payment`
-PAPEIS_QUE_APROVAM_PAGAMENTO = (Role.ADMIN, Role.GESTOR, Role.FINANCEIRO)
+PAPEIS_QUE_APROVAM_PAGAMENTO = (Role.ADMIN, Role.GESTOR)
 #: `finance.execute_payment` — dar a baixa.
 PAPEIS_QUE_EXECUTAM_PAGAMENTO = (Role.ADMIN, Role.FINANCEIRO)
 #: Desfazer baixa: FINANCEIRO ou ADMIN, com motivo (fluxos/02).
