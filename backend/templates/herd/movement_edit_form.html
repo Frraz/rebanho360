@@ -17,7 +17,10 @@
   <header class="page-header">
     <div>
       <a href="{% url 'herd:movimento_detalhe' movimento.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ movimento.code }}</a>
+      <div class="page-title-row">
       <h1 class="page-title">Corrigir movimentação</h1>
+      {% info "movimento" %}
+    </div>
       <p class="page-subtitle">A correção desfaz os efeitos da versão atual e aplica os da nova, com o motivo registrado.</p>
     </div>
   </header>

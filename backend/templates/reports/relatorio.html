@@ -5,7 +5,10 @@
 <header class="page-header">
   <div class="min-w-0">
     <a href="{% url 'reports:indice' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Todos os relatórios</a>
-    <h1 class="page-title">{{ relatorio.titulo }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ relatorio.titulo }}</h1>
+      {% info "relatorio" %}
+    </div>
     <p class="page-subtitle max-w-3xl">{{ relatorio.descricao }}</p>
   </div>
   <div class="page-actions">

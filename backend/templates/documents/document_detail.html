@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'documents:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Documentos gerados</a>
-    <h1 class="page-title">{{ documento.title }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ documento.title }}</h1>
+      {% info "documentos" %}
+    </div>
     <p class="page-subtitle">Documento PDF · pedido por {{ documento.generated_by }} em {{ documento.generated_at|date:"d/m/Y H:i" }}</p>
   </div>
 </header>

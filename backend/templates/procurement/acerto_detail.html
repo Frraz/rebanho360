@@ -5,12 +5,15 @@
 <header class="page-header">
   <div>
     <a href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ compromisso.code }}</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ acerto.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% if acerto.status == "CONFIRMADA" %}<span class="badge-confirmada">Aprovado</span>{% elif acerto.status == "RASCUNHO" %}<span class="badge-pendencia">Em andamento</span>{% else %}<span class="badge-excluida">Excluído</span>{% endif %}
       </span>
     </h1>
+      {% info "acerto" %}
+    </div>
     <p class="page-subtitle">{{ compromisso.seller.name }} · {{ compromisso.destination_farm.name }} · {{ acerto.date|date:"d/m/Y" }}</p>
   </div>
   <div class="page-actions">

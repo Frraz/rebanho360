@@ -3,5 +3,5 @@
 {% block title %}{% if object %}Editar fazenda{% else %}Nova fazenda{% endif %} · Rebanho360{% endblock %}
 {% block content %}
 {% url 'properties:fazenda_lista' as voltar %}
-{% if object %}{% include "partials/_form_page.html" with titulo="Editar fazenda" voltar=voltar voltar_rotulo="Fazendas" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova fazenda" voltar=voltar voltar_rotulo="Fazendas" %}{% endif %}
+{% if object %}{% include "partials/_form_page.html" with ajuda="fazenda" titulo="Editar fazenda" voltar=voltar voltar_rotulo="Fazendas" %}{% else %}{% include "partials/_form_page.html" with ajuda="fazenda" titulo="Nova fazenda" voltar=voltar voltar_rotulo="Fazendas" %}{% endif %}
 {% endblock %}

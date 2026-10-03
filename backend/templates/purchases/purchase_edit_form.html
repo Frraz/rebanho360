@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'purchases:detalhe' compra.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ compra.code }}</a>
-    <h1 class="page-title">Corrigir compra</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Corrigir compra</h1>
+      {% info "compra" %}
+    </div>
     {% if compra.status == "CONFIRMADA" %}
     <p class="page-subtitle">Corrigir desfaz os efeitos da versão atual (entrada no rebanho e custos) e aplica os da nova, na mesma operação. O motivo fica registrado.</p>
     {% endif %}

@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'audit:console' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Auditoria</a>
-    <h1 class="page-title">{{ entity_type }} <span class="code !text-xl">#{{ entity_id }}</span></h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ entity_type }} <span class="code !text-xl">#{{ entity_id }}</span></h1>
+      {% info "auditoria" %}
+    </div>
     <p class="page-subtitle">Tudo o que aconteceu com este registro, do mais antigo ao mais recente.</p>
   </div>
 </header>

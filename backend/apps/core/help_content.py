@@ -533,7 +533,7 @@ AJUDA: dict[str, dict] = {
             ),
             (
                 "Viagem e recebimento",
-                "Cada caminhão é uma viagem. O que chegou é registrado no recebimento, e a quebra de viagem é calculada.",
+                "Cada caminhão é uma viagem. O que chegou é registrado no recebimento, e a quebra de viagem é a que você digita.",
             ),
             (
                 "Acerto",
@@ -571,8 +571,8 @@ AJUDA: dict[str, dict] = {
                 "Valor dos animais é a soma dos itens menos descontos. Custo de aquisição é animais + frete + tributos e taxas + comissão. Líquido ao vendedor é animais menos adiantamentos e créditos.",
             ),
             (
-                "Rateio",
-                "Frete, comissão e tributos são divididos entre os itens por cabeça recebida. Descontos, pelo valor. Sem perder centavo.",
+                "Distribuição entre os itens",
+                "Com mais de um item recebido, você informa quanto de frete, comissão, tributos e descontos é de cada item. O sistema não rateia sozinho: a tela traz uma sugestão (por cabeça recebida, ou pelo valor nos descontos), que só vale depois de salva, e a soma tem de fechar com o total.",
             ),
             (
                 "Financeiro",
@@ -582,7 +582,7 @@ AJUDA: dict[str, dict] = {
         "perguntas": [
             (
                 "O que impede de aprovar?",
-                "Pendências, e o sistema diz qual: um item por arroba sem romaneio, nenhum animal recebido e assim por diante. Avisos (como quebra acima do limite) alertam, mas não bloqueiam.",
+                "Pendências, e o sistema diz qual: um item por arroba sem romaneio, nenhum animal recebido, uma distribuição entre itens que não fecha com o total e assim por diante. Avisos (como chegar mais cabeças que o compromisso, ou categoria diferente da prevista) alertam, mas não bloqueiam.",
             ),
             (
                 "Quem aprova?",
@@ -1220,6 +1220,289 @@ AJUDA: dict[str, dict] = {
             (
                 "O pedido recusado some?",
                 "Não. Nenhum pedido é apagado. Quem foi recusado pode pedir de novo.",
+            ),
+        ],
+    },
+    # --------------------------------------------------- Comercial e fazenda
+    "condicao_pagamento": {
+        "titulo": "Condições de pagamento",
+        "resumo": [
+            "A condição de pagamento diz em quantos dias, depois da data da operação, o dinheiro sai (compra) ou entra (venda): à vista, prazo único ou parcelado.",
+            "Cada empresa cria as suas. O sistema não impõe uma regra única: você cadastra as condições que realmente pratica e escolhe a de cada operação.",
+        ],
+        "relacoes": [
+            (
+                "Compras, compromissos e vendas",
+                "Cada operação escolhe uma condição. Ela grava o prazo do primeiro vencimento no momento do lançamento.",
+            ),
+            (
+                "Financeiro",
+                "O primeiro prazo é o vencimento do primeiro título. Condição parcelada gera mais de um título.",
+            ),
+            (
+                "Quem cadastra",
+                "Administrador, gestor, escritório e financeiro, porque quem lança a operação também precisa criar a condição dela.",
+            ),
+        ],
+        "perguntas": [
+            (
+                "O que escrevo em Dias?",
+                "Os dias depois da data da operação. Um número é à vista (0) ou prazo único (30). Vários separados por vírgula são parcelas: 30,60,90 são três parcelas.",
+            ),
+            (
+                "Posso apagar uma condição?",
+                "Esta tela não apaga. Para tirar de uso, edite e desmarque Ativa: ela deixa de ser oferecida em operações novas, e as que já a usam continuam com ela.",
+            ),
+            (
+                "Se eu mudar uma condição, os títulos antigos mudam?",
+                "Não. O título nasce com os vencimentos da operação no momento em que ela foi confirmada. Para mudar um vencimento, corrija o título ou a operação, com motivo.",
+            ),
+        ],
+    },
+    "reproducao": {
+        "titulo": "Reprodução",
+        "resumo": [
+            "Um ciclo por fazenda e por safra de nascimento: quantas fêmeas entraram na estação de monta, quantas ficaram prenhes (por categoria e por método) e quantos bezerros foram desmamados.",
+            "Você informa só o que contou. Vazias, fertilidade, porcentagem de inseminadas e desmama são calculadas desses números.",
+        ],
+        "relacoes": [
+            (
+                "Rebanho",
+                "Os nascimentos não são digitados aqui. Vêm das movimentações do tipo Nascimento, na fazenda e no período da safra do ciclo.",
+            ),
+            (
+                "Safra",
+                "Só pode haver um ciclo por fazenda e safra. Um ciclo excluído não conta.",
+            ),
+            (
+                "Saldo, custo e financeiro",
+                "O ciclo é um registro de apoio: não mexe no saldo do rebanho, nem em custo ou título.",
+            ),
+        ],
+        "perguntas": [
+            (
+                "Como os índices são calculados?",
+                "Fertilidade é prenhes dividido por fêmeas em monta. Desmama é desmamados dividido por nascidos. A fertilidade da IA usa as inseminadas, e a do touro usa as que não foram inseminadas.",
+            ),
+            (
+                'Por que a desmama aparece como "—"?',
+                'Porque não há nascimentos lançados no rebanho para dividir. Falta de dado aparece como "—", nunca como 0%.',
+            ),
+            (
+                "O sistema diz se um índice é bom ou ruim?",
+                "Não. Ele mostra o número. A leitura é do produtor e do consultor.",
+            ),
+            (
+                "Posso corrigir ou excluir um ciclo?",
+                "Sim, informando o motivo, e a auditoria guarda o que mudou. Como o ciclo não mexe em rebanho, custo ou título, não há nada mais a desfazer.",
+            ),
+        ],
+    },
+    "estrutura": {
+        "titulo": "Infraestrutura",
+        "resumo": [
+            "Cadastro das estruturas da fazenda: currais, cochos, bebedouros, cercas e barracões. Registre a área, os metros de cocho, o número de bebedouros e quantos animais a estrutura atende.",
+            "Com isso o sistema calcula razões como metros quadrados por animal, centímetros de cocho por cabeça e animais por bebedouro.",
+        ],
+        "relacoes": [
+            (
+                "Fazenda",
+                "Cada estrutura pertence a uma fazenda e só aparece para quem tem acesso a ela.",
+            ),
+            (
+                "Custos",
+                "O cadastro não gera custo. A despesa de manutenção se lança em Custos, como qualquer outra.",
+            ),
+            (
+                "Quem cadastra",
+                "Administrador, gestor e escritório. Os demais perfis consultam.",
+            ),
+        ],
+        "perguntas": [
+            (
+                'Por que uma razão aparece como "—"?',
+                'Porque falta a medida ou o número de animais atendidos. Sem animais, o sistema não divide: mostra "—", não zero.',
+            ),
+            (
+                "Posso excluir uma estrutura?",
+                "Não. Para tirar de uso, edite e desmarque Ativa. O cadastro fica, e a auditoria guarda quem mudou o quê.",
+            ),
+        ],
+    },
+    "maquina": {
+        "titulo": "Parque de máquinas",
+        "resumo": [
+            "Cada máquina da fazenda (trator, implemento, caminhão, utilitário) e o que ela trabalhou. Você lança o uso, com data, horas, combustível (litros e reais) e manutenção.",
+            "O sistema calcula o consumo em litros por hora e o custo por hora do que foi lançado.",
+        ],
+        "relacoes": [
+            (
+                "Custos",
+                "O uso da máquina não gera custo sozinho. O gasto do parque de máquinas continua sendo lançado em Custos. Aqui o uso serve para medir quanto custa a hora.",
+            ),
+            (
+                "Fazenda",
+                "Cada máquina pertence a uma fazenda e só aparece para quem tem acesso a ela.",
+            ),
+            (
+                "Quem lança",
+                "Administrador, gestor, escritório e campo lançam o uso, que é dado do campo. Cadastrar a máquina é só dos três primeiros.",
+            ),
+        ],
+        "perguntas": [
+            (
+                "Como o custo por hora é calculado?",
+                'Combustível mais manutenção, dividido pelas horas trabalhadas, somando os usos lançados. Sem combustível nem manutenção informados, aparece "—".',
+            ),
+            (
+                "Lancei um uso errado. E agora?",
+                "Edite ou exclua o uso informando o motivo. O custo por hora é recalculado, e a auditoria guarda o que mudou.",
+            ),
+            (
+                "Posso lançar uso de máquina inativa?",
+                "Não. Reative a máquina antes. Para tirar uma máquina de operação, desmarque Ativa em vez de excluir.",
+            ),
+        ],
+    },
+    # ------------------------------------------------------- Ciclo de compra
+    "viagem": {
+        "titulo": "Viagens",
+        "resumo": [
+            "Cada caminhão de um compromisso é uma viagem: transportador, motorista, veículo, placa, ADF, data de retirada, as cargas (cabeças programadas e embarcadas de cada item, e o peso de origem) e o frete.",
+            "Só se lança viagem em compromisso aprovado.",
+        ],
+        "relacoes": [
+            (
+                "Frete",
+                "O previsto sai do critério (por cabeça, por km, por kg de origem ou valor fechado) multiplicado pela tarifa. O realizado é o que foi cobrado, digitado por você.",
+            ),
+            (
+                "Recebimento",
+                "Quando o caminhão chega, o recebimento é registrado a partir da viagem.",
+            ),
+            (
+                "Acerto e financeiro",
+                "O acerto usa o frete realizado e, sem ele, o previsto, avisando qual usou. Ao aprovar o acerto nasce um título de frete por viagem, com o transportador como favorecido e o vencimento informado na viagem.",
+            ),
+        ],
+        "perguntas": [
+            (
+                'Por que o frete previsto aparece como "—"?',
+                'Porque falta o critério, a tarifa ou o dado que o critério pede (km, cabeças ou o peso de origem de todas as cargas). Falta de dado aparece como "—", nunca como zero.',
+            ),
+            (
+                "A viagem mexe no rebanho?",
+                "Não. O gado só entra no saldo quando o acerto é aprovado.",
+            ),
+            (
+                "Posso corrigir a viagem depois do acerto aprovado?",
+                "Não diretamente: viagens ficam travadas. O caminho é reabrir o acerto, com motivo.",
+            ),
+        ],
+    },
+    "recebimento": {
+        "titulo": "Recebimentos",
+        "resumo": [
+            "Registra o que chegou em cada carga da viagem: cabeças, peso, categoria recebida e ocorrências. O peso de origem e o recebido aparecem lado a lado.",
+            "A quebra de viagem é a que você digita. O sistema não a calcula, não alerta por percentual e não desconta nada do valor dos animais.",
+        ],
+        "relacoes": [
+            (
+                "Viagem",
+                "Todo recebimento pertence a uma viagem. A data não pode ser futura nem anterior à retirada.",
+            ),
+            (
+                "Acerto",
+                "As cabeças recebidas valem para os itens por cabeça e para as compras geradas na aprovação.",
+            ),
+            (
+                "Rebanho",
+                "O gado recebido ainda não está no saldo. Ele entra quando o acerto é aprovado, e o painel avisa enquanto isso.",
+            ),
+        ],
+        "perguntas": [
+            (
+                "E se chegou uma categoria diferente da prevista?",
+                "Informe a categoria recebida. O acerto mostra um aviso, mas não bloqueia.",
+            ),
+            (
+                "Posso corrigir ou excluir um recebimento?",
+                "Sim, informando o motivo, enquanto o acerto não estiver aprovado. Se excluir, a etapa do compromisso volta sozinha.",
+            ),
+            (
+                "Chegaram mais cabeças do que o compromisso previa. Isso bloqueia?",
+                "Não. O acerto mostra um aviso com os dois números, e a decisão continua sendo sua.",
+            ),
+        ],
+    },
+    "romaneio": {
+        "titulo": "Romaneio valorizado",
+        "resumo": [
+            "O romaneio fecha os itens negociados por arroba. Em cada linha você informa a classificação da carcaça, a faixa de preço, as cabeças e o peso de carcaça.",
+            "O sistema calcula as arrobas (peso dividido por 15), o valor bruto (arrobas vezes o preço da @), o desconto e o valor líquido.",
+        ],
+        "relacoes": [
+            (
+                "Classificações de carcaça",
+                "Vêm do cadastro comercial. Uma classificação inativa não entra em linha nova, e ela pode sugerir uma faixa.",
+            ),
+            (
+                "Compromisso",
+                "A faixa, de 1 a 5, busca o preço no item do contrato. O preço pode ser ajustado na linha, e a diferença aparece no acerto.",
+            ),
+            (
+                "Acerto",
+                "O valor líquido do romaneio é o valor do item no acerto. Item por arroba sem romaneio é pendência e impede a aprovação.",
+            ),
+        ],
+        "perguntas": [
+            (
+                "Quem escolhe a faixa?",
+                "Você, linha a linha. A classificação só sugere, e nenhuma regra decide por você.",
+            ),
+            (
+                "Item por cabeça tem romaneio?",
+                "Não. Ele vale as cabeças recebidas vezes o preço por cabeça.",
+            ),
+            (
+                "O romaneio precisa ter as mesmas cabeças do recebimento?",
+                "Não bloqueia. Se os números forem diferentes, o acerto mostra um aviso com os dois.",
+            ),
+        ],
+    },
+    # ---------------------------------------------------------- Relatório
+    "relatorio": {
+        "titulo": "Como ler este relatório",
+        "resumo": [
+            "O relatório mostra os números da safra e da fazenda escolhidas no topo. Os filtros em uso aparecem listados acima da tabela, e alguns relatórios aceitam também período ou outros parâmetros.",
+            "Os números vêm dos mesmos cálculos das telas e do painel. Se um indicador aparece em dois lugares, é o mesmo valor.",
+        ],
+        "relacoes": [
+            (
+                "CSV e Excel",
+                "Baixam na hora, com os filtros que estão na tela. Cada download fica registrado na auditoria.",
+            ),
+            (
+                "PDF",
+                "É gerado e guardado em Documentos gerados, com quem pediu, quando e com quais filtros.",
+            ),
+            (
+                "Escopo",
+                "Você só vê dados das fazendas a que tem acesso, mesmo escolhendo Todas.",
+            ),
+        ],
+        "perguntas": [
+            (
+                "O relatório está vazio. Por quê?",
+                "Quase sempre porque a safra, a fazenda ou o período do filtro não têm registro. Confira o topo da tela e os filtros.",
+            ),
+            (
+                'Por que aparece "—" em alguma coluna?',
+                "Falta de dado, não zero. Quando há uma nota abaixo dos filtros, ela explica o motivo.",
+            ),
+            (
+                "O arquivo baixado é igual ao da tela?",
+                "Sim: usa os mesmos filtros no momento do pedido. Mudou o filtro depois? Baixe de novo.",
             ),
         ],
     },

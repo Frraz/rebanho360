@@ -3,5 +3,5 @@
 {% block title %}{% if object %}Editar raça{% else %}Nova raça{% endif %} · Rebanho360{% endblock %}
 {% block content %}
 {% url 'livestock:raca_lista' as voltar %}
-{% if object %}{% include "partials/_form_page.html" with titulo="Editar raça" voltar=voltar voltar_rotulo="Raças" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova raça" voltar=voltar voltar_rotulo="Raças" %}{% endif %}
+{% if object %}{% include "partials/_form_page.html" with ajuda="raca" titulo="Editar raça" voltar=voltar voltar_rotulo="Raças" %}{% else %}{% include "partials/_form_page.html" with ajuda="raca" titulo="Nova raça" voltar=voltar voltar_rotulo="Raças" %}{% endif %}
 {% endblock %}

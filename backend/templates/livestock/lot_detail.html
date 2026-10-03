@@ -5,10 +5,13 @@
 <header class="page-header">
   <div>
     <a href="{% url 'livestock:lote_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Lotes</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ lote.code }}</span>
       <span class="text-base">{% if lote.status == "ABERTO" %}<span class="badge-confirmada">Aberto</span>{% elif lote.status == "ENCERRADO" %}<span class="badge-rascunho">Encerrado</span>{% else %}<span class="badge-excluida">Excluído</span>{% endif %}</span>
     </h1>
+      {% info "lote" %}
+    </div>
   </div>
   <div class="page-actions">
     <a href="{% url 'herd:pesagem_nova' %}" class="btn-secondary">{% icon "scale" %} Nova pesagem</a>

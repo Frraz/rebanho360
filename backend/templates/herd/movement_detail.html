@@ -5,13 +5,16 @@
 <header class="page-header">
   <div>
     <a href="{% url 'herd:movimento_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Movimentações</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ movimento.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% status_badge movimento.status %}
         {% if movimento.version > 1 %}<span class="badge-editada">Editada (v{{ movimento.version }})</span>{% endif %}
       </span>
     </h1>
+      {% info "movimento" %}
+    </div>
   </div>
   <div class="page-actions">
     {% if movimento.status == "CONFIRMADA" and pode_editar and not movimento.origin_purchase_id and not movimento.origin_sale_id %}

@@ -1,9 +1,12 @@
 {% load core_tags %}
-{# Página de cadastro simples. Parâmetros: titulo, subtitulo, voltar (url), voltar_rotulo, salvar. #}
+{# Página de cadastro simples. Parâmetros: titulo, subtitulo, voltar (url), voltar_rotulo, salvar, ajuda (slug do botão "i"). #}
 <header class="page-header">
   <div>
     {% if voltar %}<a href="{{ voltar }}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ voltar_rotulo|default:"Voltar" }}</a>{% endif %}
-    <h1 class="page-title">{{ titulo }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ titulo }}</h1>
+      {% if ajuda %}{% info ajuda %}{% endif %}
+    </div>
     {% if subtitulo %}<p class="page-subtitle">{{ subtitulo }}</p>{% endif %}
   </div>
 </header>

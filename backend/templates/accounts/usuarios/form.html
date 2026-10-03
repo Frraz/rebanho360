@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% if modo == 'editar' %}{% url 'accounts:usuario_detalhe' u.pk %}{% else %}{% url 'accounts:usuarios' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if modo == "editar" %}{{ u.username }}{% else %}Usuários{% endif %}</a>
-    <h1 class="page-title">{% if modo == "editar" %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if modo == "editar" %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
+      {% info "usuarios" %}
+    </div>
     {% if modo == "editar" %}<p class="page-subtitle">Usuário <span class="code">{{ u.username }}</span>. Toda alteração fica registrada na auditoria, com o motivo.</p>{% endif %}
   </div>
 </header>

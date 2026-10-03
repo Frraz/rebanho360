@@ -637,6 +637,7 @@ class ComissaoDefinirView(LancaNoCicloMixin, View):
         return {
             "form": form,
             "titulo": f"Comissão de {c.code}",
+            "ajuda": "comissao",
             "subtitulo": (
                 "Vale só para este compromisso. Corrigir a que já existe exige "
                 "motivo; escolher outro comprador o acrescenta."
@@ -1167,6 +1168,7 @@ class RomaneioView(LancaNoCicloMixin, View):
             "reason_form": reason_form,
             "romaneio": grading.romaneio_do_item(item),
             "titulo": "Romaneio valorizado",
+            "ajuda": "romaneio",
             "subtitulo": (
                 "Classificação, faixa, cabeças e peso de carcaça. Média @, valor "
                 "bruto e líquido são calculados."
@@ -1377,6 +1379,7 @@ class _LinhasDoAcertoView(LancaNoCicloMixin, View):
             "formset": formset,
             "reason_form": reason_form,
             "titulo": self.titulo,
+            "ajuda": "acerto",
             "subtitulo": self.subtitulo,
             "rotulo": self.rotulo,
             "voltar": reverse("procurement:acerto_detalhe", args=[a.pk]) + self.ancora,

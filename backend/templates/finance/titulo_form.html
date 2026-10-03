@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'finance:contas_a_pagar' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Contas a pagar</a>
-    <h1 class="page-title">Novo título</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Novo título</h1>
+      {% info "contas_pagar" %}
+    </div>
     <p class="page-subtitle">Para o que não nasce sozinho da compra ou da venda: frete que o vendedor não pagou, adiantamento, despesa avulsa.</p>
   </div>
 </header>

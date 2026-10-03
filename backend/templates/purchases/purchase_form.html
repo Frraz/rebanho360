@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'purchases:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Compras</a>
-    <h1 class="page-title">Nova compra</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Nova compra</h1>
+      {% info "compra" %}
+    </div>
     <p class="page-subtitle">Confirmar dá entrada no rebanho e lança os custos — sem digitar duas vezes.</p>
   </div>
 </header>

@@ -5,7 +5,8 @@
 <header class="page-header">
   <div>
     <a href="{% url 'procurement:compromisso_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Compromissos</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ compromisso.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% etapa_selo etapa %}
@@ -13,6 +14,8 @@
         {% if compromisso.version > 1 and compromisso.status != "RASCUNHO" %}<span class="badge-editada">Editado (v{{ compromisso.version }})</span>{% endif %}
       </span>
     </h1>
+      {% info "compromisso" %}
+    </div>
   </div>
   <div class="page-actions">
     {% if pode_aprovar %}<a href="{% url 'procurement:compromisso_aprovar' compromisso.pk %}" class="btn-primary">{% icon "check" %} Aprovar compromisso</a>{% endif %}

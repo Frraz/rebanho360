@@ -3,5 +3,5 @@
 {% block title %}{% if object %}Editar área/pasto{% else %}Nova área/pasto{% endif %} · Rebanho360{% endblock %}
 {% block content %}
 {% url 'properties:pasto_lista' as voltar %}
-{% if object %}{% include "partials/_form_page.html" with titulo="Editar área/pasto" voltar=voltar voltar_rotulo="Áreas / Pastos" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova área/pasto" voltar=voltar voltar_rotulo="Áreas / Pastos" %}{% endif %}
+{% if object %}{% include "partials/_form_page.html" with ajuda="pasto" titulo="Editar área/pasto" voltar=voltar voltar_rotulo="Áreas / Pastos" %}{% else %}{% include "partials/_form_page.html" with ajuda="pasto" titulo="Nova área/pasto" voltar=voltar voltar_rotulo="Áreas / Pastos" %}{% endif %}
 {% endblock %}

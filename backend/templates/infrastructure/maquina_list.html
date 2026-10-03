@@ -4,8 +4,10 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <h1 class="page-title">Parque de máquinas</h1>
-    <p class="page-subtitle max-w-3xl">Cada máquina, o que trabalhou e o custo por hora — calculado do uso lançado (horas, combustível e manutenção).</p>
+    <div class="page-title-row">
+      <h1 class="page-title">Parque de máquinas</h1>
+      {% info "maquina" %}
+    </div>
   </div>
   <div class="page-actions">
     {% if pode_gerenciar %}<a href="{% url 'infrastructure:maquina_nova' %}" class="btn-primary">{% icon "plus" %} Nova máquina</a>{% endif %}

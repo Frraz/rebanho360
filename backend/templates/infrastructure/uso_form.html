@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'infrastructure:maquina_detalhe' maquina.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ maquina.name }}</a>
-    <h1 class="page-title">{% if uso %}Corrigir uso{% else %}Lançar uso da máquina{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if uso %}Corrigir uso{% else %}Lançar uso da máquina{% endif %}</h1>
+      {% info "maquina" %}
+    </div>
     <p class="page-subtitle">Horas trabalhadas, combustível e manutenção do período. O custo por hora é calculado.</p>
   </div>
 </header>

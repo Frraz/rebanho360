@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% if viagem %}{% url 'procurement:viagem_detalhe' viagem.pk %}{% else %}{% url 'procurement:compromisso_detalhe' compromisso.pk %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if viagem %}{{ viagem.code }}{% else %}{{ compromisso.code }}{% endif %}</a>
-    <h1 class="page-title">{% if viagem %}Corrigir viagem{% else %}Nova viagem{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if viagem %}Corrigir viagem{% else %}Nova viagem{% endif %}</h1>
+      {% info "viagem" %}
+    </div>
     <p class="page-subtitle">Um caminhão. O frete previsto sai do critério e da tarifa; o realizado é o que foi cobrado.</p>
   </div>
 </header>

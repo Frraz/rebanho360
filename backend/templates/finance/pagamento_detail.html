@@ -5,10 +5,13 @@
 <header class="page-header">
   <div>
     <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Título {{ titulo.code }}</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ pagamento.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">{% baixa_selo pagamento %}</span>
     </h1>
+      {% info "pagamento" %}
+    </div>
   </div>
 </header>
 

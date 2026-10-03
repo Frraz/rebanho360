@@ -3,5 +3,5 @@
 {% block title %}{% if object %}Editar safra{% else %}Nova safra{% endif %} · Rebanho360{% endblock %}
 {% block content %}
 {% url 'organizations:safra_lista' as voltar %}
-{% if object %}{% include "partials/_form_page.html" with titulo="Editar safra" voltar=voltar voltar_rotulo="Safras" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova safra" voltar=voltar voltar_rotulo="Safras" %}{% endif %}
+{% if object %}{% include "partials/_form_page.html" with ajuda="safra" titulo="Editar safra" voltar=voltar voltar_rotulo="Safras" %}{% else %}{% include "partials/_form_page.html" with ajuda="safra" titulo="Nova safra" voltar=voltar voltar_rotulo="Safras" %}{% endif %}
 {% endblock %}

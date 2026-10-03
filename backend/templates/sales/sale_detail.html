@@ -5,13 +5,16 @@
 <header class="page-header">
   <div>
     <a href="{% url 'sales:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Vendas e abates</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ venda.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% status_badge venda.status %}
         {% if venda.version > 1 and venda.status != "RASCUNHO" %}<span class="badge-editada">Editada (v{{ venda.version }})</span>{% endif %}
       </span>
     </h1>
+      {% info "venda" %}
+    </div>
   </div>
   <div class="page-actions">
     {% if pode_confirmar %}<a href="{% url 'sales:confirmar' venda.pk %}" class="btn-primary">{% icon "check" %} Confirmar venda</a>{% endif %}

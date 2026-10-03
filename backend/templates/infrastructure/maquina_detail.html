@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'infrastructure:maquina_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Máquinas</a>
-    <h1 class="page-title">{{ maquina.name }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ maquina.name }}</h1>
+      {% info "maquina" %}
+    </div>
     <p class="page-subtitle">{{ maquina.get_kind_display }} · {{ maquina.farm.name }}{% if not maquina.is_active %} · inativa{% endif %}</p>
   </div>
   <div class="page-actions">

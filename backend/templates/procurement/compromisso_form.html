@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% if compromisso %}{% url 'procurement:compromisso_detalhe' compromisso.pk %}{% else %}{% url 'procurement:compromisso_lista' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if compromisso %}{{ compromisso.code }}{% else %}Compromissos{% endif %}</a>
-    <h1 class="page-title">{% if compromisso %}Corrigir compromisso{% else %}Novo compromisso{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if compromisso %}Corrigir compromisso{% else %}Novo compromisso{% endif %}</h1>
+      {% info "compromisso" %}
+    </div>
     <p class="page-subtitle">{% if compromisso %}Corrigir desfaz e reaplica o que depende, com o motivo registrado.{% else %}Aprovar libera viagem, recebimento e acerto. Nada vira compra até o acerto ser aprovado.{% endif %}</p>
   </div>
 </header>

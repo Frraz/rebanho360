@@ -17,7 +17,10 @@
   <header class="page-header">
     <div>
       <a href="{% url 'herd:movimento_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Movimentações</a>
+      <div class="page-title-row">
       <h1 class="page-title">Registrar movimentação</h1>
+      {% info "movimento" %}
+    </div>
       <p class="page-subtitle">Transferências e mudanças de categoria dão baixa na origem e entrada no destino, na mesma operação.</p>
     </div>
   </header>

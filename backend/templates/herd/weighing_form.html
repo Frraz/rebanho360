@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'herd:pesagem_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Pesagens</a>
-    <h1 class="page-title">Registrar pesagem</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Registrar pesagem</h1>
+      {% info "pesagem" %}
+    </div>
     <p class="page-subtitle">O peso médio do lote vem do peso total dividido pelas cabeças pesadas.</p>
   </div>
 </header>

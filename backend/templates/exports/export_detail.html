@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'exports:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Exportações</a>
-    <h1 class="page-title">Exportação de {{ job.created_at|date:"d/m/Y H:i" }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Exportação de {{ job.created_at|date:"d/m/Y H:i" }}</h1>
+      {% info "exportacao" %}
+    </div>
     <p class="page-subtitle">Pedida por {{ job.requested_by }}. Pode sair desta tela: a exportação continua rodando e fica em <a class="link" href="{% url 'exports:lista' %}">Exportações</a>.</p>
   </div>
 </header>

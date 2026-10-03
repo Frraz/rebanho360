@@ -4,8 +4,10 @@
 {% block content %}
 <header class="page-header">
   <div>
-    <h1 class="page-title">Reprodução</h1>
-    <p class="page-subtitle max-w-3xl">Um ciclo por fazenda e safra de nascimento: quantas fêmeas entraram na monta, quantas ficaram prenhes e quantos bezerros foram desmamados. Os índices são calculados dos números que você informa.</p>
+    <div class="page-title-row">
+      <h1 class="page-title">Reprodução</h1>
+      {% info "reproducao" %}
+    </div>
   </div>
   <div class="page-actions">
     {% if pode_lancar %}<a href="{% url 'reproduction:novo' %}" class="btn-primary">{% icon "plus" %} Novo ciclo</a>{% endif %}

@@ -3,5 +3,5 @@
 {% block title %}{% if object %}Editar categoria{% else %}Nova categoria{% endif %} · Rebanho360{% endblock %}
 {% block content %}
 {% url 'livestock:categoria_lista' as voltar %}
-{% if object %}{% include "partials/_form_page.html" with titulo="Editar categoria" voltar=voltar voltar_rotulo="Categorias" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova categoria" voltar=voltar voltar_rotulo="Categorias" %}{% endif %}
+{% if object %}{% include "partials/_form_page.html" with ajuda="categoria" titulo="Editar categoria" voltar=voltar voltar_rotulo="Categorias" %}{% else %}{% include "partials/_form_page.html" with ajuda="categoria" titulo="Nova categoria" voltar=voltar voltar_rotulo="Categorias" %}{% endif %}
 {% endblock %}

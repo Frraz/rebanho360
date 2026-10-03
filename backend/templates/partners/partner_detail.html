@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'partners:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Parceiros</a>
-    <h1 class="page-title">{{ parceiro.name }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ parceiro.name }}</h1>
+      {% info "parceiro" %}
+    </div>
     <p class="mt-2 flex flex-wrap gap-1.5">
       {% for papel in parceiro.roles.all %}<span class="badge-editada">{{ papel.get_role_display }}</span>{% endfor %}
     </p>

@@ -5,13 +5,16 @@
 <header class="page-header">
   <div>
     <a href="{% url 'procurement:viagem_detalhe' viagem.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ viagem.code }}</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ recebimento.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% status_badge recebimento.status %}
         {% if recebimento.version > 1 %}<span class="badge-editada">Editado (v{{ recebimento.version }})</span>{% endif %}
       </span>
     </h1>
+      {% info "recebimento" %}
+    </div>
   </div>
   <div class="page-actions">
     {% if pode_editar %}<a href="{% url 'procurement:recebimento_editar' recebimento.pk %}" class="btn-secondary">{% icon "pencil" "icon-sm" %} Editar</a>{% endif %}

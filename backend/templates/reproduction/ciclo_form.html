@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% if ciclo %}{% url 'reproduction:detalhe' ciclo.pk %}{% else %}{% url 'reproduction:lista' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if ciclo %}{{ ciclo.code }}{% else %}Reprodução{% endif %}</a>
-    <h1 class="page-title">{% if ciclo %}Corrigir ciclo reprodutivo{% else %}Novo ciclo reprodutivo{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if ciclo %}Corrigir ciclo reprodutivo{% else %}Novo ciclo reprodutivo{% endif %}</h1>
+      {% info "reproducao" %}
+    </div>
     <p class="page-subtitle max-w-3xl">Só o que você contou: fêmeas em monta e prenhes. Vazias, fertilidade e desmama são calculadas. Os nascimentos vêm do rebanho.</p>
   </div>
 </header>

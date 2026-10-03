@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'accounts:usuarios' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Usuários</a>
-    <h1 class="page-title">{{ u.get_full_name|default:u.username }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ u.get_full_name|default:u.username }}</h1>
+      {% info "usuarios" %}
+    </div>
     <p class="mt-2 flex flex-wrap items-center gap-1.5">
       <span class="code">{{ u.username }}</span>
       <span class="badge-editada">{{ u.get_role_display }}</span>

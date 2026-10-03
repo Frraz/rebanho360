@@ -36,6 +36,7 @@ class _CadastroMixin:
     titulo_edicao = ""
     subtitulo = ""
     voltar_rotulo = ""
+    ajuda = ""
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -49,6 +50,7 @@ class _CadastroMixin:
                 "subtitulo": self.subtitulo,
                 "voltar": str(self.success_url),
                 "voltar_rotulo": self.voltar_rotulo,
+                "ajuda": self.ajuda,
             }
         )
         return context
@@ -93,6 +95,7 @@ class CarcassClassCreateView(GerenciaOComercialMixin, _CadastroMixin, CreateView
     titulo_novo = "Nova classificação de carcaça"
     subtitulo = "Magro, gordura escassa, lesão traumática… Cada frigorífico classifica de um jeito."
     voltar_rotulo = "Classificações de carcaça"
+    ajuda = "classe_carcaca"
 
 
 class CarcassClassUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateView):
@@ -104,6 +107,7 @@ class CarcassClassUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateView
         "Mudar o nome não altera romaneios já lançados: eles guardam a classificação."
     )
     voltar_rotulo = "Classificações de carcaça"
+    ajuda = "classe_carcaca"
 
 
 # --- Tipos de tributo, taxa e desconto -------------------------------------
@@ -127,6 +131,7 @@ class TaxTypeCreateView(GerenciaOComercialMixin, _CadastroMixin, CreateView):
         "Sem alíquota: o valor é digitado no acerto. A natureza decide só o efeito."
     )
     voltar_rotulo = "Tributos e taxas"
+    ajuda = "tributo"
 
 
 class TaxTypeUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateView):
@@ -136,6 +141,7 @@ class TaxTypeUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateView):
     success_message = "✓ Tipo atualizado."
     subtitulo = "Mudar a natureza muda o efeito dos acertos ainda não aprovados."
     voltar_rotulo = "Tributos e taxas"
+    ajuda = "tributo"
 
 
 # --- Regras de comissão -----------------------------------------------------
@@ -160,6 +166,7 @@ class CommissionRuleCreateView(GerenciaOComercialMixin, _CadastroMixin, CreateVi
         "Os já aprovados guardam a regra que valia."
     )
     voltar_rotulo = "Regras de comissão"
+    ajuda = "comissao"
 
 
 class CommissionRuleUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateView):
@@ -169,6 +176,7 @@ class CommissionRuleUpdateView(GerenciaOComercialMixin, _CadastroMixin, UpdateVi
     success_message = "✓ Regra de comissão atualizada."
     subtitulo = "Compromissos já aprovados não mudam: guardam a regra que valia."
     voltar_rotulo = "Regras de comissão"
+    ajuda = "comissao"
 
 
 # --- Condições de pagamento -------------------------------------------------
@@ -195,6 +203,7 @@ class PaymentConditionCreateView(CadastraCondicoesMixin, _CadastroMixin, CreateV
     titulo_novo = "Nova condição de pagamento"
     subtitulo = "À vista, 4 dias, 30 dias, parcelado… Crie a que a operação precisar."
     voltar_rotulo = "Condições de pagamento"
+    ajuda = "condicao_pagamento"
 
 
 class PaymentConditionUpdateView(CadastraCondicoesMixin, _CadastroMixin, UpdateView):
@@ -206,3 +215,4 @@ class PaymentConditionUpdateView(CadastraCondicoesMixin, _CadastroMixin, UpdateV
         "Operações já lançadas guardam o prazo que valia: mudar aqui não as altera."
     )
     voltar_rotulo = "Condições de pagamento"
+    ajuda = "condicao_pagamento"

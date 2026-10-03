@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ titulo.code }}</a>
-    <h1 class="page-title">{% if titulo.a_receber %}Registrar recebimento{% else %}Dar baixa no pagamento{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if titulo.a_receber %}Registrar recebimento{% else %}Dar baixa no pagamento{% endif %}</h1>
+      {% info "pagamento" %}
+    </div>
     <p class="page-subtitle">Pode ser o valor todo ou só uma parte — a soma das baixas nunca passa do valor do título.</p>
   </div>
 </header>

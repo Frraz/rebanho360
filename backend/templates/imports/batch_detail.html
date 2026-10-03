@@ -5,7 +5,8 @@
 <header class="page-header">
   <div class="min-w-0">
     <a href="{% url 'imports:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Importações</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       {{ lote.get_kind_display }}
       <span class="text-base">
         {% if lote.status == "IMPORTADO" %}<span class="badge-confirmada">Importada</span>
@@ -13,6 +14,8 @@
         {% else %}<span class="badge-pendencia">Em prévia</span>{% endif %}
       </span>
     </h1>
+      {% info "importacao" %}
+    </div>
     <p class="page-subtitle break-words">{{ lote.original_name }} · enviada por {{ lote.created_by }} em {{ lote.created_at|date:"d/m/Y H:i" }}{% if lote.duplicate_confirmed %} · reimportação confirmada{% endif %}</p>
   </div>
 </header>

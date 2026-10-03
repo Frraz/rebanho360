@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'costs:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Custos</a>
-    <h1 class="page-title">Lançar custo</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Lançar custo</h1>
+      {% info "custo" %}
+    </div>
     <p class="page-subtitle">Fazenda, centro e classe são obrigatórios: custo sem centro não dá para analisar.</p>
   </div>
 </header>

@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% if recebimento %}{% url 'procurement:recebimento_detalhe' recebimento.pk %}{% else %}{% url 'procurement:viagem_detalhe' viagem.pk %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if recebimento %}{{ recebimento.code }}{% else %}{{ viagem.code }}{% endif %}</a>
-    <h1 class="page-title">{% if recebimento %}Corrigir recebimento{% else %}Registrar recebimento{% endif %}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{% if recebimento %}Corrigir recebimento{% else %}Registrar recebimento{% endif %}</h1>
+      {% info "recebimento" %}
+    </div>
     <p class="page-subtitle">Cabeças e peso que chegaram. A quebra de viagem é digitada por você: o sistema não a calcula nem desconta nada.</p>
   </div>
 </header>

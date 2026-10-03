@@ -5,13 +5,16 @@
 <header class="page-header">
   <div>
     <a href="{% if titulo.a_receber %}{% url 'finance:contas_a_receber' %}{% else %}{% url 'finance:contas_a_pagar' %}{% endif %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {% if titulo.a_receber %}Contas a receber{% else %}Contas a pagar{% endif %}</a>
-    <h1 class="page-title">
+    <div class="page-title-row">
+      <h1 class="page-title">
       <span class="code !text-2xl">{{ titulo.code }}</span>
       <span class="flex flex-wrap items-center gap-1.5 text-base">
         {% titulo_selos titulo hoje %}
         {% if titulo.version > 1 %}<span class="badge-editada">Editado (v{{ titulo.version }})</span>{% endif %}
       </span>
     </h1>
+      {% if titulo.a_receber %}{% info "contas_receber" %}{% else %}{% info "contas_pagar" %}{% endif %}
+    </div>
   </div>
   <div class="page-actions">
     {% if pode_aprovar %}<a href="{% url 'finance:titulo_aprovar' titulo.pk %}" class="btn-primary">{% icon "check" %} Aprovar pagamento</a>{% endif %}

@@ -37,6 +37,7 @@ class _CadastroMixin:
     template_name = "infrastructure/cadastro_form.html"
     subtitulo = ""
     voltar_rotulo = ""
+    ajuda = ""
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -55,6 +56,7 @@ class _CadastroMixin:
                 "subtitulo": self.subtitulo,
                 "voltar": str(self.success_url),
                 "voltar_rotulo": self.voltar_rotulo,
+                "ajuda": self.ajuda,
             }
         )
         return context
@@ -103,6 +105,7 @@ class EstruturaNovaView(CadastraMixin, _CadastroMixin, CreateView):
     titulo_novo = "Nova estrutura"
     subtitulo = "Curral, cocho, bebedouro… As razões (m² por animal, cm de cocho) são calculadas."
     voltar_rotulo = "Infraestrutura"
+    ajuda = "estrutura"
 
 
 class EstruturaEditarView(CadastraMixin, _CadastroMixin, UpdateView):
@@ -111,6 +114,7 @@ class EstruturaEditarView(CadastraMixin, _CadastroMixin, UpdateView):
     success_url = reverse_lazy("infrastructure:estrutura_lista")
     success_message = "✓ Estrutura atualizada."
     voltar_rotulo = "Infraestrutura"
+    ajuda = "estrutura"
 
 
 # --- Máquinas ---------------------------------------------------------------
@@ -138,6 +142,7 @@ class MaquinaNovaView(CadastraMixin, _CadastroMixin, CreateView):
     titulo_novo = "Nova máquina"
     subtitulo = "O custo por hora sai do uso lançado: horas, combustível e manutenção."
     voltar_rotulo = "Máquinas"
+    ajuda = "maquina"
 
 
 class MaquinaEditarView(CadastraMixin, _CadastroMixin, UpdateView):
@@ -146,6 +151,7 @@ class MaquinaEditarView(CadastraMixin, _CadastroMixin, UpdateView):
     success_url = reverse_lazy("infrastructure:maquina_lista")
     success_message = "✓ Máquina atualizada."
     voltar_rotulo = "Máquinas"
+    ajuda = "maquina"
 
 
 def _maquina(request, pk) -> Machine:

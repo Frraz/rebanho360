@@ -2,5 +2,5 @@
 {% block title %}Corrigir custo · Rebanho360{% endblock %}
 {% block content %}
 {% url 'costs:detalhe' custo.pk as voltar %}
-{% include "partials/_form_page.html" with titulo="Corrigir custo" subtitulo="A correção fica registrada com o motivo na auditoria." voltar=voltar voltar_rotulo="Custo" salvar="Salvar correção" %}
+{% include "partials/_form_page.html" with ajuda="custo" titulo="Corrigir custo" subtitulo="A correção fica registrada com o motivo na auditoria." voltar=voltar voltar_rotulo="Custo" salvar="Salvar correção" %}
 {% endblock %}

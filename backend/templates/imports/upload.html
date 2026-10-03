@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'imports:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Importações</a>
-    <h1 class="page-title">Importar planilha</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Importar planilha</h1>
+      {% info "importacao" %}
+    </div>
     <p class="page-subtitle max-w-2xl">Nada vai direto para o sistema: a planilha é lida, validada e mostrada numa <strong class="font-medium text-gray-700">prévia</strong>. Só entra depois que você confirmar.</p>
   </div>
 </header>

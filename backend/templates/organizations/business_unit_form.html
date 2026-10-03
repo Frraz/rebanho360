@@ -3,5 +3,5 @@
 {% block title %}{% if object %}Editar unidade{% else %}Nova unidade{% endif %} · Rebanho360{% endblock %}
 {% block content %}
 {% url 'organizations:unidade_lista' as voltar %}
-{% if object %}{% include "partials/_form_page.html" with titulo="Editar unidade" voltar=voltar voltar_rotulo="Unidades" %}{% else %}{% include "partials/_form_page.html" with titulo="Nova unidade" voltar=voltar voltar_rotulo="Unidades" %}{% endif %}
+{% if object %}{% include "partials/_form_page.html" with ajuda="unidade" titulo="Editar unidade" voltar=voltar voltar_rotulo="Unidades" %}{% else %}{% include "partials/_form_page.html" with ajuda="unidade" titulo="Nova unidade" voltar=voltar voltar_rotulo="Unidades" %}{% endif %}
 {% endblock %}

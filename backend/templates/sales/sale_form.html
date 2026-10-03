@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'sales:lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Vendas e abates</a>
-    <h1 class="page-title">Nova venda ou abate</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Nova venda ou abate</h1>
+      {% info "venda" %}
+    </div>
     <p class="page-subtitle">Confirmar dá saída no rebanho. Se o lote ficar sem animais, ele é encerrado.</p>
   </div>
 </header>

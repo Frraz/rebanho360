@@ -6,8 +6,8 @@
   <div>
     <div class="page-title-row">
       <h1 class="page-title">Condições de pagamento</h1>
+      {% info "condicao_pagamento" %}
     </div>
-    <p class="page-subtitle">À vista, prazo único ou parcelado. Você cria as condições da empresa e escolhe a de cada compra, compromisso ou venda.</p>
   </div>
   <div class="page-actions">
     {% if pode_gerenciar %}<a href="{% url 'commercial:condicao_nova' %}" class="btn-primary">{% icon "plus" %} Nova condição</a>{% endif %}

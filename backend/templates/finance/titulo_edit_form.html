@@ -5,7 +5,10 @@
 <header class="page-header">
   <div>
     <a href="{% url 'finance:titulo_detalhe' titulo.pk %}" class="crumb">{% icon "arrow-left" "icon-sm" %} {{ titulo.code }}</a>
-    <h1 class="page-title">Corrigir título</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">Corrigir título</h1>
+      {% if titulo.a_receber %}{% info "contas_receber" %}{% else %}{% info "contas_pagar" %}{% endif %}
+    </div>
     {% if titulo.origem %}
     <p class="page-subtitle">Este título nasceu de {{ titulo.origem }}: valor e favorecido (de animais e de venda) acompanham a operação. Para mudá-los, corrija a operação.</p>
     {% endif %}
