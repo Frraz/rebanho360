@@ -33,7 +33,18 @@ CAMPOS_DO_PERFIL = ("first_name", "last_name", "email", "phone", "role")
 # O que o próprio usuário edita na página Conta. Lista fechada de propósito:
 # papel, e-mail, usuário e situação são do administrador, mesmo que um POST
 # adulterado mande esses campos.
-CAMPOS_DA_PROPRIA_CONTA = ("first_name", "last_name", "phone", "birth_date", "cpf")
+CAMPOS_DA_PROPRIA_CONTA = (
+    "username",
+    "first_name",
+    "last_name",
+    "phone",
+    "birth_date",
+    "cpf",
+)
+
+
+class UsuarioEmUso(BusinessError):
+    """O usuário escolhido já é de outra conta — a tela marca o campo `username`."""
 
 
 def validade_do_link_em_dias() -> int:
@@ -72,8 +83,13 @@ def cpf_em_uso(cpf: str, *, exceto_pk: int | None = None) -> bool:
     return qs.exists()
 
 
-def usuario_em_uso(username: str) -> bool:
-    return User.objects.filter(username__iexact=username).exists()
+def usuario_em_uso(username: str, *, exceto_pk: int | None = None) -> bool:
+    """Já há outra conta com este usuário, sem diferenciar maiúsculas. Conta
+    excluída conta: o usuário dela continua reservado (a auditoria aponta para ele)."""
+    qs = User.objects.filter(username__iexact=username)
+    if exceto_pk is not None:
+        qs = qs.exclude(pk=exceto_pk)
+    return qs.exists()
 
 
 # --------------------------------------------------------------------------
@@ -332,14 +348,19 @@ def atualizar_propria_conta(usuario: User, *, dados: dict) -> bool:
             "Este CPF já está cadastrado em outra conta. "
             "Se o CPF é seu, fale com o administrador."
         )
+    if "username" in dados and usuario_em_uso(dados["username"], exceto_pk=usuario.pk):
+        raise UsuarioEmUso("Este usuário já existe. Escolha outro.")
     for campo in CAMPOS_DA_PROPRIA_CONTA:
         if campo in dados:
             setattr(usuario, campo, dados[campo])
     try:
         usuario.save(update_fields=list(CAMPOS_DA_PROPRIA_CONTA))
     except IntegrityError as exc:
-        # Duas gravações simultâneas do mesmo CPF: a constraint do banco decide.
-        raise BusinessError("Este CPF já está cadastrado em outra conta.") from exc
+        # Duas gravações simultâneas do mesmo CPF ou usuário: a constraint do
+        # banco decide.
+        if cpf_em_uso(cpf, exceto_pk=usuario.pk):
+            raise BusinessError("Este CPF já está cadastrado em outra conta.") from exc
+        raise UsuarioEmUso("Este usuário já existe. Escolha outro.") from exc
     depois = _retrato(usuario)
     if depois == antes:
         return False

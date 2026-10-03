@@ -49,7 +49,7 @@
           <dd>{% if user.has_broad_access %}Todas{% elif fazendas_do_usuario %}{{ fazendas_do_usuario|join:", " }}{% else %}Nenhuma liberada{% endif %}</dd>
         </div>
       </dl>
-      <p class="field-help">Usuário, e-mail, papel e fazendas são definidos pelo administrador. Para trocar o e-mail, fale com ele.</p>
+      <p class="field-help">E-mail, papel e fazendas são definidos pelo administrador. Para trocar o e-mail, fale com ele. O usuário você troca em "Dados pessoais".</p>
     </div>
 
     <form method="post" class="card space-y-5">
@@ -58,6 +58,7 @@
       {% if form.non_field_errors %}
       <div class="alert-danger" role="alert">{% icon "circle-x" %}<div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div></div>
       {% endif %}
+      {% include "partials/_field.html" with field=form.username %}
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {% include "partials/_field.html" with field=form.first_name %}
         {% include "partials/_field.html" with field=form.last_name %}

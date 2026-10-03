@@ -140,6 +140,8 @@ class ContaView(LoginRequiredMixin, View):
                 mudou = usuarios.atualizar_propria_conta(
                     request.user, dados=form.cleaned_data
                 )
+            except usuarios.UsuarioEmUso as exc:
+                form.add_error("username", str(exc))
             except BusinessError as exc:
                 form.add_error("cpf", str(exc))
             else:

@@ -1171,7 +1171,7 @@ AJUDA: dict[str, dict] = {
         "relacoes": [
             (
                 "Perfil",
-                "Nome, sobrenome, telefone, data de nascimento e CPF. Usuário, e-mail, papel e fazendas são definidos pelo administrador.",
+                "Usuário (para entrar), nome, sobrenome, telefone, data de nascimento e CPF. Você entra com o usuário ou com o e-mail. E-mail, papel e fazendas são definidos pelo administrador.",
             ),
             (
                 "Senha",

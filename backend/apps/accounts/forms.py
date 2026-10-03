@@ -41,6 +41,21 @@ def _telefone(valor: str) -> str:
     return valor
 
 
+def _validar_username(valor: str, *, exceto_pk: int | None = None) -> str:
+    """Usuário para entrar. Sem `@`: o login aceita usuário **ou** e-mail e tenta o
+    usuário primeiro, então um usuário parecido com e-mail confundiria quem entra."""
+    username = (valor or "").strip()
+    for validador in User._meta.get_field("username").validators:
+        validador(username)
+    if "@" in username:
+        raise ValidationError(
+            "O usuário não pode ter @ — assim ele não se confunde com um e-mail."
+        )
+    if usuarios.usuario_em_uso(username, exceto_pk=exceto_pk):
+        raise ValidationError("Este usuário já existe. Escolha outro.")
+    return username
+
+
 def _validar_senhas(form, usuario_provisorio: User) -> None:
     """`senha` e `senha2` iguais e aceitas pelos validadores do projeto."""
     senha = form.cleaned_data.get("senha", "")
@@ -58,8 +73,20 @@ def _validar_senhas(form, usuario_provisorio: User) -> None:
 
 
 class ContaForm(forms.Form):
-    """Perfil que o próprio usuário edita. Sem papel, e-mail, usuário nem situação."""
+    """Perfil que o próprio usuário edita. Sem papel, e-mail nem situação."""
 
+    username = forms.CharField(
+        label="Usuário (para entrar)",
+        max_length=150,
+        help_text="Letras, números e . _ - + (sem @). Você também entra com o e-mail.",
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "username",
+                "autocapitalize": "none",
+                "spellcheck": "false",
+            }
+        ),
+    )
     first_name = forms.CharField(label="Nome", max_length=150)
     last_name = forms.CharField(label="Sobrenome", max_length=150, required=False)
     phone = forms.CharField(label="Telefone", max_length=20, required=False)
@@ -90,12 +117,22 @@ class ContaForm(forms.Form):
         self.usuario = usuario
         if not self.is_bound:
             self.initial = {
+                "username": usuario.username,
                 "first_name": usuario.first_name,
                 "last_name": usuario.last_name,
                 "phone": usuario.phone,
                 "birth_date": usuario.birth_date,
                 "cpf": formatar_cpf(usuario.cpf),
             }
+
+    def clean_username(self):
+        # Quem não mexeu no usuário não é barrado por regra nova (contas antigas
+        # podem ter `@`); só vale para o que for digitado de diferente.
+        if self.cleaned_data["username"].strip() == self.usuario.username:
+            return self.usuario.username
+        return _validar_username(
+            self.cleaned_data["username"], exceto_pk=self.usuario.pk
+        )
 
     def clean_first_name(self):
         nome = _uma_linha(self.cleaned_data["first_name"])
@@ -152,7 +189,8 @@ class UsuarioForm(forms.Form):
     username = forms.CharField(
         label="Usuário (para entrar)",
         max_length=150,
-        help_text="Letras, números e . _ - @ +. Não muda depois.",
+        help_text="Letras, números e . _ - + (sem @). A própria pessoa pode "
+        "trocá-lo depois, na página Conta.",
     )
     first_name = forms.CharField(label="Nome", max_length=150)
     last_name = forms.CharField(label="Sobrenome", max_length=150, required=False)
@@ -269,12 +307,7 @@ class UsuarioForm(forms.Form):
     # ---- validação ----
 
     def clean_username(self):
-        username = self.cleaned_data["username"].strip()
-        for validador in User._meta.get_field("username").validators:
-            validador(username)
-        if usuarios.usuario_em_uso(username):
-            raise ValidationError("Este usuário já existe. Escolha outro.")
-        return username
+        return _validar_username(self.cleaned_data["username"])
 
     def clean_first_name(self):
         return _uma_linha(self.cleaned_data["first_name"])

@@ -30,6 +30,7 @@ def cliente(client, gestor):
 
 def _dados(**extra):
     base = {
+        "username": "gestor1",
         "first_name": "Gilberto",
         "last_name": "Souza",
         "phone": "(63) 99999-0000",
@@ -119,17 +120,14 @@ class TestPerfil:
         )
         assert "não é plausível" in crianca.content.decode()
 
-    def test_post_adulterado_nao_muda_papel_email_nem_usuario(self, cliente, gestor):
+    def test_post_adulterado_nao_muda_papel_email_nem_situacao(self, cliente, gestor):
         cliente.post(
             reverse("accounts:conta"),
-            _dados(
-                role=Role.ADMIN, email="invasor@x.com", username="root", is_active=""
-            ),
+            _dados(role=Role.ADMIN, email="invasor@x.com", is_active=""),
         )
         gestor.refresh_from_db()
         assert gestor.role == Role.GESTOR
         assert gestor.email == "gestor1@fazenda.com.br"
-        assert gestor.username == "gestor1"
         assert gestor.is_active is True
 
     def test_nome_em_branco_e_recusado(self, cliente):
@@ -145,6 +143,94 @@ class TestPerfil:
         gestor.cpf = CPF
         gestor.save(update_fields=["cpf"])
         assert CPF_FORMATADO in cliente.get(reverse("accounts:conta")).content.decode()
+
+
+class TestUsuario:
+    """O próprio usuário troca o nome com que entra (cliente, 2026-10-03)."""
+
+    def test_troca_o_usuario_e_audita_com_o_antes_e_o_depois(self, cliente, gestor):
+        resposta = cliente.post(reverse("accounts:conta"), _dados(username="gilberto"))
+        assert resposta.status_code == 302
+        gestor.refresh_from_db()
+        assert gestor.username == "gilberto"
+        evento = AuditEvent.objects.filter(
+            entity_type="User", entity_id=str(gestor.pk), action=AuditAction.UPDATE
+        ).latest("timestamp")
+        assert evento.actor_id == gestor.pk
+        assert "username" in evento.changed_fields
+        assert evento.before["username"] == "gestor1"
+        assert evento.after["username"] == "gilberto"
+
+    def test_continua_logado_e_entra_pelo_novo_usuario(self, cliente, gestor, client):
+        cliente.post(reverse("accounts:conta"), _dados(username="gilberto"))
+        assert cliente.get(reverse("accounts:conta")).status_code == 200
+        client.logout()
+        assert client.login(username="gilberto", password=SENHA)
+        assert not client.login(username="gestor1", password=SENHA)
+
+    def test_usuario_de_outra_conta_e_recusado_sem_diferenciar_maiusculas(
+        self, cliente, gestor
+    ):
+        User.objects.create_user(username="Maria", password=SENHA, role=Role.CAMPO)
+        resposta = cliente.post(reverse("accounts:conta"), _dados(username="maria"))
+        assert resposta.status_code == 200
+        assert "Este usuário já existe" in resposta.content.decode()
+        gestor.refresh_from_db()
+        assert gestor.username == "gestor1"
+
+    def test_usuario_de_conta_excluida_continua_reservado(self, cliente, gestor):
+        from django.utils import timezone
+
+        User.objects.create_user(
+            username="exfunc",
+            password=SENHA,
+            role=Role.CAMPO,
+            is_active=False,
+            deleted_at=timezone.now(),
+        )
+        resposta = cliente.post(reverse("accounts:conta"), _dados(username="exfunc"))
+        assert "Este usuário já existe" in resposta.content.decode()
+
+    def test_pode_mudar_so_as_maiusculas_do_proprio_usuario(self, cliente, gestor):
+        resposta = cliente.post(reverse("accounts:conta"), _dados(username="Gestor1"))
+        assert resposta.status_code == 302
+        gestor.refresh_from_db()
+        assert gestor.username == "Gestor1"
+
+    @pytest.mark.parametrize("invalido", ["com espaço", "com@arroba", "a/b", ""])
+    def test_usuario_invalido_e_recusado(self, cliente, gestor, invalido):
+        resposta = cliente.post(reverse("accounts:conta"), _dados(username=invalido))
+        assert resposta.status_code == 200
+        gestor.refresh_from_db()
+        assert gestor.username == "gestor1"
+
+    def test_arroba_tem_mensagem_propria(self, cliente):
+        resposta = cliente.post(reverse("accounts:conta"), _dados(username="a@b"))
+        assert "não pode ter @" in resposta.content.decode()
+
+    def test_conta_antiga_com_arroba_salva_o_resto_sem_ser_barrada(self, client, db):
+        antigo = User.objects.create_user(
+            username="velho@casa", password=SENHA, role=Role.CAMPO
+        )
+        client.force_login(antigo)
+        resposta = client.post(
+            reverse("accounts:conta"), _dados(username="velho@casa", cpf="")
+        )
+        assert resposta.status_code == 302
+
+    def test_usuario_igual_ao_email_de_outro_nao_vale(self, cliente, gestor):
+        User.objects.create_user(
+            username="maria",
+            password=SENHA,
+            role=Role.CAMPO,
+            email="maria@exemplo.com",
+        )
+        resposta = cliente.post(
+            reverse("accounts:conta"), _dados(username="maria@exemplo.com")
+        )
+        assert resposta.status_code == 200
+        gestor.refresh_from_db()
+        assert gestor.username == "gestor1"
 
 
 class TestSenha:
