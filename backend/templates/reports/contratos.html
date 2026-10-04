@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load core_tags widget_tweaks %}
+{% block title %}Contrato de compra · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div class="min-w-0">
+    <a href="{% url 'reports:indice' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Todos os relatórios</a>
+    <div class="page-title-row">
+      <h1 class="page-title">Contrato de compra{% if season %}<span class="text-lg font-normal text-gray-500">safra {{ season.name }}</span>{% endif %}</h1>
+      {% info "relatorio" %}
+    </div>
+    <p class="page-subtitle max-w-3xl">Os compromissos aprovados. Gere o contrato em PDF de cada um: produtor, datas, condição de pagamento, itens e preços por faixa. Dado bancário só sai para quem pode vê-lo.</p>
+  </div>
+</header>
+
+<form method="get" class="card mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end" aria-label="Filtrar contratos">
+  <div>
+    <label class="field-label" for="q">Registro ou produtor</label>
+    <input type="search" id="q" name="q" value="{{ q }}" class="field-input" placeholder="Ex.: OP-000049 ou secchi" autocomplete="off">
+  </div>
+  <div>
+    <label class="field-label" for="comprador">Comprador</label>
+    <select id="comprador" name="comprador" class="field-input">
+      <option value="">Todos os compradores</option>
+      {% for p in compradores %}<option value="{{ p.pk }}" {% if comprador == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="field-label" for="de">De</label>
+    <input type="date" id="de" name="de" value="{{ de }}" class="field-input">
+  </div>
+  <div>
+    <label class="field-label" for="ate">Até</label>
+    <input type="date" id="ate" name="ate" value="{{ ate }}" class="field-input">
+  </div>
+  <div class="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4 lg:justify-end">
+    {% if filtrando %}<a href="{% url 'reports:contrato_de_compra' %}" class="btn-secondary">Limpar filtros</a>{% endif %}
+    <button type="submit" class="btn-primary">Filtrar</button>
+  </div>
+</form>
+
+<div class="table-wrap">
+  {% if compromissos %}
+  <table class="table table-stack">
+    <thead>
+      <tr>
+        <th scope="col">Compromisso</th><th scope="col">Data</th><th scope="col">Produtor</th>
+        <th scope="col">Destino</th><th scope="col" class="num">Cabeças</th><th scope="col">Contrato</th><th scope="col"><span class="sr-only">Ação</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in compromissos %}
+      <tr>
+        <td class="cell-title"><a href="{% url 'procurement:compromisso_detalhe' c.pk %}" class="link code">{{ c.code }}</a></td>
+        <td data-label="Data" class="nowrap">{{ c.date|date:"d/m/Y" }}</td>
+        <td data-label="Produtor">{{ c.seller.name }}</td>
+        <td data-label="Destino">{{ c.destination_farm.name }}</td>
+        <td data-label="Cabeças" class="num">{{ c.cabecas|default:"—" }}</td>
+        <td data-label="Contrato">
+          {% if c.contrato %}
+          <a class="link" href="{% url 'documents:detalhe' c.contrato.document_id %}">Gerado em {{ c.contrato.generated_at|date:"d/m/Y H:i" }}</a>
+          {% else %}<span class="muted">Ainda não gerado</span>{% endif %}
+        </td>
+        <td class="cell-status">
+          <form method="post" action="{% url 'procurement:contrato_gerar' c.pk %}">{% csrf_token %}
+            <button type="submit" class="btn-secondary btn-sm">{% icon "file-down" "icon-sm" %} {% if c.contrato %}Gerar de novo{% else %}Gerar contrato{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "partials/_pagination.html" %}
+  {% else %}
+  {% include "partials/_empty.html" with icone="file-text" titulo="Nenhum compromisso aprovado" texto="O contrato nasce do compromisso aprovado. Ajuste os filtros ou aprove um compromisso." %}
+  {% endif %}
+</div>
+{% endblock %}

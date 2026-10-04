@@ -15,7 +15,16 @@ from django.urls import reverse
 
 from apps.accounts.models import Role, User, UserFarmAccess
 from apps.dashboards import selectors
-from apps.dashboards.bi import abas, compras, custos, insights, rebanho, specs, vendas
+from apps.dashboards.bi import (
+    abas,
+    compras,
+    custos,
+    financeiro,
+    insights,
+    rebanho,
+    specs,
+    vendas,
+)
 from apps.dashboards.bi.escopo import Escopo
 from apps.herd import services as herd
 from apps.herd.models import MovementType
@@ -331,7 +340,7 @@ class TestTelas:
                 client.get(reverse("dashboards:dashboard_aba", args=[slug])).status_code
                 == 403
             )
-        for slug in ("visao-geral", "rebanho", "lotes"):
+        for slug in ("visao-geral", "rebanho", "mortes", "lotes"):
             assert (
                 client.get(reverse("dashboards:dashboard_aba", args=[slug])).status_code
                 == 200
@@ -370,6 +379,7 @@ class TestTelas:
         assert [a.slug for a in abas.abas_visiveis(campo_baixao)] == [
             "visao-geral",
             "rebanho",
+            "mortes",
             "lotes",
         ]
 
@@ -497,6 +507,50 @@ class TestMesmoNumero:
         assert (
             custos.total(e) == cartao.custos == D("15000")
         )  # fora o frete que a compra gerou
+
+    def test_cabecas_vendidas_e_a_soma_das_vendas(self, gestor, season, venda_parcial):
+        e = escopo(gestor, season)
+        kpi = {k.rotulo: k for k in vendas.kpis(e)}["Cabeças vendidas"]
+        assert kpi.valor == "60" and "1 venda(s)" in kpi.nota
+        # a mesma conta do gráfico de cabeças por mês e do subtexto da receita
+        receita = {k.rotulo: k for k in vendas.kpis(e)}["Receita de vendas"]
+        assert "60 cabeças" in receita.nota
+
+    def test_a_visao_geral_segue_mostrando_receita_e_resultado(
+        self, gestor, season, lote_de_compra, venda_parcial
+    ):
+        from apps.dashboards.bi import visao_geral
+
+        rotulos = [k.rotulo for k in visao_geral.kpis(escopo(gestor, season))]
+        assert "Receita de vendas" in rotulos
+        assert "Resultado dos lotes vendidos" in rotulos
+
+    def test_despesas_do_financeiro_sao_os_custos_da_safra(
+        self, gestor, season, lote_de_compra
+    ):
+        """Soma por centro e soma por mês fecham com o total da aba Custos e com
+        o cartão da safra (regra 6: um número só)."""
+        e = escopo(gestor, season)
+        por_centro = financeiro.grafico_despesas_por_centro(e)
+        por_mes = financeiro.grafico_despesas_por_mes(e)
+        total = custos.total(e)
+        assert total == D("15000")
+        assert sum(v for _, v, _ in custos.por_centro(e)) == total
+        assert sum(custos.totais_por_mes(e)) == total
+        assert (
+            por_centro.id == "fin-despesas-centro" and por_mes.id == "fin-despesas-mes"
+        )
+        # um único centro não é ranking: o gráfico diz isso em vez de desenhar 1 barra
+        assert por_centro.vazio and "FUNCIONARIO" in por_centro.aviso_vazio
+        assert not por_mes.vazio
+        assert "fora a compra de animais" in por_centro.nota
+
+    def test_a_aba_financeiro_mostra_as_despesas_mesmo_sem_titulos(
+        self, gestor, season, lote_de_compra
+    ):
+        painel = financeiro.montar(escopo(gestor, season)).finalizar()
+        ids = {g.id for g in painel.graficos()}
+        assert {"fin-despesas-centro", "fin-despesas-mes"} <= ids
 
     def test_valor_por_arroba_e_o_da_venda(self, gestor, season, venda_parcial):
         e = escopo(gestor, season)
@@ -659,6 +713,7 @@ class TestSemDados:
         assert kpi["Custo por @ (peso vivo)"].valor == "—"
         vendas_kpi = {k.rotulo: k for k in vendas.kpis(e)}
         assert vendas_kpi["Receita de vendas"].valor == "—"
+        assert vendas_kpi["Cabeças vendidas"].valor == "—"  # sem venda: falta, não 0
         assert vendas_kpi["Valor por @ (abates)"].valor == "—"
 
     def test_primeira_safra_nao_inventa_variacao(self, gestor, season, venda_parcial):

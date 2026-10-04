@@ -1,0 +1,11 @@
+(Transcrito por TurboScribe. Atualize para Ilimitado para remover esta mensagem.)
+
+A gente tem esses dois relatórios aqui de centros de custos, né, de custos. Um é por centros de custos. Aí, esses centros de custos faltam um filtro por fazenda, né, pra gente poder saber por fazenda como é que tá, como é que tá esses custos por centros de custos.
+
+E o outro é por fazenda, só que ele traz todas as fazendas agrupadas. Eu tô sentindo falta só de um, que seria o quê? Custo por fazenda detalhado, vamos dizer assim. Onde lá a gente iria filtrar a fazenda, e aí viria... e o período também, né, data inicial e final.
+
+E aí viria os custos detalhados, que é o quê? Tudo que foi lançado lá em custos, de forma detalhada, pra gente poder exportar. Que é um relatório que eles têm aqui na planilha também, que é o custo por fazenda. Aí vai vir todos os lançamentos de custos, e eu filtrando a fazenda.
+
+Então, ó, vou filtrar a fazenda em São Francisco, aí vai vir todos os custos detalhados daquele mês, né, pra pessoa conferir mês a mês, né.
+
+(Transcrito por TurboScribe. Atualize para Ilimitado para remover esta mensagem.)

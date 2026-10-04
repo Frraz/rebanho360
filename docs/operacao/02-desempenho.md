@@ -20,7 +20,7 @@ docker compose run --rm --no-deps -e DATABASE_URL=$DB web \
     python manage.py medir_desempenho --usuario admin@teste
 ```
 
-`medir_desempenho` abre cada tela pesada como um usuário (dashboard em 8 abas, Início e as listas) e imprime **tempo, número de consultas, tempo no banco** e as consultas que mais se repetem. Opções úteis:
+`medir_desempenho` abre cada tela pesada como um usuário (dashboard em 9 abas, Início e as listas) e imprime **tempo, número de consultas, tempo no banco** e as consultas que mais se repetem. Opções úteis:
 
 | Opção | Para quê |
 |---|---|

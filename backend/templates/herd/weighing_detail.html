@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Pesagem {{ pesagem.lot.code }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="{% url 'herd:pesagem_lista' %}" class="crumb">{% icon "arrow-left" "icon-sm" %} Pesagens</a>
+    <div class="page-title-row">
+      <h1 class="page-title">
+        <span>Pesagem de {{ pesagem.date|date:"d/m/Y" }}</span>
+        <span class="flex flex-wrap items-center gap-1.5 text-base">
+          {% status_badge pesagem.status %}
+          {% if pesagem.version > 1 %}<span class="badge-editada">Editada (v{{ pesagem.version }})</span>{% endif %}
+        </span>
+      </h1>
+      {% info "pesagem" %}
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if pesagem.status == "CONFIRMADA" and pode_editar %}
+    <a href="{% url 'herd:pesagem_editar' pesagem.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>
+    {% endif %}
+  </div>
+</header>
+
+{% if pesagem.status == "EXCLUIDA" %}
+<div class="alert-warning mb-4" role="status">{% icon "triangle-alert" %}<p>Excluída por {{ pesagem.deleted_by }}{% if pesagem.delete_reason %}: "{{ pesagem.delete_reason }}"{% endif %}. Pesagem excluída não entra no GMD do lote.</p></div>
+{% endif %}
+
+<section class="card" aria-label="Dados da pesagem">
+  <dl class="facts">
+    <div><dt>Lote</dt><dd><a href="{% url 'livestock:lote_detalhe' pesagem.lot_id %}" class="link code">{{ pesagem.lot.code }}</a></dd></div>
+    <div><dt>Fazenda</dt><dd>{{ pesagem.farm.name }}</dd></div>
+    <div><dt>Data</dt><dd>{{ pesagem.date|date:"d/m/Y" }}</dd></div>
+    <div><dt>Motivo</dt><dd>{{ pesagem.get_reason_display }}</dd></div>
+    <div><dt>Cabeças pesadas</dt><dd>{{ pesagem.head_count }}</dd></div>
+    <div><dt>Peso total</dt><dd>{{ pesagem.total_weight_kg|numero:0 }} kg</dd></div>
+    <div><dt>Peso médio</dt><dd>{{ pesagem.average_weight_kg|numero:1 }} kg</dd></div>
+  </dl>
+</section>
+
+{% if pesagem.status == "CONFIRMADA" and pode_excluir %}
+<div class="mt-8 border-t border-gray-200 pt-6" x-data="{ aberto: false }">
+  <button type="button" class="btn-danger-outline" @click="aberto = !aberto" :aria-expanded="aberto">{% icon "trash-2" %} Excluir pesagem</button>
+  <div x-show="aberto" x-cloak class="card mt-4 max-w-2xl space-y-3">
+    <p class="text-sm text-gray-600">A pesagem sai da operação e do cálculo do GMD. Ela não mexe no saldo de cabeças; o registro e o motivo ficam na auditoria.</p>
+    <form method="post" action="{% url 'herd:pesagem_excluir' pesagem.pk %}">
+      {% csrf_token %}
+      <label class="field-label" for="motivo-exclusao">Motivo<span class="text-red-600" aria-hidden="true"> *</span></label>
+      <textarea id="motivo-exclusao" name="motivo" class="field-input" rows="2" required></textarea>
+      <button type="submit" class="btn-danger mt-3">Confirmar exclusão</button>
+    </form>
+  </div>
+</div>
+{% elif pesagem.status == "EXCLUIDA" and pode_excluir %}
+<form method="post" action="{% url 'herd:pesagem_restaurar' pesagem.pk %}" class="mt-8 border-t border-gray-200 pt-6">
+  {% csrf_token %}
+  <button type="submit" class="btn-secondary">{% icon "rotate-ccw" %} Restaurar</button>
+</form>
+{% endif %}
+{% endblock %}

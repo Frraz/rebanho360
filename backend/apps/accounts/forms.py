@@ -4,6 +4,7 @@ import re
 
 from django import forms
 from django.contrib.auth import password_validation
+from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
@@ -456,3 +457,17 @@ class SolicitacaoAcessoForm(forms.Form):
     @property
     def parece_robo(self) -> bool:
         return bool(self.cleaned_data.get("website"))
+
+
+class TrocaDeSenhaForm(PasswordChangeForm):
+    """Troca de senha sem o `autofocus` que o Django põe em "Senha atual".
+
+    Na página Conta o formulário fica no meio da página: com `autofocus` o
+    navegador rola até ele ao abrir, e a tela "abre na senha". Só a troca
+    obrigatória, que é a tela inteira, mantém o foco no primeiro campo.
+    """
+
+    def __init__(self, *args, manter_foco: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not manter_foco:
+            self.fields["old_password"].widget.attrs.pop("autofocus", None)

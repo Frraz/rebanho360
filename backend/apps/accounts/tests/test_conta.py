@@ -1,5 +1,7 @@
 """Página Conta: o usuário edita o próprio perfil, a senha e vê o segundo fator."""
 
+import re
+
 import pytest
 from django.urls import reverse
 
@@ -306,3 +308,11 @@ class TestSegundoFator:
         html = cliente.get(reverse("accounts:conta")).content.decode()
         assert "Desativado" in html
         assert reverse("accounts:2fa_configurar") in html
+
+
+def test_a_conta_nao_rouba_o_foco_para_o_campo_de_senha(cliente):
+    """`autofocus` no meio da página faz o navegador rolar até ele ao abrir:
+    a Conta tem de abrir no topo."""
+    html = cliente.get(reverse("accounts:conta")).content.decode()
+    campo = re.search(r"<input[^>]*id=\"id_old_password\"[^>]*>", html)
+    assert campo and "autofocus" not in campo.group(0)

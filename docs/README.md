@@ -12,7 +12,7 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 | [00-visao-geral](00-visao-geral.md) | Problema, usuários, escopo e não-escopo |
 | [roadmap/](roadmap/README.md) | **As fases, tarefa a tarefa, até produção** — por onde começar |
 | [roadmap/definition-of-done](roadmap/definition-of-done.md) | Quando uma tarefa está realmente pronta |
-| [regras-negocio/99-pendencias](regras-negocio/99-pendencias.md) | **15 pendências de negócio abertas**, cada uma com padrão reversível — ler antes de codificar. As respondidas/dispensadas: [99-pendencias-resolvidas](regras-negocio/99-pendencias-resolvidas.md) |
+| [regras-negocio/99-pendencias](regras-negocio/99-pendencias.md) | **16 pendências de negócio abertas**, cada uma com padrão reversível — ler antes de codificar. As respondidas/dispensadas: [99-pendencias-resolvidas](regras-negocio/99-pendencias-resolvidas.md) |
 
 ### Arquitetura
 | Documento | Assunto |

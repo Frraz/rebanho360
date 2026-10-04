@@ -1,6 +1,6 @@
 # Dashboard analítico
 
-Análise da safra em oito abas: indicadores com comparação, gráficos, tabelas e leituras automáticas. Responde às perguntas de gestão que a planilha só respondia montando tabela dinâmica: o rebanho cresceu quanto e por quê, a que preço se comprou e se vendeu, o boi pagou o que custou criar, quem está atrasado, que lote está ganhando pouco peso.
+Análise da safra em nove abas: indicadores com comparação, gráficos, tabelas e leituras automáticas. Responde às perguntas de gestão que a planilha só respondia montando tabela dinâmica: o rebanho cresceu quanto e por quê, a que preço se comprou e se vendeu, o boi pagou o que custou criar, quem está atrasado, que lote está ganhando pouco peso.
 
 Tela: **Dashboard**, logo abaixo de **Início** no menu (`/dashboard/` e `/dashboard/<aba>/`). Código em `apps/dashboards/bi/`; desenho em `static/js/dashboard.js` sobre o ECharts hospedado em `static/vendor/`; visual em [`docs/ux/02-design-system.md`](../ux/02-design-system.md#13-dashboard-analítico).
 
@@ -49,11 +49,12 @@ A seta traz o valor, o sentido e se é favorável ou não (cor + texto): "subiu 
 |---|---|---|
 | **Visão geral** | todos (campo sem dinheiro) | Os números que importam, **o que merece atenção**, rebanho, dinheiro da safra, resultado e caixa, ciclo, fazenda a fazenda |
 | **Rebanho** | todos | Saldo por fazenda, entradas e saídas por tipo, categoria × fazenda, tempo no pasto, fluxo de animais (abertura + entradas = saídas + saldo final), mortes e mortalidade, lotação |
+| **Mortes** | todos | Mortes por mês (jovens e adultos), por causa, categoria, fazenda e lote; mortalidade mês a mês e por faixa; peso e causa não informada |
 | **Lotes** | todos (campo sem custo) | GMD de cada lote e sua distribuição, curvas de peso, custo × GMD, margem por @, painel de lotes |
 | **Compras** | quem vê dinheiro | Investimento por mês, preço (@ vivo e cabeça), acumulado × safra anterior, peso × preço, vendedores, destino |
-| **Vendas e resultado** | quem vê dinheiro | Receita, valor/@, rendimento (com a faixa usual), cascata do resultado, resultado por lote, custo/@ × valor/@ |
+| **Vendas e resultado** | quem vê dinheiro | Receita, cabeças vendidas, valor/@, rendimento (com a faixa usual), cascata do resultado, resultado por lote, custo/@ × valor/@ |
 | **Custos** | quem vê dinheiro | Mês a mês por classe, centro de custo (mapa em árvore e ranking), centro × mês, custo por cabeça/dia, por fazenda |
-| **Financeiro** | quem vê títulos | Fluxo de caixa (realizado × previsto), vencimentos a pagar e a receber, etapa de cada real, a quem se deve, calendário, formas de pagamento |
+| **Financeiro** | quem vê títulos | Fluxo de caixa (realizado × previsto), despesas por centro de custo e por mês, vencimentos a pagar e a receber, etapa de cada real, a quem se deve, calendário, formas de pagamento |
 | **Ciclo de compra** | quem vê o ciclo | Compromissos por etapa, contratado × embarcado × recebido, quebra por viagem, frete previsto × realizado |
 
 **Carregamento sob demanda:** a página traz a aba pedida; ao trocar de aba, o HTMX pede só o fragmento (`HX-Request`), com a URL no histórico. Sem JavaScript, as abas são links comuns.
@@ -67,6 +68,8 @@ A seta traz o valor, o sentido e se é favorável ou não (cor + texto): "subiu 
 - **Resultado dos lotes vendidos** = soma do resultado dos lotes **com venda na safra** (cada lote por inteiro, com custo pela fração já vendida), ao lado de "N de M lotes com resultado" ([#48](99-pendencias.md#48--🟢-dashboard-quem-vê-dinheiro-limiares-das-leituras-e-o-resultado-da-safra-fase-6)).
 - **Posição de contas** (aging, a pagar, a receber) soma os títulos em aberto de **todas as safras**: dívida não tem safra. O **fluxo de caixa** é o da safra escolhida e não tem saldo bancário inicial: o saldo acumulado parte de zero e o painel avisa.
 - **Lotação** = cabeças ÷ área de pasto cadastrada, só das fazendas que têm a área; sem ela, "—".
+- **Despesa** (aba Financeiro) = o custo lançado confirmado da safra, **sem** a compra de animais: o mesmo número da aba Custos e do cartão da safra, em dois gráficos (por centro de custo e por mês). Ver [#50](99-pendencias.md#50--🟢-ajustes-de-out2026-whatsapp-aba-mortes-quadro-de-movimentação-despesas-e-filtros-fase-6).
+- **Aba Mortes:** a soma do razão dos movimentos de morte (a morte desfeita some sozinha: a compensação vale na data original). **Jovem** = categoria até a ordem etária 3; a taxa por faixa usa o estoque do fim do mês (como a planilha) e o total usa o saldo médio (o mesmo do painel inicial). Faixa sem estoque é "—", nunca 0 nem erro. **Sem alerta de mortalidade**, por decisão do cliente: o sistema mostra, a leitura é do usuário.
 - **Mortalidade consolidada** = mortes ÷ soma dos saldos médios (média ponderada, não média das taxas).
 
 ---

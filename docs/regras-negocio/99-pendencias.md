@@ -8,7 +8,7 @@ Dúvidas que **continuam sem resposta**. Cada uma tem: a pergunta, por que impor
 
 Os números das pendências **não foram reordenados** (o código e os documentos citam "pendência #N"): faltam números porque esses itens estão no arquivo de resolvidas.
 
-**Abertas (15):** #3 · #7 · #13 · #14 · #21 · #26 · #29 · #35 · #37 · #38 · #39 · #40 · #44 · #47 · #48
+**Abertas (16):** #3 · #7 · #13 · #14 · #21 · #26 · #29 · #35 · #37 · #38 · #39 · #40 · #44 · #47 · #48 · #50
 
 ---
 
@@ -226,10 +226,26 @@ Os números das pendências **não foram reordenados** (o código e os documento
 
 ---
 
+## #50 — 🟢 Ajustes de out/2026 (WhatsApp): aba Mortes, quadro de movimentação, despesas e filtros *(Fase 6)*
+
+**Onde:** `apps/dashboards/bi/mortes.py`, `bi/financeiro.py`, `apps/herd/selectors.py` (`movimentacao_por_categoria`), `apps/purchases/forms.py` (`PurchaseFilterForm`). Relatórios: [catálogo](../relatorios/01-catalogo.md).
+
+**A dúvida:** o cliente pediu coisas sem definir quatro pontos, e cada um foi resolvido com o padrão mais reversível:
+
+(a) **Jovem × adulto** (aba Mortes). A planilha tem "animais jovens" e "adultos" e não diz onde está a linha. (b) **Despesa** (gráficos do Financeiro: por centro de custo e por mês) é o **custo lançado confirmado da safra**, com ou sem a compra de animais? (c) **Movimentação por fazenda**: a planilha só tem Compra, Evolução, Nascimento e Transferência nas entradas e Abate, Morte, Venda e Transferência nas saídas, mas o razão tem também saldo inicial, ajuste de inventário, reclassificação e consumo/doação. (d) **Filtro de datas em Compras**: vale dentro da safra escolhida no topo, ou atravessa safras?
+
+**Por que importa:** (a) muda a taxa de mortalidade por faixa; (b) muda o total dos dois gráficos e a ligação com a aba Custos; (c) sem uma coluna para esses tipos, "saldo anterior + entradas − saídas" não fecha com a posição final; (d) pesquisar uma data de outra safra devolve lista vazia.
+
+**Implementado:** (a) jovem = categoria com ordem etária **até 3** (bezerros, desmama e 13 a 24 meses); as demais, e a tropa sem ordem, são adulto — constante `ULTIMA_ORDEM_JOVEM` em `bi/mortes.py`. A taxa por faixa usa o **estoque no fim do mês**, como a planilha; o total usa o saldo médio, para bater com o painel inicial. (b) **Sem** a compra de animais, o mesmo critério da aba Custos e do cartão da safra; a nota do gráfico diz isso. (c) Colunas **"Outras entradas" e "Outras saídas"**, que só aparecem quando há movimento desses tipos; transferência entre lotes da mesma fazenda não é entrada nem saída dela. (d) Dentro da safra do topo.
+
+**Custo de mudar:** baixo. (a) uma constante; (b) trocar `custos.por_centro` por uma variante com `com_os_da_compra=True`; (c) acrescentar colunas em `herd/selectors.py:_coluna_do_movimento`; (d) tirar o `season` de `PurchaseListView`.
+
+---
+
 ## Como usar este documento
 
 1. **Antes de usar o acerto de verdade:** confirmar #21 com o contador.
 2. **Antes de apresentar:** o que entra na reunião com os usuários está em [14](14-roteiro-de-validacao-com-os-usuarios.md); a de **#47** (mais de uma empresa) precisa ser decidida antes de cadastrar dado real na segunda empresa.
 3. **Decididas na reunião:** #29 (status), #35 (tabela de preço), #38 (lotação), #39 (consumo e arroba viva), #44 (exportações).
-4. **Podem esperar:** #3, #26, #37, #40, #48 — funcionam com os padrões reversíveis e não bloqueiam nada.
+4. **Podem esperar:** #3, #26, #37, #40, #48, #50 — funcionam com os padrões reversíveis e não bloqueiam nada.
 5. Resolvida uma pendência: registrar a resposta **no próprio item**, com data e quem respondeu, **mover o item para** [99-pendencias-resolvidas](99-pendencias-resolvidas.md) e só então mexer no código. A pergunta e a resposta ficam no arquivo de resolvidas — apagar a pergunta é perder o motivo da regra.

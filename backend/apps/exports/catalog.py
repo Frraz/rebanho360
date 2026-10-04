@@ -605,11 +605,13 @@ def grupos_para(user) -> list[tuple[str, list[Conjunto]]]:
 
 def relatorios_para(user) -> list[tuple[str, str, str]]:
     """(slug, título, descrição) dos relatórios que o papel pode abrir. Fora o
-    que precisa de um registro escolhido (a conferência de **um** acerto)."""
+    que precisa de um registro escolhido (a conferência de **um** acerto) e o que
+    não é tabela (o contrato de compra, que é um PDF por compromisso)."""
     from apps.reports import services
 
     return [
         item
         for item in services.catalogo_para(user)
         if "acerto" not in services.PARAMETROS.get(item[0], ())
+        and item[0] in services.RELATORIOS
     ]

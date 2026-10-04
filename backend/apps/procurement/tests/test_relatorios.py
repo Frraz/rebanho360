@@ -503,3 +503,164 @@ class TestExportacoes:
             "Romaneio de abate valorizado",
         ):
             assert secao in csv
+
+
+class TestFiltroDeComprador:
+    """Comissão e histórico filtram por comprador; o histórico também o mostra."""
+
+    def _outro(self):
+        from apps.partners.models import Partner
+
+        return Partner.objects.create(name="Outro Comprador")
+
+    def test_comissao_so_traz_as_linhas_do_comprador_escolhido(
+        self, escritorio, season, rascunho, regra_de_comissao, comissionado, gestor
+    ):
+        commitments.aprovar_compromisso(rascunho, usuario=gestor)
+
+        dele = montar(
+            escritorio, "comissao-por-comprador", season, comprador=comissionado
+        )
+        assert [lin["comprador"] for lin in dele.linhas] == [comissionado.name]
+        assert f"Comprador: {comissionado.name}" in dele.filtros
+
+        de_outro = montar(
+            escritorio, "comissao-por-comprador", season, comprador=self._outro()
+        )
+        assert de_outro.linhas == []
+
+    def test_historico_mostra_o_comprador_e_filtra_por_ele(
+        self,
+        escritorio,
+        season,
+        regra_de_comissao,
+        acerto_aprovado,
+        compromisso,
+        comissionado,
+    ):
+        (linha,) = montar(escritorio, "historico-por-pecuarista", season).linhas
+        assert linha["comprador"] == comissionado.name
+
+        achado = montar(
+            escritorio, "historico-por-pecuarista", season, comprador=comissionado
+        )
+        assert len(achado.linhas) == 1
+        sem = montar(
+            escritorio, "historico-por-pecuarista", season, comprador=self._outro()
+        )
+        assert sem.linhas == []
+        assert "comprador" in {c.chave for c in achado.colunas}
+
+    def test_a_tela_oferece_o_filtro_e_aplica_o_escolhido(
+        self,
+        client,
+        escritorio,
+        regra_de_comissao,
+        acerto_aprovado,
+        compromisso,
+        comissionado,
+    ):
+        client.force_login(escritorio)
+        url = reverse("reports:relatorio", args=["comissao-por-comprador"])
+        html = client.get(url).content.decode()
+        assert 'name="comprador"' in html and comissionado.name in html
+
+        filtrado = client.get(url, {"comprador": comissionado.pk}).content.decode()
+        assert f"Comprador: {comissionado.name}" in filtrado
+
+    def test_comprador_que_o_usuario_nao_alcanca_nao_vira_filtro(
+        self,
+        client,
+        baixao,
+        regra_de_comissao,
+        acerto_aprovado,
+        compromisso,
+        comissionado,
+    ):
+        de_outra = User.objects.create_user(
+            username="o", password="x", role=Role.ESCRITORIO
+        )
+        UserFarmAccess.objects.create(user=de_outra, farm=baixao, can_write=True)
+        client.force_login(de_outra)
+        html = client.get(
+            reverse("reports:relatorio", args=["comissao-por-comprador"])
+        ).content.decode()
+        # O comprador existe só em compromisso de São Francisco: fora do escopo.
+        assert f">{comissionado.name}</option>" not in html
+
+    def test_pdf_leva_o_comprador_escolhido(
+        self,
+        client,
+        escritorio,
+        regra_de_comissao,
+        acerto_aprovado,
+        compromisso,
+        comissionado,
+        settings,
+        tmp_path,
+    ):
+        settings.MEDIA_ROOT = tmp_path / "media"
+        client.force_login(escritorio)
+        client.post(
+            reverse("documents:gerar", args=["comissao-por-comprador"]),
+            {"comprador": comissionado.pk},
+        )
+        from apps.documents.models import GeneratedDocument
+
+        doc = GeneratedDocument.objects.get()
+        assert f"Comprador: {comissionado.name}" in doc.filters
+        assert doc.params["comprador_id"] == comissionado.pk
+
+
+class TestContratoDeCompraNoCatalogo:
+    def test_o_catalogo_lista_o_contrato_e_a_tela_abre(
+        self, client, escritorio, compromisso
+    ):
+        client.force_login(escritorio)
+        indice = client.get(reverse("reports:indice")).content.decode()
+        assert reverse("reports:relatorio", args=["contrato-de-compra"]) in indice
+        resposta = client.get(reverse("reports:relatorio", args=["contrato-de-compra"]))
+        assert resposta.status_code == 200
+        html = resposta.content.decode()
+        assert compromisso.code in html
+        assert reverse("procurement:contrato_gerar", args=[compromisso.pk]) in html
+
+    def test_rascunho_nao_tem_contrato(self, client, escritorio, rascunho):
+        client.force_login(escritorio)
+        html = client.get(reverse("reports:contrato_de_compra")).content.decode()
+        assert rascunho.code not in html
+
+    def test_campo_nao_ve_o_contrato(self, client, campo_baixao, compromisso):
+        client.force_login(campo_baixao)
+        assert client.get(reverse("reports:contrato_de_compra")).status_code == 403
+        indice = client.get(reverse("reports:indice")).content.decode()
+        # o link do catálogo some (o texto de ajuda "i" é igual para todos)
+        assert reverse("reports:relatorio", args=["contrato-de-compra"]) not in indice
+
+    def test_so_aparece_o_que_a_fazenda_do_usuario_alcanca(
+        self, client, baixao, compromisso
+    ):
+        de_outra = User.objects.create_user(
+            username="o", password="x", role=Role.ESCRITORIO
+        )
+        UserFarmAccess.objects.create(user=de_outra, farm=baixao, can_write=True)
+        client.force_login(de_outra)
+        html = client.get(reverse("reports:contrato_de_compra")).content.decode()
+        assert compromisso.code not in html
+
+    def test_mostra_o_contrato_ja_gerado_e_filtra_por_produtor(
+        self, client, escritorio, gestor, compromisso, settings, tmp_path
+    ):
+        from apps.procurement import contract
+
+        settings.MEDIA_ROOT = tmp_path / "media"
+        documento = contract.gerar_contrato(compromisso, usuario=gestor)
+        client.force_login(escritorio)
+        url = reverse("reports:contrato_de_compra")
+        html = client.get(url).content.decode()
+        assert str(documento.document_id) in html and "Gerar de novo" in html
+        assert (
+            compromisso.code
+            not in client.get(url, {"q": "inexistente"}).content.decode()
+        )
+        assert compromisso.code in client.get(url, {"q": "secchi"}).content.decode()

@@ -22,7 +22,7 @@ from apps.finance.models import (
     PaymentStatus,
 )
 
-from . import specs
+from . import custos, specs
 from .escopo import Escopo
 from .specs import Kpi, Painel, Secao, Tabela
 
@@ -422,6 +422,42 @@ def tabela_proximos_vencimentos(e: Escopo) -> Tabela:
 # --------------------------------------------------------------------------
 
 
+# Despesa = lançamento de custo confirmado da safra, o mesmo da aba Custos e do
+# cartão da safra: os números batem (regra 6). Fica de fora a compra de animais,
+# que a aba Compras já mostra como investimento.
+NOTA_DAS_DESPESAS = (
+    "Lançamentos de custo confirmados da safra, fora a compra de animais."
+)
+
+
+def grafico_despesas_por_centro(e: Escopo) -> specs.Grafico:
+    return specs.ranking(
+        "fin-despesas-centro",
+        "Despesas por centro de custo",
+        [(nome, valor) for nome, valor, _ in custos.por_centro(e)],
+        formato="brl",
+        nome_serie="Despesa",
+        limite=12,
+        largura="metade",
+        url=reverse("costs:lista"),
+        nota=NOTA_DAS_DESPESAS,
+    )
+
+
+def grafico_despesas_por_mes(e: Escopo) -> specs.Grafico:
+    return specs.cartesiano(
+        "fin-despesas-mes",
+        "Despesas por mês",
+        [specs.rotulo_do_mes(m) for m in e.meses],
+        [specs.serie("Despesas", custos.totais_por_mes(e), cor=specs.COR_CUSTOS)],
+        formato="brl",
+        titulo_y="R$",
+        largura="metade",
+        url=reverse("costs:lista"),
+        nota=NOTA_DAS_DESPESAS,
+    )
+
+
 def montar(e: Escopo) -> Painel:
     painel = Painel(kpis=kpis(e), kpis_titulo="Contas e caixa")
     total = fluxo(e).total
@@ -437,6 +473,7 @@ def montar(e: Escopo) -> Painel:
         not por_vencimento(e, Direction.PAGAR)
         and not por_vencimento(e, Direction.RECEBER)
         and sem_movimento
+        and not custos.total(e)
     ):
         painel.vazio = "Nenhum título lançado ainda."
     n_sem = financeiro.contar_operacoes_sem_titulo(e.user)
@@ -446,6 +483,11 @@ def montar(e: Escopo) -> Painel:
         )
     painel.secoes = [
         Secao("Caixa", [grafico_fluxo(e)]),
+        Secao(
+            "Despesas",
+            [grafico_despesas_por_centro(e), grafico_despesas_por_mes(e)],
+            descricao="Os lançamentos de custo da safra, por competência (a data do fato).",
+        ),
         Secao("Contas em aberto", [grafico_aging(e), grafico_pipeline(e)]),
         Secao(
             "Com quem",

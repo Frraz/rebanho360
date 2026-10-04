@@ -13,7 +13,12 @@ from apps.core import reversible
 from apps.core.exceptions import BlockingDependencyError, BusinessError, DependencyError
 from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmado
 from apps.herd import selectors, services
-from apps.herd.forms import MovementEditForm, MovementForm, WeighingForm
+from apps.herd.forms import (
+    MovementEditForm,
+    MovementForm,
+    WeighingEditForm,
+    WeighingForm,
+)
 from apps.herd.models import HerdMovement, MovementType, Weighing
 from apps.herd.permissions import LancaMovimentoMixin
 from apps.properties.models import Farm
@@ -343,6 +348,114 @@ class WeighingListView(LoginRequiredMixin, ListView):
         return Weighing.objects.for_user(self.request.user).select_related(
             "farm", "lot"
         )
+
+
+def _get_pesagem(request, pk) -> Weighing:
+    """Pesagem dentro do escopo do usuário: fora dele, 404 (ADR 0003)."""
+    return get_object_or_404(
+        Weighing.objects.for_user(request.user).select_related("farm", "lot"), pk=pk
+    )
+
+
+class WeighingDetailView(LoginRequiredMixin, TemplateView):
+    template_name = "herd/weighing_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["pesagem"] = _get_pesagem(self.request, kwargs["pk"])
+        context["pode_editar"] = pode_editar_confirmado(self.request.user)
+        context["pode_excluir"] = pode_excluir_confirmado(self.request.user)
+        return context
+
+
+class WeighingUpdateView(LoginRequiredMixin, TemplateView):
+    template_name = "herd/weighing_edit_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        pesagem = _get_pesagem(request, kwargs["pk"])
+        if not pode_editar_confirmado(request.user):
+            messages.error(
+                request, "Você não tem permissão para editar este lançamento."
+            )
+            return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
+        if pesagem.status != "CONFIRMADA":
+            messages.error(request, "Só se corrige pesagem confirmada.")
+            return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        pesagem = _get_pesagem(request, kwargs["pk"])
+        form = WeighingEditForm(
+            initial={
+                "date": pesagem.date,
+                "reason": pesagem.reason,
+                "head_count": pesagem.head_count,
+                "total_weight_kg": pesagem.total_weight_kg,
+            }
+        )
+        return render(request, self.template_name, {"form": form, "pesagem": pesagem})
+
+    def post(self, request, *args, **kwargs):
+        pesagem = _get_pesagem(request, kwargs["pk"])
+        form = WeighingEditForm(request.POST)
+        if form.is_valid():
+            dados = dict(form.cleaned_data)
+            motivo = dados.pop("edit_reason")
+            try:
+                services.editar_pesagem(
+                    pesagem, dados=dados, motivo=motivo, usuario=request.user
+                )
+            except BusinessError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"✓ Pesagem corrigida. Peso médio: {pesagem.average_weight_kg:.0f} kg.",
+                )
+                return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
+        return render(request, self.template_name, {"form": form, "pesagem": pesagem})
+
+
+class WeighingDeleteView(LoginRequiredMixin, TemplateView):
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        pesagem = _get_pesagem(request, kwargs["pk"])
+        if not pode_excluir_confirmado(request.user):
+            messages.error(
+                request, "Você não tem permissão para excluir este lançamento."
+            )
+            return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
+        try:
+            reversible.excluir(
+                pesagem, usuario=request.user, motivo=request.POST.get("motivo", "")
+            )
+        except (DependencyError, BlockingDependencyError, BusinessError) as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, "✓ Pesagem excluída.")
+        return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
+
+
+class WeighingRestoreView(LoginRequiredMixin, TemplateView):
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        pesagem = _get_pesagem(request, kwargs["pk"])
+        if not pode_excluir_confirmado(request.user):
+            messages.error(
+                request, "Você não tem permissão para restaurar este lançamento."
+            )
+            return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
+        try:
+            reversible.restaurar(pesagem, usuario=request.user)
+        except BusinessError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, "✓ Pesagem restaurada.")
+        return redirect("herd:pesagem_detalhe", pk=pesagem.pk)
 
 
 class ReconciliationView(LoginRequiredMixin, TemplateView):

@@ -13,7 +13,17 @@ from dataclasses import dataclass
 from apps.finance.permissions import pode_ver_titulos
 from apps.procurement.permissions import pode_ver_o_ciclo
 
-from . import ciclo, compras, custos, financeiro, lotes, rebanho, vendas, visao_geral
+from . import (
+    ciclo,
+    compras,
+    custos,
+    financeiro,
+    lotes,
+    mortes,
+    rebanho,
+    vendas,
+    visao_geral,
+)
 from .escopo import Escopo, pode_ver_dinheiro
 from .specs import Painel
 
@@ -61,6 +71,14 @@ ABAS = (
         "beef",
         "Onde estão os animais, de onde vieram e para onde foram.",
         rebanho.montar,
+        _todos,
+    ),
+    Aba(
+        "mortes",
+        "Mortes",
+        "triangle-alert",
+        "Quantas, quando, de quê e onde.",
+        mortes.montar,
         _todos,
     ),
     Aba(

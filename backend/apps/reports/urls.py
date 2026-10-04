@@ -20,5 +20,12 @@ urlpatterns = [
         {"slug": "mapa-financeiro"},
         name="relatorio_mapa",
     ),
+    # O contrato é um documento por compromisso, não uma tabela: tem tela própria,
+    # mas o catálogo o lista como os demais (`reports:relatorio` leva até aqui).
+    path(
+        "contrato-de-compra/",
+        views.ContratosView.as_view(),
+        name="contrato_de_compra",
+    ),
     path("<slug:slug>/", views.RelatorioView.as_view(), name="relatorio"),
 ]

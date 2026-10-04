@@ -12,31 +12,37 @@ from django.views.generic import (
 )
 
 from apps.partners import selectors, services
-from apps.partners.forms import BankAccountForm, PartnerForm
+from apps.partners.forms import BankAccountForm, PartnerFilterForm, PartnerForm
 from apps.partners.models import BankAccount, Partner
 from apps.partners.permissions import GerenciaParceiroMixin
 
 
-class PartnerListView(GerenciaParceiroMixin, ListView):
-    template_name = "partners/partner_list.html"
+class _FiltroDeParceirosMixin:
+    """A listagem inteira e o fragmento do HTMX filtram do mesmo jeito: o que se
+    vê ao digitar é o que se vê ao recarregar a página."""
+
     context_object_name = "parceiros"
+    paginate_by = 50
 
     def get_queryset(self):
-        termo = self.request.GET.get("q", "")
-        if termo:
-            return selectors.buscar_parceiros(termo, limite=50)
-        return selectors.listar_parceiros()
+        self.filtro = PartnerFilterForm(self.request.GET or None)
+        dados = self.filtro.cleaned_data if self.filtro.is_valid() else {}
+        return selectors.filtrar_parceiros(dados.get("q", ""), dados.get("papel", ""))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filtro"] = self.filtro
+        return context
 
 
-class PartnerSearchView(GerenciaParceiroMixin, ListView):
-    """Combobox com busca (docs/ux/01) — devolve só o fragmento de
-    resultados, para HTMX trocar no DOM."""
+class PartnerListView(_FiltroDeParceirosMixin, GerenciaParceiroMixin, ListView):
+    template_name = "partners/partner_list.html"
+
+
+class PartnerSearchView(_FiltroDeParceirosMixin, GerenciaParceiroMixin, ListView):
+    """Devolve só o fragmento de resultados, para o HTMX trocar no DOM."""
 
     template_name = "partners/_resultado_busca.html"
-    context_object_name = "parceiros"
-
-    def get_queryset(self):
-        return selectors.buscar_parceiros(self.request.GET.get("q", ""))
 
 
 class PartnerCreateView(GerenciaParceiroMixin, CreateView):

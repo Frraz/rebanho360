@@ -56,6 +56,10 @@ class DesempenhoDoLote:
     trechos: tuple = ()
     primeiro: PontoDePeso | None = None
     ultimo: PontoDePeso | None = None
+    # O peso de entrada (pesagem de compra ou peso informado na compra), mesmo
+    # quando ainda não há GMD: o "peso inicial" do lote não depende de ter duas
+    # pesagens em dias diferentes.
+    entrada: PontoDePeso | None = None
     dias: int | None = None
     ganho_por_cabeca_kg: Decimal | None = None
     gmd: Decimal | None = None
@@ -189,6 +193,12 @@ def _montar_desempenho(
 
     gmd = dias = ganho = primeiro = ultimo = None
     desde_a_entrada = False
+    entrada = next((p for p in pontos if p.e_entrada), None)
+    if entrada is None and compras and not all(c.total_weight_kg for c in compras):
+        motivos.append(
+            "Peso de entrada indisponível: nem todas as compras do lote têm o peso "
+            "informado."
+        )
     if not pontos:
         motivos.append("GMD indisponível: sem pesagem registrada.")
     elif len(pontos) == 1:
@@ -221,6 +231,7 @@ def _montar_desempenho(
         trechos=tuple(_trechos(pontos)),
         primeiro=primeiro,
         ultimo=ultimo,
+        entrada=entrada,
         dias=dias,
         ganho_por_cabeca_kg=ganho,
         gmd=gmd,

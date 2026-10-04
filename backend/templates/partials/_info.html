@@ -1,15 +1,15 @@
 {% load core_tags %}
 {# Botão "i" + painel de ajuda de uma tela. Conteúdo em apps/core/help_content.py; uso: {% info "empresa" %}. #}
 {% if topico %}
-<span x-data="{ aberto: false }" @keydown.escape.window="if (aberto) { aberto = false; $refs.abrir.focus() }">
-  <button type="button" x-ref="abrir" class="info-btn" @click="aberto = true; $nextTick(() => $refs.fechar.focus())"
+<span x-data="{ aberto: false }" @keydown.escape.window="if (aberto) { aberto = false; $refs.abrir.focus({ preventScroll: true }) }">
+  <button type="button" x-ref="abrir" class="info-btn" @click="aberto = true; $nextTick(() => $refs.fechar.focus({ preventScroll: true }))"
           aria-haspopup="dialog" :aria-expanded="aberto" aria-label="Sobre {{ topico.titulo }}: para que serve e como se liga ao resto do sistema">
     {% icon "info" %}
   </button>
   <template x-teleport="body">
     <div data-info-dialog x-show="aberto" x-cloak class="fixed inset-0 z-[55] flex items-end justify-center sm:items-center sm:p-6"
          role="dialog" aria-modal="true" aria-labelledby="info-{{ slug }}-titulo">
-      <div class="absolute inset-0 bg-brand-950/60" @click="aberto = false; $refs.abrir.focus()" x-show="aberto" x-transition.opacity.duration.150ms></div>
+      <div class="absolute inset-0 bg-brand-950/60" @click="aberto = false; $refs.abrir.focus({ preventScroll: true })" x-show="aberto" x-transition.opacity.duration.150ms></div>
       <div class="sheet relative flex max-h-[88vh] w-full flex-col rounded-t-xl bg-surface shadow-float sm:max-w-xl sm:rounded-xl"
            x-show="aberto" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-6 opacity-0"
            x-transition:enter-end="translate-y-0 opacity-100" x-transition:leave="transition ease-in duration-150"
@@ -19,7 +19,7 @@
             <p class="eyebrow">Como funciona</p>
             <h2 id="info-{{ slug }}-titulo" class="text-base font-semibold text-gray-900">{{ topico.titulo }}</h2>
           </div>
-          <button type="button" x-ref="fechar" class="btn-icon -mr-2 -mt-1" @click="aberto = false; $refs.abrir.focus()" aria-label="Fechar">{% icon "x" "icon-lg" %}</button>
+          <button type="button" x-ref="fechar" class="btn-icon -mr-2 -mt-1" @click="aberto = false; $refs.abrir.focus({ preventScroll: true })" aria-label="Fechar">{% icon "x" "icon-lg" %}</button>
         </div>
         <div class="overflow-y-auto overscroll-contain px-5 pb-8 pt-4 sm:pb-6">
           <h3 class="info-section-title">Para que serve</h3>

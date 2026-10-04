@@ -132,3 +132,58 @@ class PurchaseEditForm(PurchaseForm):
         widget=forms.Textarea(attrs={"rows": 2}),
         help_text="Por que esta compra está sendo corrigida.",
     )
+
+
+class PurchaseFilterForm(forms.Form):
+    """Filtros da listagem de compras: nº de registro, vendedor, destino, datas
+    e situação."""
+
+    registro = forms.CharField(label="Nº de registro", required=False)
+    vendedor = forms.ModelChoiceField(
+        label="Vendedor", queryset=Partner.objects.none(), required=False
+    )
+    destino = forms.ModelChoiceField(
+        label="Destino", queryset=Farm.objects.none(), required=False
+    )
+    data_de = forms.DateField(
+        label="De",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    data_ate = forms.DateField(
+        label="Até",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    situacao = forms.ChoiceField(
+        label="Situação",
+        required=False,
+        choices=[
+            ("", "Todas"),
+            ("RASCUNHO", "Rascunhos"),
+            ("CONFIRMADA", "Confirmadas"),
+            ("EXCLUIDA", "Excluídas"),
+        ],
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["destino"].queryset = (
+            ctx.available_farms(user) if user else Farm.objects.none()
+        )
+        # Quem já vendeu para nós, mesmo inativo hoje ou vindo do ciclo de compra:
+        # a lista do cadastro (só fornecedor/produtor ativo) esconderia compras antigas.
+        self.fields["vendedor"].queryset = (
+            Partner.objects.filter(sales_to_us__isnull=False)
+            .distinct()
+            .order_by("name")
+        )
+
+    def clean(self):
+        dados = super().clean()
+        de, ate = dados.get("data_de"), dados.get("data_ate")
+        if de and ate and de > ate:
+            self.add_error("data_ate", "A data final é anterior à inicial.")
+        return dados

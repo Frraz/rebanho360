@@ -141,7 +141,7 @@
 
     var self = this;
     this.aoFocarSelect = function () {
-      self.trigger.focus();
+      self.trigger.focus({ preventScroll: true });
     };
     this.aoMudar = function () {
       self.sync();

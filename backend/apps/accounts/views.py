@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
-from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -11,7 +10,7 @@ from django.views import View
 from apps.accounts import services as account_services
 from apps.accounts import trusted_devices, two_factor
 from apps.accounts import user_management as usuarios
-from apps.accounts.forms import ContaForm
+from apps.accounts.forms import ContaForm, TrocaDeSenhaForm
 from apps.accounts.middleware import gravar_cookie_do_tema
 from apps.accounts.models import Tema, TrustedDevice
 from apps.audit.models import AuditAction
@@ -110,7 +109,7 @@ def contexto_da_conta(request, *, form=None, senha_form=None) -> dict:
     return {
         "temas": TEMAS_DA_CONTA,
         "form": form or ContaForm(usuario=usuario),
-        "senha_form": senha_form or PasswordChangeForm(usuario),
+        "senha_form": senha_form or TrocaDeSenhaForm(usuario),
         "cpf_formatado": formatar_cpf(usuario.cpf),
         "fazendas_do_usuario": acessos,
         "segundo_fator_ativo": two_factor.dispositivo_confirmado(usuario) is not None,
@@ -200,6 +199,12 @@ class PasswordChangeView(auth_views.PasswordChangeView):
 
     template_name = "registration/password_change_form.html"
     success_url = "/"
+    form_class = TrocaDeSenhaForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["manter_foco"] = self.request.user.must_change_password
+        return kwargs
 
     def get(self, request, *args, **kwargs):
         if not request.user.must_change_password:

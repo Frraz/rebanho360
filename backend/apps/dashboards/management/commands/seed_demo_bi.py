@@ -28,7 +28,12 @@ from apps.costs.services import registrar_custo
 from apps.finance import services as financeiro
 from apps.finance.models import Invoice, PaymentMethod, PaymentStatus
 from apps.herd import services as herd
-from apps.herd.models import HerdLedgerEntry, MovementType, WeighingReason
+from apps.herd.models import (
+    DeathCause,
+    HerdLedgerEntry,
+    MovementType,
+    WeighingReason,
+)
 from apps.livestock.models import AnimalCategory, Breed
 from apps.organizations.models import Company, Season, SeasonStatus
 from apps.partners.models import Partner, PartnerRole, PartnerRoleChoice
@@ -261,10 +266,23 @@ class Command(BaseCommand):
             quando = data + datetime.timedelta(days=self.rnd.randrange(15, 120))
             if quando <= self.hoje:
                 try:
+                    cabecas_mortas = self.rnd.randrange(1, 4)
                     herd.registrar_movimento(
                         type=MovementType.MORTE,
                         date=quando,
-                        quantity=self.rnd.randrange(1, 4),
+                        quantity=cabecas_mortas,
+                        # Parte das mortes sem causa e sem peso: é o que acontece no
+                        # campo, e a aba Mortes tem de mostrar a falta de dado.
+                        death_cause=(
+                            self.rnd.choice(DeathCause.values)
+                            if self.rnd.random() < 0.75
+                            else ""
+                        ),
+                        total_weight_kg=(
+                            (peso_medio * cabecas_mortas).quantize(D("0.001"))
+                            if self.rnd.random() < 0.6
+                            else None
+                        ),
                         usuario=self.admin,
                         origin_farm=fazenda,
                         origin_lot=lote,

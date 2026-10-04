@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load core_tags %}
+{% load core_tags widget_tweaks %}
 {% block title %}Parceiros · Rebanho360{% endblock %}
 {% block content %}
 <header class="page-header">
@@ -14,24 +14,21 @@
   </div>
 </header>
 
-<div class="mb-4 max-w-xl">
-  <label class="field-label" for="busca-parceiro">Buscar por nome, documento ou cidade</label>
-  <div class="relative">
-    {% icon "search" "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" %}
-    <input
-      type="search"
-      id="busca-parceiro"
-      name="q"
-      class="field-input pl-10"
-      placeholder="Ex.: secchi"
-      autocomplete="off"
-      hx-get="{% url 'partners:buscar' %}"
-      hx-trigger="keyup changed delay:300ms, search"
-      hx-target="#resultado-parceiros"
-      hx-swap="outerHTML"
-    >
+<form method="get" action="{% url 'partners:lista' %}" class="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-end lg:max-w-3xl"
+      hx-get="{% url 'partners:buscar' %}" hx-trigger="input delay:300ms from:#busca-parceiro, change from:#filtro-papel, submit"
+      hx-target="#resultado-parceiros" hx-swap="outerHTML">
+  <div>
+    <label class="field-label" for="busca-parceiro">{{ filtro.q.label }}</label>
+    <div class="relative">
+      {% icon "search" "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" %}
+      <input type="search" id="busca-parceiro" name="q" value="{{ filtro.q.value|default:'' }}" class="field-input pl-10" placeholder="Ex.: secchi" autocomplete="off">
+    </div>
   </div>
-</div>
+  <div>
+    <label class="field-label" for="filtro-papel">{{ filtro.papel.label }}</label>
+    {{ filtro.papel|add_class:"field-input"|attr:"id:filtro-papel" }}
+  </div>
+</form>
 
 {% include "partners/_resultado_busca.html" %}
 {% endblock %}

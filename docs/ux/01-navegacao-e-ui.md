@@ -12,6 +12,8 @@ O campo é o mais exigente e o mais fácil de esquecer. **Se o lançamento no ce
 
 ## Contexto fixo
 
+**Toda tela abre no topo.** Nunca no meio nem no fim da página, e sem "subir sozinha" depois: não se põe `autofocus` em campo fora das telas de entrada (login e segundo fator), `.focus()` programático usa `{ preventScroll: true }`, e o `base.html` guarda a rede de segurança (rolagem manual, `scrollTo(0, 0)` ao carregar e ao voltar do cache, e o htmx rola `instant`). Troca de aba do dashboard não rola a página (`show:none`).
+
 No topo, sempre:
 
 ```

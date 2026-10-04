@@ -11,6 +11,23 @@
   <link rel="preload" href="{% static 'fonts/ibm-plex-sans-latin-400.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{% static 'fonts/ibm-plex-sans-latin-500.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'css/output.css' %}">
+  <meta name="htmx-config" content='{"scrollBehavior":"instant"}'>
+  <script>
+    /* Toda tela abre no topo. Sem isto o navegador restaura a rolagem da visita
+       anterior e rola até campos com `autofocus`; com o conteúdo dos gráficos
+       chegando depois, a página parecia "subir sozinha". */
+    (function () {
+      if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+      function noTopo() {
+        if (location.hash) return;
+        var a = document.activeElement;
+        if (a && a.hasAttribute && a.hasAttribute("autofocus") && a.closest("#conteudo") && !a.closest("[data-manter-foco]")) a.blur();
+        window.scrollTo(0, 0);
+      }
+      document.addEventListener("DOMContentLoaded", noTopo);
+      window.addEventListener("pageshow", function (ev) { if (ev.persisted) noTopo(); });
+    })();
+  </script>
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
   <script src="{% static 'js/combobox.js' %}" data-icons="{% static 'img/icons.svg' %}" defer></script>

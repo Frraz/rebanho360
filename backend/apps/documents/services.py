@@ -17,6 +17,7 @@ from apps.audit.models import AuditAction
 from apps.audit.services import registrar_auditoria
 from apps.core import context as ctx
 from apps.core.exceptions import BusinessError
+from apps.documents import layout
 from apps.documents.models import DocumentStatus, DocumentType, GeneratedDocument
 from apps.organizations.models import Season
 from apps.reports import services as relatorios
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 #: Muda quando o layout do PDF muda. Fica gravada em cada documento: o
 #: arquivo é a reprodução, a versão diz com qual layout ele nasceu.
-TEMPLATE_VERSION = "relatorio-v1"
+TEMPLATE_VERSION = "relatorio-v2"
 
 #: Relatórios que percorrem lote a lote (rateio de custo, pesagens) e podem
 #: demorar: vão para a fila em vez de segurar o navegador.
@@ -57,8 +58,8 @@ def _parametros_para_gravar(extras: dict, *, season, farm) -> dict:
             params[chave] = valor.isoformat()
         elif chave == "lote":
             params["lote_id"] = valor.pk
-        elif chave == "acerto":
-            params["acerto_id"] = valor.pk
+        elif chave in ("acerto", "comprador", "fazenda"):
+            params[f"{chave}_id"] = valor.pk
         else:
             params[chave] = str(valor)
     return params
@@ -82,6 +83,18 @@ def _extras_a_partir_dos_parametros(params: dict, user) -> dict:
         extras["acerto"] = (
             Settlement.objects.for_user(user).filter(pk=params["acerto_id"]).first()
         )
+    if params.get("comprador_id"):
+        from apps.reports.parametros import compradores_do_escopo
+
+        extras["comprador"] = (
+            compradores_do_escopo(user).filter(pk=params["comprador_id"]).first()
+        )
+    if params.get("fazenda_id"):
+        extras["fazenda"] = (
+            ctx.available_farms(user).filter(pk=params["fazenda_id"]).first()
+        )
+    if params.get("situacao"):
+        extras["situacao"] = params["situacao"]
     if params.get("rendimento_entrada"):
         extras["rendimento_entrada"] = Decimal(params["rendimento_entrada"])
     if params.get("preco_arroba"):
@@ -129,8 +142,9 @@ def solicitar_documento(*, slug: str, user, season, farm, origem) -> GeneratedDo
 def renderizar_html(relatorio, *, emitido_por: str, emitido_em, versao: str) -> str:
     """O HTML do documento: cabeçalho com sistema, relatório, emissão e
     **filtros aplicados**, repetido em toda página (CSS `running`)."""
-    tabelas = [("", relatorios.para_tela(relatorio))] + [
-        (s.titulo, relatorios.para_tela(s)) for s in relatorio.secoes
+    tabelas = [("", layout.preparar_tabela(relatorios.para_tela(relatorio)))] + [
+        (s.titulo, layout.preparar_tabela(relatorios.para_tela(s)))
+        for s in relatorio.secoes
     ]
     return render_to_string(
         "documents/relatorio.html",
@@ -141,6 +155,7 @@ def renderizar_html(relatorio, *, emitido_por: str, emitido_em, versao: str) -> 
             "emitido_em": emitido_em,
             "versao": versao,
             "paisagem": len(relatorio.colunas) > LARGURA_PARA_PAISAGEM,
+            "densidade": layout.densidade_do_documento([t for _, t in tabelas]),
         },
     )
 

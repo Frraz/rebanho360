@@ -120,3 +120,22 @@ class WeighingForm(forms.Form):
         self.fields["lot"].queryset = (
             Lot.objects.for_user(user) if user else Lot.objects.none()
         )
+
+
+class WeighingEditForm(forms.Form):
+    """Correção de pesagem confirmada. Fazenda e lote não mudam: pesagem no lote
+    errado se exclui e se lança de novo, para a trilha dizer o que houve."""
+
+    date = forms.DateField(
+        label="Data",
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        input_formats=["%Y-%m-%d"],
+    )
+    reason = forms.ChoiceField(label="Motivo", choices=WeighingReason.choices)
+    head_count = forms.IntegerField(label="Cabeças pesadas", min_value=1)
+    total_weight_kg = forms.DecimalField(label="Peso total (kg)", min_value=0.001)
+    edit_reason = forms.CharField(
+        label="Motivo da correção",
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Por que esta pesagem está sendo corrigida.",
+    )

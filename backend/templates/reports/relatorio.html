@@ -39,6 +39,15 @@
     <input type="date" id="ate" name="ate" value="{{ ate }}" class="field-input">
   </div>
   {% endif %}
+  {% for campo in campos %}
+  <div>
+    <label class="field-label" for="{{ campo.nome }}">{{ campo.rotulo }}</label>
+    <select id="{{ campo.nome }}" name="{{ campo.nome }}" class="field-input">
+      <option value="">{{ campo.vazio }}</option>
+      {% for valor, rotulo in campo.opcoes %}<option value="{{ valor }}" {% if campo.valor == valor|stringformat:"s" %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endfor %}
   {% if aceita_lote %}
   <div class="sm:col-span-2">
     <label class="field-label" for="lote">Lote</label>

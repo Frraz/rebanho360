@@ -25,7 +25,8 @@ from apps.dashboards.bi.escopo import pode_ver_dinheiro
 from apps.finance import selectors as financeiro
 from apps.finance.models import Direction
 from apps.finance.permissions import pode_ver_titulos
-from apps.herd.models import Weighing
+from apps.herd import selectors as rebanho
+from apps.herd.models import MovementType, Weighing
 from apps.herd.weight_gain import desempenho_dos_lotes as _desempenhos
 from apps.livestock.models import Lot, LotStatus
 from apps.procurement.permissions import pode_ver_o_ciclo
@@ -330,6 +331,64 @@ def custos_por_fazenda(user, *, season, farm=None) -> Relatorio:
     )
 
 
+def custos_por_fazenda_detalhado(
+    user, *, season, farm, start=None, end=None
+) -> Relatorio:
+    """Cada lançamento de custo da fazenda e do período, um a um — o relatório
+    "custo por fazenda" da planilha, para conferir mês a mês. Inclui os custos
+    gerados por compra (coluna "Origem"): é tudo o que foi lançado."""
+    qs = (
+        custos.listar_custos_para(user, season=season, farm=farm)
+        .select_related("payer")
+        .order_by("date", "id")
+    )
+    if start:
+        qs = qs.filter(date__gte=start)
+    if end:
+        qs = qs.filter(date__lte=end)
+    lancamentos = list(qs)
+    linhas = [
+        {
+            "data": f"{c.date:%d/%m/%Y}",
+            "fazenda": c.farm.name,
+            "centro": c.cost_center.name,
+            "classe": c.cost_class.name,
+            "descricao": c.description,
+            "lote": c.lot.code if c.lot_id else None,
+            "pagador": c.payer.name if c.payer_id else None,
+            "valor": c.amount,
+            "origem": c.source_purchase.code if c.source_purchase_id else None,
+        }
+        for c in lancamentos
+    ]
+    return Relatorio(
+        titulo="Custos por fazenda (detalhado)",
+        descricao="Todos os lançamentos de custo da fazenda e do período, um a um, "
+        "para conferir mês a mês e exportar.",
+        colunas=[
+            Coluna("data", "Data"),
+            Coluna("fazenda", "Fazenda"),
+            Coluna("centro", "Centro de custo"),
+            Coluna("classe", "Classe"),
+            Coluna("descricao", "Descrição"),
+            Coluna("lote", "Lote"),
+            Coluna("pagador", "Pagador"),
+            Coluna("valor", "Valor", DINHEIRO),
+            Coluna("origem", "Origem"),
+        ],
+        linhas=linhas,
+        totais={
+            "data": "Total",
+            "valor": sum((c.amount for c in lancamentos), Decimal("0")),
+        },
+        filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
+        notas=[
+            "Só lançamentos confirmados. 'Origem' preenchida = custo gerado por uma "
+            "compra (frete, comissão); ele se corrige pela compra."
+        ],
+    )
+
+
 def custeio_x_investimento(user, *, season, farm) -> Relatorio:
     return _de_custo(
         "Custeio × investimento",
@@ -567,8 +626,10 @@ def vendas_e_abates(user, *, season, farm, start=None, end=None) -> Relatorio:
     )
 
 
-def _lotes_do_escopo(user, *, season, farm):
+def _lotes_do_escopo(user, *, season, farm, situacao=None):
     qs = Lot.objects.for_user(user).exclude(status=LotStatus.EXCLUIDO)
+    if situacao in (LotStatus.ABERTO, LotStatus.ENCERRADO):
+        qs = qs.filter(status=situacao)
     if season is not None:
         qs = qs.filter(season=season)
     if farm is not None:
@@ -577,13 +638,13 @@ def _lotes_do_escopo(user, *, season, farm):
 
 
 def desempenho_dos_lotes(
-    user, *, season, farm, rendimento_entrada=None, hoje=None
+    user, *, season, farm, rendimento_entrada=None, situacao=None, hoje=None
 ) -> Relatorio:
     """GMD, @ produzida, dias e rendimento por lote. Lote sem dado aparece
     com "—" e o motivo — nunca com um GMD inventado."""
     hoje = hoje or datetime.date.today()
     linhas = []
-    lotes = list(_lotes_do_escopo(user, season=season, farm=farm))
+    lotes = list(_lotes_do_escopo(user, season=season, farm=farm, situacao=situacao))
     desempenhos = _desempenhos(lotes, rendimento_entrada=rendimento_entrada)
     vendas_por_lote = defaultdict(list)
     for v in Sale.objects.filter(
@@ -601,7 +662,12 @@ def desempenho_dos_lotes(
                 "fazenda": lote.farm.name,
                 "situacao": lote.get_status_display(),
                 "dias": (fim - lote.entry_date).days,
-                "peso_inicial": d.primeiro.peso_medio_kg if d.primeiro else None,
+                # O peso de entrada (compra) aparece mesmo sem GMD ainda.
+                "peso_inicial": (
+                    d.entrada.peso_medio_kg
+                    if d.entrada
+                    else (d.primeiro.peso_medio_kg if d.primeiro else None)
+                ),
                 "peso_final": d.ultimo.peso_medio_kg if d.ultimo else None,
                 "gmd": d.gmd,
                 "desde_entrada": (
@@ -616,9 +682,18 @@ def desempenho_dos_lotes(
         )
     notas = [
         "GMD = (peso médio final − inicial) ÷ dias, de pesagens do mesmo lote. "
-        "Sem duas pesagens em datas diferentes é —; o peso de entrada nunca é estimado.",
+        "Sem duas pesagens em datas diferentes o GMD é —. O peso inicial é o de "
+        "entrada: a pesagem de compra ou o peso informado na compra; ele nunca é "
+        "estimado.",
+        "Lote aberto não tem data final nem abate: GMD, @ produzida e rendimento "
+        "ficam parciais ou em branco. Use o filtro de situação para ver só os encerrados.",
     ]
     filtros = _contexto(season, farm)
+    if situacao in (LotStatus.ABERTO, LotStatus.ENCERRADO):
+        filtros.append(
+            "Situação do lote: "
+            + ("abertos" if situacao == LotStatus.ABERTO else "encerrados")
+        )
     if rendimento_entrada is not None:
         filtros.append(
             f"Rendimento de entrada estimado: {numero_br(Decimal(rendimento_entrada), 2)}% "
@@ -647,6 +722,148 @@ def desempenho_dos_lotes(
         linhas=linhas,
         filtros=filtros,
         notas=notas,
+    )
+
+
+MESES_ABREVIADOS = (
+    "jan",
+    "fev",
+    "mar",
+    "abr",
+    "mai",
+    "jun",
+    "jul",
+    "ago",
+    "set",
+    "out",
+    "nov",
+    "dez",
+)
+
+
+def _periodo_da_movimentacao(season, start, end):
+    """Sem datas, o período é a safra do topo (até hoje): é assim que a planilha
+    mostra a movimentação da fazenda. Sem safra, o ano corrente."""
+    hoje = datetime.date.today()
+    if start is None:
+        start = season.start_date if season else hoje.replace(month=1, day=1)
+    if end is None:
+        end = min(season.end_date, hoje) if season else hoje
+    return start, end
+
+
+def _origem_ou_destino(m, farm) -> str | None:
+    """Com quem foi o movimento: quem vendeu, quem comprou, para onde foi."""
+    if m.type == MovementType.COMPRA:
+        parte = m.origin_purchase.seller if m.origin_purchase_id else m.partner
+        return parte.name if parte else None
+    if m.type in (MovementType.VENDA, MovementType.ABATE):
+        parte = m.origin_sale.buyer if m.origin_sale_id else m.partner
+        return parte.name if parte else None
+    if m.type == MovementType.TRANSFERENCIA:
+        origem = m.origin_farm.name if m.origin_farm_id else "—"
+        destino = m.destination_farm.name if m.destination_farm_id else "—"
+        if farm is not None and m.destination_farm_id == farm.pk != m.origin_farm_id:
+            return f"de {origem}"
+        if farm is not None and m.origin_farm_id == farm.pk != m.destination_farm_id:
+            return f"para {destino}"
+        return f"{origem} → {destino}"
+    if m.type == MovementType.MORTE and m.death_cause:
+        return m.get_death_cause_display()
+    return m.partner.name if m.partner_id else None
+
+
+def _categoria_do_movimento(m) -> str | None:
+    de = m.origin_category.name if m.origin_category_id else None
+    para = m.destination_category.name if m.destination_category_id else None
+    if de and para and de != para:
+        return f"{de} → {para}"
+    return de or para
+
+
+def movimentacao_por_fazenda(user, *, season, farm, start=None, end=None) -> Relatorio:
+    """A aba "Movimentação Fazenda" da planilha: por categoria, saldo anterior,
+    entradas, saídas e posição final — e embaixo, cada movimentação. Já está
+    tudo no razão; aqui só se enxerga assim."""
+    start, end = _periodo_da_movimentacao(season, start, end)
+    linhas_cat, totais = rebanho.movimentacao_por_categoria(
+        user=user, farm=farm, start=start, end=end
+    )
+    # "Outras" só aparece quando houve: saldo inicial, ajuste, reclassificação,
+    # consumo ou transferência entre lotes da mesma fazenda.
+    com_outras_e = bool(totais["outras_e"])
+    com_outras_s = bool(totais["outras_s"])
+
+    colunas = [
+        Coluna("categoria", "Categoria"),
+        Coluna("saldo_anterior", "Saldo anterior", INTEIRO),
+        Coluna("compra", "Compra", INTEIRO),
+        Coluna("evolucao", "Evolução (líq.)", INTEIRO),
+        Coluna("nascimento", "Nasc.", INTEIRO),
+        Coluna("transf_e", "Transf. E", INTEIRO),
+    ]
+    if com_outras_e:
+        colunas.append(Coluna("outras_e", "Outras entradas", INTEIRO))
+    colunas += [
+        Coluna("total_e", "Total entradas", INTEIRO),
+        Coluna("abate", "Abate", INTEIRO),
+        Coluna("morte", "Morte", INTEIRO),
+        Coluna("venda", "Venda", INTEIRO),
+        Coluna("transf_s", "Transf. S", INTEIRO),
+    ]
+    if com_outras_s:
+        colunas.append(Coluna("outras_s", "Outras saídas", INTEIRO))
+    colunas += [
+        Coluna("total_s", "Total saídas", INTEIRO),
+        Coluna("posicao", "Posição final", INTEIRO),
+    ]
+    linhas = [{**lin, "categoria": lin["categoria"].name} for lin in linhas_cat]
+
+    movimentos = []
+    for m in rebanho.movimentos_da_fazenda(user=user, farm=farm, start=start, end=end):
+        movimentos.append(
+            {
+                "data": f"{m.date:%d/%m/%Y}",
+                "mes": MESES_ABREVIADOS[m.date.month - 1],
+                "categoria": _categoria_do_movimento(m),
+                "tipo": m.get_type_display(),
+                "quantidade": m.quantity,
+                "com_quem": _origem_ou_destino(m, farm),
+                "peso_total": m.total_weight_kg,
+                "peso_medio": safe_div(m.total_weight_kg, m.quantity),
+            }
+        )
+    lista = Relatorio(
+        titulo="Movimentações de bovinos",
+        descricao="",
+        colunas=[
+            Coluna("data", "Data"),
+            Coluna("mes", "Mês"),
+            Coluna("categoria", "Categoria"),
+            Coluna("tipo", "Tipo"),
+            Coluna("quantidade", "Quantidade", INTEIRO),
+            Coluna("com_quem", "Origem / destino"),
+            Coluna("peso_total", "Peso total (kg)", NUMERO),
+            Coluna("peso_medio", "Peso médio (kg)", NUMERO),
+        ],
+        linhas=movimentos,
+    )
+    return Relatorio(
+        titulo="Movimentação por fazenda",
+        descricao="Por categoria: saldo anterior, entradas, saídas e posição final "
+        "da fazenda no período, e cada movimentação.",
+        colunas=colunas,
+        linhas=linhas,
+        totais={"categoria": "Total", **{k: v for k, v in totais.items()}},
+        filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
+        notas=[
+            "Saldo anterior = o que havia antes do período; posição final = saldo "
+            "anterior + entradas − saídas, igual ao saldo do razão na data final. "
+            "Evolução é líquida: a categoria que perde animais mostra número negativo.",
+            "Desfazer ou corrigir um lançamento antigo corrige este quadro para trás: "
+            "a compensação vale na data do fato original.",
+        ],
+        secoes=[lista],
     )
 
 
@@ -1158,12 +1375,14 @@ def mapa_financeiro(user, *, season, farm) -> Relatorio:
 RELATORIOS = {
     "custos-por-centro": custos_por_centro,
     "custos-por-fazenda": custos_por_fazenda,
+    "custos-por-fazenda-detalhado": custos_por_fazenda_detalhado,
     "custeio-x-investimento": custeio_x_investimento,
     "compras-do-periodo": compras_do_periodo,
     "aquisicao-por-lote": aquisicao_por_lote,
     "vendas-e-abates": vendas_e_abates,
     "desempenho-do-lote": desempenho_dos_lotes,
     "resultado-do-lote": resultado_dos_lotes,
+    "movimentacao-por-fazenda": movimentacao_por_fazenda,
     "pesagens": pesagens_do_periodo,
     "contas-a-pagar": contas_a_pagar,
     "contas-a-receber": contas_a_receber,
@@ -1225,13 +1444,19 @@ RELATORIOS.update(
 #: Dinheiro (custo, valor de mercado, retorno): o pessoal de campo não os abre
 #: — o mesmo corte do dashboard (`dashboards.bi.escopo.PAPEIS_SEM_DINHEIRO`).
 RELATORIOS_COM_DINHEIRO = frozenset(
-    {"curva-abc-de-custos", "inventario-valorizado", "tir-da-safra"}
+    {
+        "curva-abc-de-custos",
+        "inventario-valorizado",
+        "tir-da-safra",
+        "custos-por-fazenda-detalhado",
+    }
 )
 
 #: Preço, comissão e frete são dado comercial: quem não vê o ciclo (o `CAMPO`)
 #: não abre estes relatórios — na tela, no CSV/XLSX nem no PDF.
 RELATORIOS_DO_CICLO = frozenset(
     {
+        "contrato-de-compra",
         "programacao-de-embarque",
         "programacao-de-abate",
         "conferencia-do-acerto",
@@ -1266,7 +1491,10 @@ def montar_relatorio(user, slug, *, season, farm, extras=None) -> Relatorio:
         raise PermissionDenied
     if slug in RELATORIOS_COM_DINHEIRO and not pode_ver_dinheiro(user):
         raise PermissionDenied
-    return RELATORIOS[slug](user, season=season, farm=farm, **(extras or {}))
+    extras = dict(extras or {})
+    # "Fazenda" escolhida no próprio relatório vale mais que a do topo da tela.
+    farm = extras.pop("fazenda", None) or farm
+    return RELATORIOS[slug](user, season=season, farm=farm, **extras)
 
 
 def catalogo_para(user):
@@ -1286,10 +1514,13 @@ def catalogo_para(user):
 #: Parâmetros que cada relatório aceita, além de safra e fazenda (que vêm do
 #: contexto fixo no topo). O view só repassa o que o relatório declara.
 PARAMETROS = {
+    "movimentacao-por-fazenda": ("de", "ate", "fazenda"),
+    "custos-por-centro": ("fazenda",),
+    "custos-por-fazenda-detalhado": ("de", "ate", "fazenda"),
     "compras-do-periodo": ("de", "ate"),
     "vendas-e-abates": ("de", "ate"),
     "pesagens": ("de", "ate", "lote"),
-    "desempenho-do-lote": ("rendimento_entrada",),
+    "desempenho-do-lote": ("rendimento_entrada", "situacao"),
     "contas-a-pagar": ("de", "ate"),
     "contas-a-receber": ("de", "ate"),
     "programacao-de-pagamentos": ("de", "ate"),
@@ -1297,9 +1528,9 @@ PARAMETROS = {
     "programacao-de-embarque": ("de", "ate"),
     "programacao-de-abate": ("de", "ate"),
     "conferencia-do-acerto": ("acerto",),
-    "comissao-por-comprador": ("de", "ate"),
+    "comissao-por-comprador": ("de", "ate", "comprador"),
     "fretes-e-quebra": ("de", "ate"),
-    "historico-por-pecuarista": ("de", "ate"),
+    "historico-por-pecuarista": ("de", "ate", "comprador"),
     "programado-x-realizado": ("de", "ate"),
     "mortalidade-por-causa": ("de", "ate"),
     "curva-abc-de-custos": ("de", "ate"),
@@ -1315,9 +1546,19 @@ CATALOGO = [
     ),
     ("custos-por-fazenda", "Custos por fazenda", "Qual fazenda consome mais."),
     (
+        "custos-por-fazenda-detalhado",
+        "Custos por fazenda (detalhado)",
+        "Cada lançamento de custo de uma fazenda no período, para conferir mês a mês.",
+    ),
+    (
         "custeio-x-investimento",
         "Custeio × investimento",
         "Quanto é gasto, quanto é imobilizado.",
+    ),
+    (
+        "contrato-de-compra",
+        "Contrato de compra",
+        "O contrato de cada compromisso aprovado, em PDF: produtor, datas, condição, itens e preços por faixa.",
     ),
     (
         "compras-do-periodo",
@@ -1343,6 +1584,12 @@ CATALOGO = [
         "resultado-do-lote",
         "Resultado do lote",
         "Receita − custos = resultado, e a margem por @: o boi pagou o que custou criar?",
+    ),
+    (
+        "movimentacao-por-fazenda",
+        "Movimentação por fazenda",
+        "Por categoria: saldo anterior, entradas, saídas e posição final, e cada movimentação. "
+        "A aba Movimentação Fazenda da planilha.",
     ),
     (
         "pesagens",

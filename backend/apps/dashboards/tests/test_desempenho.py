@@ -16,6 +16,8 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from apps.herd import services as herd
+from apps.herd.models import DeathCause, MovementType
 from apps.herd.weight_gain import desempenho_dos_lotes
 from apps.livestock.models import Lot
 from apps.livestock.selectors import (
@@ -32,7 +34,8 @@ D = Decimal
 
 
 def mais_lotes(n, *, escritorio, sao_francisco, categoria_25_36, vendedor, frigorifico):
-    """`n` lotes novos na mesma fazenda, cada um com compra e uma venda parcial."""
+    """`n` lotes novos na mesma fazenda, cada um com compra, uma venda parcial e
+    uma morte (a aba Mortes agrupa por lote: não pode consultar um por um)."""
     for i in range(n):
         compra = compras.confirmar_compra(
             compras.criar_compra(
@@ -56,6 +59,17 @@ def mais_lotes(n, *, escritorio, sao_francisco, categoria_25_36, vendedor, frigo
             total_weight_kg=D("19200"),
             carcass_weight_kg=D("9600"),
             total_value=D("192000"),
+        )
+        herd.registrar_movimento(
+            type=MovementType.MORTE,
+            date=DATA_COMPRA + datetime.timedelta(days=10 + i % 5),
+            quantity=1,
+            usuario=escritorio,
+            origin_farm=sao_francisco,
+            origin_lot=compra.lot,
+            origin_category=categoria_25_36,
+            reason="Encontrada morta",
+            death_cause=DeathCause.values[i % len(DeathCause.values)],
         )
 
 
@@ -108,7 +122,10 @@ class TestServicosEmLote:
 
 
 class TestTelasNaoCrescemComOsLotes:
-    @pytest.mark.parametrize("aba", ["visao-geral", "lotes", "vendas", "custos"])
+    @pytest.mark.parametrize(
+        "aba",
+        ["visao-geral", "rebanho", "mortes", "lotes", "vendas", "custos", "financeiro"],
+    )
     def test_aba_do_dashboard(
         self, client, gestor, season, cenario, lote_de_compra, aba
     ):

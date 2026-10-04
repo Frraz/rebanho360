@@ -179,3 +179,53 @@ class TestContaBancaria:
 
         conta1.refresh_from_db()
         assert conta1.is_default is False
+
+
+class TestFiltroPorPapel:
+    @pytest.fixture
+    def parceiros(self):
+        comprador = Partner.objects.create(name="Cláudia Dias", city="Araguaína")
+        produtor = Partner.objects.create(name="Waldemar Secchi", city="Alvorada")
+        os_dois = Partner.objects.create(name="Edson Barbosa", city="Gurupi")
+        PartnerRole.objects.create(partner=comprador, role=PartnerRoleChoice.COMPRADOR)
+        PartnerRole.objects.create(partner=produtor, role=PartnerRoleChoice.PRODUTOR)
+        PartnerRole.objects.create(partner=os_dois, role=PartnerRoleChoice.PRODUTOR)
+        PartnerRole.objects.create(partner=os_dois, role=PartnerRoleChoice.COMPRADOR)
+        return comprador, produtor, os_dois
+
+    def test_filtra_por_papel_sem_duplicar_quem_tem_dois(self, parceiros):
+        from apps.partners.selectors import filtrar_parceiros
+
+        comprador, produtor, os_dois = parceiros
+        achados = list(filtrar_parceiros(papel=PartnerRoleChoice.COMPRADOR))
+        assert achados == [comprador, os_dois]  # por nome
+        assert list(filtrar_parceiros(papel=PartnerRoleChoice.PRODUTOR)) == [
+            os_dois,
+            produtor,
+        ]
+
+    def test_papel_e_texto_se_combinam(self, parceiros):
+        from apps.partners.selectors import filtrar_parceiros
+
+        _, _, os_dois = parceiros
+        achados = filtrar_parceiros("gurupi", PartnerRoleChoice.COMPRADOR)
+        assert list(achados) == [os_dois]
+
+    def test_sem_filtro_lista_todos_inclusive_a_busca_vazia(
+        self, client, escritorio, parceiros
+    ):
+        client.force_login(escritorio)
+        html = client.get(reverse("partners:buscar"), {"q": "", "papel": ""}).content
+        for nome in ("Cláudia Dias", "Waldemar Secchi", "Edson Barbosa"):
+            assert nome in html.decode()
+
+    def test_a_tela_filtra_pelo_papel_e_mostra_os_papeis(
+        self, client, escritorio, parceiros
+    ):
+        client.force_login(escritorio)
+        html = client.get(
+            reverse("partners:lista"), {"papel": PartnerRoleChoice.COMPRADOR}
+        ).content.decode()
+        assert "Cláudia Dias" in html and "Edson Barbosa" in html
+        assert "Waldemar Secchi" not in html
+        assert "Produtor · Comprador" in html or "Comprador · Produtor" in html

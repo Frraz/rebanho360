@@ -52,8 +52,15 @@ def kpi_custo_por_arroba(e: Escopo) -> Kpi:
 def kpis(e: Escopo) -> list[Kpi]:
     saida = [rebanho.kpi_cabecas(e)]
     if e.ver_dinheiro:
-        v = vendas.kpis(e)
-        saida += [compras.kpis(e)[0], v[0], v[1], custos.kpis(e)[0]]
+        # Por rótulo, não por posição: a aba de vendas ganha cartões sem quebrar a
+        # visão geral.
+        v = {k.rotulo: k for k in vendas.kpis(e)}
+        saida += [
+            compras.kpis(e)[0],
+            v["Receita de vendas"],
+            v["Resultado dos lotes vendidos"],
+            custos.kpis(e)[0],
+        ]
         saida.append(kpi_custo_por_arroba(e))
     saida.append(rebanho.kpi_mortalidade(e))
     linhas = lotes.linhas_de_lotes(e)

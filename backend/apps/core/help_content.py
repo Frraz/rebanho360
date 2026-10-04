@@ -238,6 +238,10 @@ AJUDA: dict[str, dict] = {
         ],
         "perguntas": [
             (
+                "Como acho só os compradores, ou só os transportadores?",
+                "Use o filtro Papel ao lado da busca. Ele combina com o texto digitado: papel Comprador e a cidade Gurupi, por exemplo.",
+            ),
+            (
                 "O mesmo produtor vende e compra. Cadastro duas vezes?",
                 "Não. Cadastre uma vez e marque os dois papéis. Duplicar a pessoa quebra o histórico dela.",
             ),
@@ -701,8 +705,12 @@ AJUDA: dict[str, dict] = {
         ],
         "perguntas": [
             (
+                "Lancei a pesagem no dia errado. Como corrijo?",
+                "Abra a pesagem na lista e use Editar: dá para mudar a data, o motivo, as cabeças e o peso, com o motivo da correção, que fica na auditoria. O GMD do lote se recalcula. Para tirar a pesagem do cálculo, use Excluir; dá para restaurar depois.",
+            ),
+            (
                 "E se o lote não tiver pesagem de entrada?",
-                "O GMD continua existindo, mas cobre só o período pesado, e a tela avisa. O sistema nunca estima o peso de entrada.",
+                "O GMD continua existindo, mas cobre só o período pesado, e a tela avisa. O sistema nunca estima o peso de entrada. Se a compra do lote informou o peso, ele serve de peso de entrada.",
             ),
             (
                 'Por que o GMD aparece como "—"?',
@@ -930,6 +938,14 @@ AJUDA: dict[str, dict] = {
                 "Falta dado para calcular: um lote com uma pesagem só não tem GMD, uma venda sem peso de carcaça não tem valor por @, um lote sem compra registrada não tem resultado. O painel avisa quantos registros ficaram de fora e nunca estima o que não foi informado.",
             ),
             (
+                "O que a aba Mortes mostra?",
+                "Quantas cabeças morreram por mês (jovens e adultos), por causa, categoria, fazenda e lote, e a mortalidade mês a mês. Morte lançada sem causa aparece como Não informada. O sistema não diz o que é mortalidade alta: ele mostra, e a leitura é sua. Jovem é a categoria até 13 a 24 meses.",
+            ),
+            (
+                "O que são as despesas da aba Financeiro?",
+                "São os custos lançados e confirmados da safra, por centro de custo e por mês. A compra de animais fica de fora (ela está na aba Compras), e o total é o mesmo da aba Custos.",
+            ),
+            (
                 "O resultado do lote inclui custos que ainda vão chegar?",
                 "Inclui o que está lançado até hoje. Lote que ainda tem animais mostra resultado parcial, com o custo rateado pela fração já vendida; ele fecha quando o saldo zera.",
             ),
@@ -966,7 +982,7 @@ AJUDA: dict[str, dict] = {
         "titulo": "Relatórios",
         "resumo": [
             "Reúne todos os relatórios do sistema: compras, programações, acertos, comissões, financeiro e desempenho dos lotes. Os números respeitam a safra e a fazenda escolhidas no topo.",
-            "Cada relatório pode ser visto na tela e baixado em CSV, XLSX ou PDF.",
+            "Cada relatório pode ser visto na tela e baixado em CSV, XLSX ou PDF. Use o campo de busca para achar um relatório pelo nome ou pelo assunto; os filtros de comprador, fazenda, período e situação do lote aparecem nos relatórios que os aceitam e saem impressos em Filtros aplicados.",
         ],
         "relacoes": [
             (
@@ -982,6 +998,14 @@ AJUDA: dict[str, dict] = {
             (
                 'Por que aparece "—" em alguma coluna?',
                 "Falta de dado, não zero. Em alguns relatórios há uma explicação do motivo.",
+            ),
+            (
+                "Onde está o contrato de compra?",
+                "No relatório Contrato de compra: ele lista os compromissos aprovados e gera o PDF de cada um. É o mesmo documento do detalhe do compromisso.",
+            ),
+            (
+                "Para que serve o relatório Movimentação por fazenda?",
+                "Mostra, por categoria, o saldo anterior, as entradas, as saídas e a posição final de uma fazenda no período, e a lista de cada movimentação. Sai do razão do rebanho, sem lançamento novo.",
             ),
         ],
     },

@@ -17,7 +17,7 @@ from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmad
 from apps.core.reversible import Status
 from apps.core.views import ExclusaoComImpactoView
 from apps.purchases import selectors, services
-from apps.purchases.forms import PurchaseEditForm, PurchaseForm
+from apps.purchases.forms import PurchaseEditForm, PurchaseFilterForm, PurchaseForm
 from apps.purchases.models import Purchase
 from apps.purchases.permissions import (
     LancaCompraMixin,
@@ -60,9 +60,18 @@ class PurchaseListView(LoginRequiredMixin, TemplateView):
         user = self.request.user
         season = ctx.current_season(self.request, ctx.current_company())
         farm = ctx.current_farm(self.request, user)
-        situacao = self.request.GET.get("situacao", "")
+        filtro = PurchaseFilterForm(self.request.GET or None, user=user)
+        dados = filtro.cleaned_data if filtro.is_valid() else {}
         qs = selectors.listar_compras_para(
-            user, season=season, farm=farm, situacao=situacao
+            user,
+            season=season,
+            # O "Destino" do filtro vale mais que a fazenda do topo da tela.
+            farm=dados.get("destino") or farm,
+            situacao=dados.get("situacao", ""),
+            registro=dados.get("registro", ""),
+            vendedor=dados.get("vendedor"),
+            data_de=dados.get("data_de"),
+            data_ate=dados.get("data_ate"),
         )
         pagina = Paginator(qs, self.paginate_by).get_page(self.request.GET.get("page"))
         context.update(
@@ -70,7 +79,8 @@ class PurchaseListView(LoginRequiredMixin, TemplateView):
                 "page_obj": pagina,
                 "compras": pagina.object_list,
                 "season": season,
-                "situacao": situacao,
+                "filtro": filtro,
+                "filtrando": bool(dados) and any(dados.values()),
                 "pode_lancar": pode_lancar_compra(user),
             }
         )

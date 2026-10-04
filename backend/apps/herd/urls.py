@@ -26,6 +26,24 @@ urlpatterns = [
     path("pesagens/", views.WeighingListView.as_view(), name="pesagem_lista"),
     path("pesagens/nova/", views.WeighingCreateView.as_view(), name="pesagem_nova"),
     path(
+        "pesagens/<int:pk>/", views.WeighingDetailView.as_view(), name="pesagem_detalhe"
+    ),
+    path(
+        "pesagens/<int:pk>/editar/",
+        views.WeighingUpdateView.as_view(),
+        name="pesagem_editar",
+    ),
+    path(
+        "pesagens/<int:pk>/excluir/",
+        views.WeighingDeleteView.as_view(),
+        name="pesagem_excluir",
+    ),
+    path(
+        "pesagens/<int:pk>/restaurar/",
+        views.WeighingRestoreView.as_view(),
+        name="pesagem_restaurar",
+    ),
+    path(
         "conciliacao/",
         views.ReconciliationView.as_view(),
         name="conciliacao_transferencias",

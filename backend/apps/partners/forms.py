@@ -65,3 +65,14 @@ class BankAccountForm(forms.ModelForm):
                 "Motivo é obrigatório para alterar um dado bancário já cadastrado."
             )
         return reason
+
+
+class PartnerFilterForm(forms.Form):
+    """Filtros da listagem de Parceiros."""
+
+    q = forms.CharField(label="Buscar por nome, documento ou cidade", required=False)
+    papel = forms.ChoiceField(
+        label="Papel",
+        required=False,
+        choices=[("", "Todos os papéis"), *PartnerRoleChoice.choices],
+    )

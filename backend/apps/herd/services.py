@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from apps.core import reversible
 from apps.core.exceptions import BusinessError
+from apps.core.reversible import Status
 from apps.herd.models import (
     ENTRY_TYPES,
     EXIT_TYPES,
@@ -320,6 +321,20 @@ def registrar_pesagem(
     )
     pesagem.save()
     return reversible.confirmar(pesagem, usuario=usuario)
+
+
+@transaction.atomic
+def editar_pesagem(pesagem: Weighing, *, dados: dict, motivo: str, usuario) -> Weighing:
+    """Corrige data, motivo, cabeças ou peso de uma pesagem confirmada. As mesmas
+    regras do lançamento valem aqui: data futura recusada e acesso de escrita à
+    fazenda. O GMD acompanha sozinho, porque é calculado das pesagens."""
+    if dados["date"] > timezone.localdate():
+        raise BusinessError("Pesagem com data futura não é permitida.")
+    if not tem_acesso_de_escrita_a_fazenda(usuario, pesagem.farm):
+        raise BusinessError(f"Você não tem permissão de lançamento em {pesagem.farm}.")
+    if pesagem.status != Status.CONFIRMADA:
+        raise BusinessError("Só se corrige pesagem confirmada.")
+    return reversible.editar(pesagem, dados, usuario=usuario, motivo=motivo)
 
 
 def calcular_gmd(lot) -> Decimal | None:

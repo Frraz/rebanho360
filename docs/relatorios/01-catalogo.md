@@ -44,8 +44,9 @@ Todos filtráveis por: período, safra, fazenda, lote, categoria, parceiro, cent
 
 | Relatório | Responde | Substitui |
 |---|---|---|
-| **Custos por centro de custo** | Onde o dinheiro foi | `DASH FINANCEIRO` |
+| **Custos por centro de custo** | Onde o dinheiro foi (com filtro de **fazenda**) | `DASH FINANCEIRO` |
 | **Custos por fazenda** | Qual fazenda consome mais | Tabela dinâmica manual |
+| **Custos por fazenda (detalhado)** | Cada lançamento de custo de uma fazenda no período (filtros: fazenda e datas), para conferir mês a mês e exportar | Aba `CUSTO FAZENDA` |
 | **Custeio × investimento** | Quanto é gasto, quanto é imobilizado | Coluna `CLASSE` |
 | **Compras do período** | O que foi comprado, de quem, por quanto | `COMPRA DE GADO` + `DASH COMPRAS` |
 | **Custo de aquisição por lote** | Quanto custou formar o lote | Não existe |
@@ -55,9 +56,10 @@ Todos filtráveis por: período, safra, fazenda, lote, categoria, parceiro, cent
 | Relatório | Responde | Estado |
 |---|---|---|
 | **Vendas e abates** | Quanto saiu, para quem, a que preço — substitui `VENDAS` e `DASH VENDAS` (com seções "por mês" e "por comprador") | ✅ |
-| **Desempenho do lote** | GMD, @ produzida, dias, rendimento | ✅ |
+| **Desempenho do lote** | GMD, @ produzida, dias, rendimento. Filtro de **situação** (abertos × encerrados). O peso inicial é o de entrada (pesagem de compra ou peso da compra), mesmo antes de haver GMD | ✅ |
 | **Resultado do lote** | Receita − custos = resultado, e margem por @ | ✅ |
 | **Pesagens** | Histórico por lote, com evolução de peso e GMD do trecho | ✅ |
+| **Movimentação por fazenda** | Por categoria: saldo anterior, entradas (compra, evolução, nascimento, transferência), saídas (abate, morte, venda, transferência) e posição final de uma fazenda no período, e a lista de cada movimentação. Do razão, sem dado novo; a posição final é o saldo do razão na data final. Filtros: fazenda e datas (sem datas, a safra do topo) | Aba `MOVIMENTAÇÃO FAZENDA` ✅ |
 | **Programado × realizado** | Onde a operação divergiu do previsto | ✅ na Fase 5 (a fonte do "programado" é o compromisso) |
 
 > **Programado × realizado** não existe ainda: não há fonte do "programado" — a programação de abate é da Fase 5 (`03_Relatorio_Programacao_de_Abate`). Construir agora seria inventar um modelo de planejamento.
@@ -74,17 +76,18 @@ Mapa financeiro · Contas a pagar (e a receber) · Pagamentos realizados · Flux
 
 ### Fase 5 — Ciclo de compra
 
-Sete relatórios, com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calcular_acerto`, viagem, recebimento). Escopo por fazenda; **negados ao `CAMPO`** (preço, comissão e frete são dado comercial). Não levam dado bancário.
+Oito relatórios, com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calcular_acerto`, viagem, recebimento). Escopo por fazenda; **negados ao `CAMPO`** (preço, comissão e frete são dado comercial). Não levam dado bancário.
 
 | Relatório | Legado de referência |
 |---|---|
 | Programação de embarque | `03` |
 | Programação de abate | `03` |
 | Conferência do acerto (abre pelo acerto: `?acerto=`) | `04` |
-| Comissão por comprador — a regra **gravada** no compromisso | `05` |
+| Comissão por comprador — a regra **gravada** no compromisso; filtro de **comprador** | `05` |
 | Fretes e quebra de viagem | — |
-| Histórico por pecuarista | `06` |
+| Histórico por pecuarista — com a coluna e o filtro de **comprador** | `06` |
 | **Programado × realizado** (o que a Fase 3 deixou de fora), com "Por que há —" | — |
+| **Contrato de compra** — lista os compromissos aprovados e gera o PDF de cada um (o mesmo do detalhe do compromisso). Não é tabela: fica fora da exportação de dados | `Contrato de Compra de Animais` |
 
 Os cinco legados abaixo foram a especificação.
 
@@ -139,9 +142,13 @@ Aparência profissional e sóbria. **Não** reproduzir o SisAtak pixel a pixel: 
 |---|---|
 | CSV | `;` como separador, vírgula decimal, BOM UTF-8. Título, **filtros aplicados** e notas no topo. |
 | XLSX | Números como **números**, com formato de moeda, milhar e %. Dado ausente vai como "—" (célula vazia pareceria zero numa tabela dinâmica). Cada seção do relatório vira uma aba. Filtros, notas e "emitido em… por…" no topo. |
-| PDF | WeasyPrint. A4, paisagem quando há mais de 7 colunas. Cabeçalho repetido em **toda página**: sistema, relatório, emissão e filtros aplicados; rodapé com quem emitiu e "Página x de y". |
+| PDF | WeasyPrint. A4, paisagem quando há mais de 7 colunas; com 10 ou mais, letra menor e colunas de largura proporcional ao conteúdo, com quebra de linha — a última coluna sempre cabe na página (layout `relatorio-v2`). Cabeçalho repetido em **toda página**: sistema, relatório, emissão e filtros aplicados; rodapé com quem emitiu e "Página x de y". |
 
 Toda exportação é auditada (`EXPORT`) com os filtros.
+
+### Busca e filtros
+
+"Todos os relatórios" tem um campo de busca (título e descrição, sem acento, sem recarregar). Filtros de escolha — comprador, fazenda e situação do lote — aparecem só nos relatórios que os aceitam, valem na tela, no CSV, no Excel e no PDF, e saem impressos em "Filtros aplicados". A lista de compradores e de fazendas é a do escopo do usuário.
 
 ## Documentos gerados
 

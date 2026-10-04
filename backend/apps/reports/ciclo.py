@@ -64,6 +64,18 @@ def _compromissos(user, *, season, farm, aprovados=True):
     return qs
 
 
+def _filtro_de_comprador(comprador) -> list[str]:
+    return [f"Comprador: {comprador.name}"] if comprador is not None else []
+
+
+def _compradores_em_texto(compromisso) -> str | None:
+    """Os compradores (comissionados) do compromisso, na ordem informada. Lê o
+    que o `prefetch_related("commissions__payee")` do relatório já trouxe."""
+    comissoes = sorted(compromisso.commissions.all(), key=lambda x: (x.position, x.id))
+    nomes = [x.payee.name for x in comissoes if x.payee_id]
+    return ", ".join(nomes) or None
+
+
 def _faixas_em_texto(item) -> str | None:
     if item.price_basis != PriceBasis.ARROBA:
         return f"{dinheiro_br(item.unit_price)} por cabeça" if item.unit_price else None
@@ -448,13 +460,19 @@ def conferencia_do_acerto(user, *, season, farm, acerto: Settlement | None = Non
 # --------------------------------------------------------------------------
 
 
-def comissao_por_comprador(user, *, season, farm, start=None, end=None) -> Relatorio:
-    """A comissão **gravada na operação** (snapshot), não a do cadastro de hoje."""
+def comissao_por_comprador(
+    user, *, season, farm, start=None, end=None, comprador=None
+) -> Relatorio:
+    """A comissão **gravada na operação** (snapshot), não a do cadastro de hoje.
+    Com `comprador`, só as linhas dele: um compromisso com vários compradores
+    mostra a comissão de quem foi escolhido, não a dos outros."""
     qs = (
         _compromissos(user, season=season, farm=farm)
         .filter(commissions__isnull=False)
         .distinct()
     )
+    if comprador is not None:
+        qs = qs.filter(commissions__payee=comprador)
     if start:
         qs = qs.filter(date__gte=start)
     if end:
@@ -480,6 +498,8 @@ def comissao_por_comprador(user, *, season, farm, start=None, end=None) -> Relat
         # Uma linha por comprador: cada um tem a sua comissão.
         for x in calculo.comissoes:
             comissao = x.commission
+            if comprador is not None and comissao.payee_id != comprador.pk:
+                continue
             linhas.append(
                 {
                     "comprador": (
@@ -528,7 +548,11 @@ def comissao_por_comprador(user, *, season, farm, start=None, end=None) -> Relat
                 (lin["comissao"] for lin in linhas if lin["comissao"]), ZERO
             ),
         },
-        filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
+        filtros=[
+            *_contexto(season, farm),
+            *_filtro_de_periodo(start, end),
+            *_filtro_de_comprador(comprador),
+        ],
         notas=[
             "A regra é a gravada no compromisso na aprovação: mudar o cadastro "
             'depois não altera este relatório. "—" = ainda não há animal recebido.',
@@ -619,14 +643,20 @@ def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
 # --------------------------------------------------------------------------
 
 
-def historico_por_pecuarista(user, *, season, farm, start=None, end=None) -> Relatorio:
+def historico_por_pecuarista(
+    user, *, season, farm, start=None, end=None, comprador=None
+) -> Relatorio:
     """Só acerto aprovado: o que virou compra. R$/@ e custo/@ só existem para
-    quem vendeu por @ de carcaça."""
+    quem vendeu por @ de carcaça. Mostra o comprador de cada acerto e filtra
+    por ele."""
     acertos = (
         Settlement.objects.for_user(user)
         .filter(status=Status.CONFIRMADA)
         .select_related("commitment__seller", "commitment__destination_farm")
+        .prefetch_related("commitment__commissions__payee")
     )
+    if comprador is not None:
+        acertos = acertos.filter(commitment__commissions__payee=comprador).distinct()
     if season is not None:
         acertos = acertos.filter(commitment__season=season)
     if farm is not None:
@@ -657,6 +687,7 @@ def historico_por_pecuarista(user, *, season, farm, start=None, end=None) -> Rel
         linhas.append(
             {
                 "pecuarista": c.seller.name,
+                "comprador": _compradores_em_texto(c),
                 "acerto": a.code,
                 "data": _data(a.date),
                 "cidade": c.origin_city or None,
@@ -677,6 +708,7 @@ def historico_por_pecuarista(user, *, season, farm, start=None, end=None) -> Rel
         descricao="Cada acerto aprovado: cabeças, @, valor, comissão, frete, distância, R$/@ e custo/@.",
         colunas=[
             Coluna("pecuarista", "Pecuarista"),
+            Coluna("comprador", "Comprador"),
             Coluna("acerto", "Acerto"),
             Coluna("data", "Data"),
             Coluna("cidade", "Cidade"),
@@ -699,7 +731,11 @@ def historico_por_pecuarista(user, *, season, farm, start=None, end=None) -> Rel
             "comissao": sum((lin["comissao"] for lin in linhas), ZERO),
             "frete": sum((lin["frete"] for lin in linhas), ZERO),
         },
-        filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
+        filtros=[
+            *_contexto(season, farm),
+            *_filtro_de_periodo(start, end),
+            *_filtro_de_comprador(comprador),
+        ],
         notas=[
             "R$/@ e custo/@ só existem quando todos os itens foram vendidos por @ de "
             'carcaça (com romaneio); por cabeça, ficam em "—". O período filtra a '

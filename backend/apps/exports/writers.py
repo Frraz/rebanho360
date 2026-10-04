@@ -20,6 +20,7 @@ from pathlib import Path
 from django.template.loader import render_to_string
 from django.utils import timezone
 
+from apps.documents import layout
 from apps.exports import tabular
 from apps.exports.tabular import LEGIVEL, TECNICO
 
@@ -424,12 +425,14 @@ class PdfEscritor(Escritor):
             self.conjunto.titulo, descricao, notas, self.meta["filtros"]
         )
         numericas = [c.eh_numerica() for c in self.escolhidas]
-        tabela = {
-            "cabecalho": [c.rotulo for c in self.escolhidas],
-            "celulas": [list(zip(linha, numericas)) for linha in self.buffer],
-            "indices_numericos": [i for i, n in enumerate(numericas) if n],
-            "tem_totais": False,
-        }
+        tabela = layout.preparar_tabela(
+            {
+                "cabecalho": [c.rotulo for c in self.escolhidas],
+                "celulas": [list(zip(linha, numericas)) for linha in self.buffer],
+                "indices_numericos": [i for i, n in enumerate(numericas) if n],
+                "tem_totais": False,
+            }
+        )
         html = render_to_string(
             "documents/relatorio.html",
             {
@@ -439,6 +442,7 @@ class PdfEscritor(Escritor):
                 "emitido_em": self.meta["gerado_em_dt"],
                 "versao": VERSAO_DO_FORMATO,
                 "paisagem": len(self.escolhidas) > 7,
+                "densidade": layout.densidade_do_documento([tabela]),
             },
         )
         sufixo = "" if unica else f"-parte-{numero:02d}"

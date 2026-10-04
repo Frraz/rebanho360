@@ -7,7 +7,7 @@
 <style>
   @page {
     size: {% if paisagem %}A4 landscape{% else %}A4{% endif %};
-    margin: 30mm 12mm 16mm 12mm;
+    margin: 30mm {% if densidade %}8mm{% else %}12mm{% endif %} 16mm {% if densidade %}8mm{% else %}12mm{% endif %};
     /* Cabeçalho em TODA página, com o sistema, o relatório, a emissão e os
        filtros aplicados — sem eles, papel na mesa não diz a que se refere. */
     @top-left { content: element(cabecalho); width: 100%; vertical-align: top; }
@@ -30,6 +30,15 @@
   td.num { white-space: nowrap; }
   tr { page-break-inside: avoid; }
   tr.total td { font-weight: bold; border-top: 1pt solid #666; background: #fafafa; }
+  /* Muitas colunas: letra menor, larguras fixas (colgroup, proporcionais ao
+     conteúdo) e quebra de linha, para a tabela caber na página. */
+  table.densa, table.muito-densa { table-layout: fixed; }
+  table.densa th, table.densa td, table.muito-densa th, table.muito-densa td { padding: 1mm .8mm; overflow-wrap: anywhere; }
+  table.densa th { font-size: 7pt; }
+  table.densa td { font-size: 7.5pt; }
+  table.muito-densa th { font-size: 6.5pt; }
+  table.muito-densa td { font-size: 6.5pt; }
+  table.densa td.num, table.muito-densa td.num { white-space: normal; }
   .vazio { color: #666; text-align: center; padding: 6mm; }
 </style>
 </head>
@@ -47,7 +56,8 @@
 
 {% for titulo, tabela in tabelas %}
 {% if titulo %}<h2>{{ titulo }}</h2>{% endif %}
-<table>
+<table{% if tabela.densidade %} class="{{ tabela.densidade }}"{% endif %}>
+  {% if tabela.larguras %}<colgroup>{% for l in tabela.larguras %}<col style="width: {{ l|stringformat:'.2f' }}%">{% endfor %}</colgroup>{% endif %}
   <thead><tr>{% for rotulo in tabela.cabecalho %}<th{% if forloop.counter0 in tabela.indices_numericos %} class="num"{% endif %}>{{ rotulo }}</th>{% endfor %}</tr></thead>
   <tbody>
     {% for linha in tabela.celulas %}

@@ -10,18 +10,36 @@
     </div>
   </div>
 </header>
-<ul class="card-flush divide-y divide-gray-100">
-  {% for slug, titulo, descricao in catalogo %}
-  <li>
-    <a href="{% url 'reports:relatorio' slug %}" class="flex min-h-touch items-center gap-4 px-5 py-4 hover:bg-gray-50">
-      {% icon "file-text" "icon-lg shrink-0 text-gray-400" %}
-      <span class="min-w-0 flex-1">
-        <span class="block font-medium text-gray-900">{{ titulo }}</span>
-        <span class="mt-0.5 block text-sm text-gray-500">{{ descricao }}</span>
-      </span>
-      {% icon "chevron-right" "text-gray-400" %}
-    </a>
-  </li>
-  {% endfor %}
-</ul>
+
+{# Busca no próprio navegador: filtra por título e descrição, sem acento e sem recarregar. #}
+<div x-data="{
+       q: '',
+       sem(t) { return (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase() },
+       casa(texto) { return !this.q.trim() || this.sem(texto).includes(this.sem(this.q.trim())) },
+       get nenhum() { return ![...this.$refs.lista.children].some(li => this.casa(li.dataset.texto)) },
+     }">
+  <div class="mb-4 max-w-xl">
+    <label class="field-label" for="busca-relatorio">Buscar relatório</label>
+    <div class="relative">
+      {% icon "search" "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" %}
+      <input type="search" id="busca-relatorio" x-model="q" class="field-input pl-10" placeholder="Ex.: comissão, custos, movimentação" autocomplete="off" @keydown.escape="q = ''">
+    </div>
+  </div>
+
+  <ul x-ref="lista" class="card-flush divide-y divide-gray-100">
+    {% for slug, titulo, descricao in catalogo %}
+    <li data-texto="{{ titulo }} {{ descricao }}" x-show="casa($el.dataset.texto)">
+      <a href="{% url 'reports:relatorio' slug %}" class="flex min-h-touch items-center gap-4 px-5 py-4 hover:bg-gray-50">
+        {% icon "file-text" "icon-lg shrink-0 text-gray-400" %}
+        <span class="min-w-0 flex-1">
+          <span class="block font-medium text-gray-900">{{ titulo }}</span>
+          <span class="mt-0.5 block text-sm text-gray-500">{{ descricao }}</span>
+        </span>
+        {% icon "chevron-right" "text-gray-400" %}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  <p x-show="nenhum" x-cloak class="card mt-4 text-sm text-gray-600" role="status">Nenhum relatório combina com "<span x-text="q"></span>". Tente outra palavra.</p>
+</div>
 {% endblock %}

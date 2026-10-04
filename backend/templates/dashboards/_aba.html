@@ -3,7 +3,7 @@
   {% for a in abas %}
   <a href="{% url 'dashboards:dashboard_aba' a.slug %}" class="dash-tab"
      {% if a.slug == aba.slug %}aria-current="page"{% endif %}
-     hx-get="{% url 'dashboards:dashboard_aba' a.slug %}" hx-target="#dash" hx-swap="innerHTML show:#dash:top"
+     hx-get="{% url 'dashboards:dashboard_aba' a.slug %}" hx-target="#dash" hx-swap="innerHTML show:none"
      hx-push-url="true">
     {% icon a.icone %}<span>{{ a.rotulo }}</span>
   </a>

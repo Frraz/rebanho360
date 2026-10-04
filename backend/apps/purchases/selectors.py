@@ -13,7 +13,17 @@ from apps.purchases.models import Purchase
 from apps.purchases.services import calcular_custo_da_compra, custo_da_compra
 
 
-def listar_compras_para(user, *, season=None, farm=None, situacao: str = ""):
+def listar_compras_para(
+    user,
+    *,
+    season=None,
+    farm=None,
+    situacao: str = "",
+    registro: str = "",
+    vendedor=None,
+    data_de=None,
+    data_ate=None,
+):
     qs = Purchase.objects.for_user(user).select_related(
         "destination_farm", "category", "seller", "lot", "season"
     )
@@ -23,6 +33,15 @@ def listar_compras_para(user, *, season=None, farm=None, situacao: str = ""):
         qs = qs.filter(destination_farm=farm)
     if situacao:
         qs = qs.filter(status=situacao)
+    if registro and registro.strip():
+        # CP-2026/27-0009 ou OP-000048/I2: basta um pedaço ("48/I2", "0009").
+        qs = qs.filter(code__icontains=registro.strip())
+    if vendedor is not None:
+        qs = qs.filter(seller=vendedor)
+    if data_de is not None:
+        qs = qs.filter(date__gte=data_de)
+    if data_ate is not None:
+        qs = qs.filter(date__lte=data_ate)
     return qs
 
 

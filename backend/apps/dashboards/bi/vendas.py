@@ -176,6 +176,19 @@ def kpis(e: Escopo) -> list[Kpi]:
             destaque=True,
         ),
         Kpi(
+            "Cabeças vendidas",
+            specs.formatar(atual.cabecas) if atual.vendas else specs.TRAVESSAO,
+            unidade="cabeças",
+            nota=f"{atual.vendas} venda(s)",
+            delta=specs.variacao(
+                atual.cabecas if atual.vendas else None,
+                ant.cabecas if ant and ant.vendas else None,
+            ),
+            spark=specs.sparkline([agregado(v).cabecas for v in meses.values()]),
+            url=url,
+            ajuda="Soma das cabeças das vendas e abates confirmados da safra.",
+        ),
+        Kpi(
             "Resultado dos lotes vendidos",
             (
                 specs.brl_curto(res.resultado)
