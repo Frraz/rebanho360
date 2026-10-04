@@ -169,13 +169,26 @@ class Tabela:
     vazio: str = "Sem dados para mostrar."
     # Coluna de código de registro (fonte mono).
     codigo: int | None = None
+    # Quantas linhas mostrar. `None` = todas. A tabela gêmea de um gráfico tem
+    # teto (`LIMITE_DA_TABELA_GEMEA`): o gráfico segue com todos os pontos, mas
+    # 600 linhas escondidas por gráfico faziam a aba passar de 1 MB — no celular
+    # com sinal ruim isso é a aba que não abre.
+    limite: int | None = None
+
+    @property
+    def omitidas(self) -> int:
+        """Linhas que existem e não foram mostradas por causa do `limite`."""
+        if self.limite is None:
+            return 0
+        return max(len(self.linhas) - self.limite, 0)
 
     @property
     def linhas_prontas(self) -> list[LinhaPronta]:
         """As linhas já com barra, marca e link resolvidos por célula: o template
         só percorre, não indexa dicionário por tupla nem calcula."""
         prontas = []
-        for i, linha in enumerate(self.linhas):
+        mostradas = self.linhas if self.limite is None else self.linhas[: self.limite]
+        for i, linha in enumerate(mostradas):
             celulas = []
             for j, texto in enumerate(linha):
                 barras = self.barras.get(j)
@@ -214,6 +227,9 @@ class Tabela:
 # Gráfico
 # --------------------------------------------------------------------------
 
+#: Teto de linhas da tabela gêmea de cada gráfico (ver `Tabela.limite`).
+LIMITE_DA_TABELA_GEMEA = 100
+
 LARGURAS = {
     "quarto": "dash-col-3",
     "terco": "dash-col-4",
@@ -239,6 +255,10 @@ class Grafico:
     # Gráfico com um elemento só (um bloco no mapa de calor, uma fatia de 100%,
     # uma barra) não compara nada: em vez de desenhá-lo, o cartão diz o que há.
     aviso_vazio: str = ""
+
+    def __post_init__(self):
+        if self.tabela is not None and self.tabela.limite is None:
+            self.tabela.limite = LIMITE_DA_TABELA_GEMEA
 
     @property
     def mensagem_vazia(self) -> str:

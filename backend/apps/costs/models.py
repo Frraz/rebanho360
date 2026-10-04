@@ -141,6 +141,16 @@ class CostEntry(ReversibleModel):
         indexes = [
             models.Index(fields=["farm", "season"]),
             models.Index(fields=["cost_center", "season"]),
+            # Os custos indiretos confirmados da fazenda, por dia: é o que o
+            # rateio lê (`BaseDeRateio`). Parcial: só as linhas que interessam.
+            models.Index(
+                fields=["farm", "date"],
+                condition=models.Q(lot__isnull=True, status="CONFIRMADA"),
+                name="costentry_indireto_farm_date",
+            ),
+            # A busca por descrição tem índice trigram em `UPPER(description)`,
+            # criado por SQL na migração (o Django 5.0 não monta o índice de
+            # expressão com classe de operador).
         ]
 
     def __str__(self) -> str:

@@ -69,13 +69,13 @@ Por código de compra, venda, lote, parceiro e documento.
 
 ## Melhorias de desempenho
 
-Não antecipar. Medir primeiro. Candidatos, na ordem em que provavelmente apertam:
+**Feito em 2026-10-04**, depois de o seed grande (262 a 585 lotes) deixar o dashboard em 5 a 30 s: o problema era consulta por lote (N+1) e soma feita em Python, não falta de cache. Medição, correções, índices e metas em [operacao/02-desempenho](../operacao/02-desempenho.md).
+
+Continuam sem necessidade, e só entram se a medição pedir:
 
 1. `HerdMonthlySnapshot` como cache do saldo histórico — **nunca** como fonte da verdade, e sempre recalculável
 2. Materialized view para o dashboard
-3. Índices adicionais conforme o log de consultas lenta apontar
-
-Com o volume atual — menos de 10 mil movimentos por safra — nenhum é necessário.
+3. Cache de resultado por aba, com chave versionada (nunca por tempo)
 
 ---
 

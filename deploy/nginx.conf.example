@@ -24,6 +24,19 @@ server {
     # Importação de planilhas (.xlsx) e anexos
     client_max_body_size 20m;
 
+    # Compressão: a aba mais pesada do dashboard tem centenas de KB de HTML e
+    # JSON, que caem uns 90% comprimidos — a diferença entre abrir e não abrir
+    # no celular com sinal ruim. Se o nginx global do VPS já comprime, mantenha
+    # um só (não duplique). Os tipos abaixo não incluem imagem nem PDF, que já
+    # vêm comprimidos.
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_types text/plain text/css text/csv application/json application/javascript
+               text/javascript image/svg+xml application/xml;
+
     # Mesmo valor de STATIC_HOST_DIR no .env
     location /static/ {
         alias /var/www/rebanho360/static/;

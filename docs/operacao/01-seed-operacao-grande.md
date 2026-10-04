@@ -72,7 +72,7 @@ python manage.py desfazer_seed_operacao_grande --sim       # sem perguntar
 ## Cuidados
 
 - `conferir_importacao` compara os números do banco com a planilha real e **passa a divergir** enquanto o seed estiver no banco.
-- O dashboard calcula resultado e rateio por lote na hora. Com centenas de lotes ele fica mais lento que os ~2 s medidos com ~60 lotes ([11-dashboard-analitico](../regras-negocio/11-dashboard-analitico.md#desempenho)). É esperado; use `--escala` para um volume menor.
+- Ao final o seed roda `ANALYZE`, para o PostgreSQL planejar as consultas com as estatísticas do volume novo. O dashboard continua abrindo em cerca de 1 s com centenas de lotes ([operacao/02-desempenho](02-desempenho.md)); se algo parecer lento, meça antes de supor.
 - Os dados são fictícios, inclusive CPF/CNPJ, telefone e conta bancária.
 
 ## Testes

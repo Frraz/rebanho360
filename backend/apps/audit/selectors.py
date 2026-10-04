@@ -1,7 +1,12 @@
 """Consultas do console de auditoria. Leitura, nunca escrita."""
 
+import datetime
+
 from django.apps import apps as django_apps
+from django.core.cache import cache
 from django.db.models import QuerySet
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from apps.audit.models import AuditEvent
 
@@ -22,13 +27,31 @@ def filter_events(
         qs = qs.filter(action=action)
     if entity_type:
         qs = qs.filter(entity_type=entity_type)
-    if date_from:
-        qs = qs.filter(timestamp__date__gte=date_from)
-    if date_to:
-        qs = qs.filter(timestamp__date__lte=date_to)
+    # Faixa de instantes, não `timestamp__date`: converter a coluna para data
+    # impede o banco de usar o índice de `timestamp` e varre a tabela inteira.
+    # O dia vai de 00:00 do dia inicial a 00:00 do dia seguinte ao final, no
+    # fuso do sistema — o mesmo recorte que `__date` fazia.
+    inicio = _inicio_do_dia(date_from)
+    if inicio is not None:
+        qs = qs.filter(timestamp__gte=inicio)
+    fim = _inicio_do_dia(date_to, dias_depois=1)
+    if fim is not None:
+        qs = qs.filter(timestamp__lt=fim)
     if ip_address:
         qs = qs.filter(ip_address=ip_address)
     return qs
+
+
+def _inicio_do_dia(valor, *, dias_depois: int = 0):
+    """00:00 do dia (no fuso do sistema), `dias_depois` dias adiante. Aceita
+    `date` ou texto `AAAA-MM-DD`; vazio ou inválido não filtra."""
+    if not valor:
+        return None
+    dia = valor if isinstance(valor, datetime.date) else parse_date(str(valor))
+    if dia is None:
+        return None
+    dia += datetime.timedelta(days=dias_depois)
+    return timezone.make_aware(datetime.datetime.combine(dia, datetime.time.min))
 
 
 def timeline_for(entity_type: str, entity_id: str) -> QuerySet[AuditEvent]:
@@ -39,8 +62,17 @@ def timeline_for(entity_type: str, entity_id: str) -> QuerySet[AuditEvent]:
 
 
 def distinct_entity_types() -> list[str]:
-    return list(
-        AuditEvent.objects.order_by().values_list("entity_type", flat=True).distinct()
+    """Os tipos que já aparecem na auditoria, para o filtro do console. A tabela
+    só cresce e o `DISTINCT` a percorre inteira: o resultado fica 10 minutos em
+    cache (é uma lista de opções de filtro, não um indicador)."""
+    return cache.get_or_set(
+        "audit:entity_types",
+        lambda: sorted(
+            AuditEvent.objects.order_by()
+            .values_list("entity_type", flat=True)
+            .distinct()
+        ),
+        600,
     )
 
 

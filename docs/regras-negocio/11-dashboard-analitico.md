@@ -94,9 +94,11 @@ O papel define **o quê**; o escopo de fazenda, **onde** (ADR 0003).
 
 ## Desempenho
 
-Cada aba é calculada na hora (sem cache: um número defasado contradiria a tela do registro). As partes caras — resultado e rateio por lote — são calculadas **uma vez por requisição** (`Escopo.memo`) e compartilhadas entre a visão geral e a aba do assunto. Com ~60 lotes a *Visão geral* e a aba *Lotes* levam ~2 s no desenvolvimento; as demais, menos de 0,7 s. O tempo aparece no rodapé de cada aba.
+Cada aba é calculada na hora (sem cache: um número defasado contradiria a tela do registro). O que é caro — desempenho, custo e resultado **por lote** — é calculado **em lote**: `desempenho_dos_lotes`, `financeiro_dos_lotes` e `resultados_dos_lotes` leem o necessário com um número fixo de consultas, e o rateio de custo lê o razão e os custos indiretos **uma vez por fazenda** (`BaseDeRateio`), não uma vez por lote e por centro. A versão de um lote (`desempenho_do_lote`, `financeiro_do_lote`, `resultado_do_lote`) é o caso de uma posição da versão em lote: tela do lote e dashboard dão o mesmo número pelo mesmo código. O que é pedido por mais de uma aba vive em `Escopo.memo` e é calculado uma vez por requisição.
 
-Se crescer: o custo está em `resultado_do_lote` e `financeiro_do_lote` (um rateio por lote). A saída é calcular o rateio por fazenda e período uma vez — mudança dentro de `costs.allocation`, sem tocar no dashboard.
+**O que isso garante:** o número de consultas de uma aba **não cresce com a quantidade de lotes** (testado em `dashboards/tests/test_desempenho.py`); o tempo cresce de forma aproximadamente linear, pelo trabalho em Python de montar tabelas e gráficos. Medidas e como repetir: [operacao/02-desempenho](../operacao/02-desempenho.md). O tempo de cada aba aparece no rodapé dela.
+
+Cache de resultado (Redis) ficou **de fora de propósito**: só entra se, com as consultas corrigidas, alguma aba ainda passar de ~1 s, e então com chave versionada e invalidação a cada escrita — nunca por tempo.
 
 ---
 

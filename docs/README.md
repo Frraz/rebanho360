@@ -59,6 +59,7 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 | [migracao/01-planilhas-e-importacao](migracao/01-planilhas-e-importacao.md) | Aba por aba: o que importar |
 | [relatorios/01-catalogo](relatorios/01-catalogo.md) | Relatórios por fase + leitura dos legados |
 | [operacao/01-seed-operacao-grande](operacao/01-seed-operacao-grande.md) | Dados de demonstração: 12 fazendas, 3 safras, e o comando que desfaz só o que o seed criou |
+| [operacao/02-desempenho](operacao/02-desempenho.md) | Como medir o desempenho, o que foi corrigido (e por quê), metas e como não regredir |
 
 ### Decisões (ADR)
 | ADR | Decisão |

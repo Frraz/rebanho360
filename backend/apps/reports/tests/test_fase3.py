@@ -187,7 +187,9 @@ class TestResultadoDoLote:
             cabecas_vendidas=real.cabecas_vendidas,
             arrobas_vendidas=D("1"),
         )
-        monkeypatch.setattr(services, "resultado_do_lote", lambda lote: falso)
+        monkeypatch.setattr(
+            services, "_resultados", lambda lotes, **_: {lt.pk: falso for lt in lotes}
+        )
 
         lin = services.resultado_dos_lotes(gestor, season=season, farm=None).linhas[0]
 

@@ -17,7 +17,8 @@ from django.urls import reverse
 from apps.core.money import safe_div
 from apps.sales import carcass
 from apps.sales.models import SaleType
-from apps.sales.result import ResultadoDoLote, resultado_do_lote
+from apps.sales.result import ResultadoDoLote
+from apps.sales.result import resultados_dos_lotes as _resultados
 
 from . import specs
 from .escopo import Escopo
@@ -32,7 +33,7 @@ def lista_de_vendas(e: Escopo) -> list:
         "vendas",
         lambda: list(
             e.vendas()
-            .select_related("buyer", "farm", "lot", "category")
+            .select_related("buyer", "farm", "lot", "lot__farm", "category")
             .order_by("date", "id")
         ),
     )
@@ -72,11 +73,12 @@ def resultados_dos_lotes(e: Escopo) -> list[ResultadoDoLote]:
     mês): é o número que a tela do lote mostra."""
 
     def calcular():
-        lotes = {v.lot_id: v.lot for v in lista_de_vendas(e)}
-        return [
-            resultado_do_lote(lt)
-            for lt in sorted(lotes.values(), key=lambda lt: lt.code)
-        ]
+        lotes = sorted(
+            {v.lot_id: v.lot for v in lista_de_vendas(e)}.values(),
+            key=lambda lt: lt.code,
+        )
+        resultados = _resultados(lotes, financeiros=e.financeiro_dos_lotes(lotes))
+        return [resultados[lt.pk] for lt in lotes]
 
     return e.memo("resultados_dos_lotes", calcular)
 

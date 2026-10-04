@@ -95,6 +95,9 @@ DATABASES = {
         env="DATABASE_URL",
         default="postgres://rebanho360:rebanho360@localhost:5432/rebanho360",
         conn_max_age=60,
+        # Conexão reaproveitada que o servidor já fechou (reinício do Postgres,
+        # rede) é detectada antes da requisição, em vez de virar erro 500.
+        conn_health_checks=True,
     )
 }
 

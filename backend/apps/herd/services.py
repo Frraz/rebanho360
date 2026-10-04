@@ -9,6 +9,7 @@ docs/regras-negocio/01-rebanho-movimentacoes.md.
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from apps.core import reversible
@@ -60,25 +61,41 @@ def saldo(*, farm=None, lot=None, category=None, season=None, until=None) -> dic
     if until is not None:
         qs = qs.filter(date__lte=until)
 
-    head_count = 0
-    weight_kg = Decimal("0")
-    for quantity, weight in qs.values_list("quantity", "weight_kg"):
-        head_count += quantity
-        if weight is not None:
-            weight_kg += weight
-    return {"head_count": head_count, "weight_kg": weight_kg}
+    # A soma é do banco (ADR 0002: saldo é `SUM` do razão). Antes cada linha do
+    # filtro vinha para Python só para ser somada.
+    resumo = qs.aggregate(cabecas=Sum("quantity"), peso=Sum("weight_kg"))
+    return {
+        "head_count": resumo["cabecas"] or 0,
+        "weight_kg": resumo["peso"] or Decimal("0"),
+    }
+
+
+def saldo_por_lote(lots) -> dict:
+    """`{lot_id: cabeças}` de vários lotes numa só consulta. Lote sem linha no
+    razão não aparece; quem consulta usa `.get(pk, 0)`."""
+    ids = [lt.pk if hasattr(lt, "pk") else lt for lt in lots]
+    return {
+        lot_id: total or 0
+        for lot_id, total in HerdLedgerEntry.objects.filter(lot_id__in=ids)
+        .values_list("lot_id")
+        .annotate(total=Sum("quantity"))
+        .order_by("lot_id")
+    }
 
 
 def saldo_travado(*, farm, lot, category) -> int:
     """Trava (`select_for_update`) todas as linhas da posição antes de
     somar — é o que impede duas saídas concorrentes de passarem juntas
     pela validação (F1-09). Só vale dentro de uma transação."""
-    linhas = list(
-        HerdLedgerEntry.objects.select_for_update().filter(
-            farm=farm, lot=lot, category=category
-        )
+    # `FOR UPDATE` não combina com `SUM` no Postgres: trava as linhas lendo só a
+    # coluna que importa, em vez de montar um objeto do modelo por linha.
+    quantidades = list(
+        HerdLedgerEntry.objects.select_for_update()
+        .filter(farm=farm, lot=lot, category=category)
+        .order_by("pk")
+        .values_list("quantity", flat=True)
     )
-    return sum(linha.quantity for linha in linhas)
+    return sum(quantidades)
 
 
 _saldo_travado = saldo_travado

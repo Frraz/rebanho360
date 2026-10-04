@@ -7,7 +7,7 @@ Tudo sai do razão (`HerdLedgerEntry`): saldo é `SUM` com sinal, nunca campo
 from __future__ import annotations
 
 import datetime
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -719,14 +719,16 @@ def tabela_de_fazendas(e: Escopo) -> Tabela:
     ]
     linhas = []
     valores = []
+    lotacao = lotacao_por_fazenda(e)
+    lotes_por_fazenda = Counter(lt.lote.farm_id for lt in lotes)
     for f in e.fazendas():
-        taxa_lot, area, cb = lotacao_por_fazenda(e)[f]
+        taxa_lot, area, cb = lotacao[f]
         mort = m.por_fazenda[f]
         linhas.append(
             [
                 f.name,
                 specs.formatar(saldos.get(f.pk, 0)),
-                specs.formatar(sum(1 for lt in lotes if lt.lote.farm_id == f.pk)),
+                specs.formatar(lotes_por_fazenda[f.pk]),
                 specs.formatar(area, "num1") + " ha" if area else specs.TRAVESSAO,
                 specs.formatar(taxa_lot, "num2"),
                 specs.formatar(mort.mortes),

@@ -127,6 +127,12 @@ class Command(BaseCommand):
         with use_context(actor=atores.admin, request_id=uuid.UUID(cat.SEED_UUID)):
             self._executar(ctx, opts)
 
+        # Milhares de linhas novas de uma vez: sem estatísticas atualizadas o
+        # planejador do PostgreSQL escolhe plano para a tabela vazia e as telas
+        # ficam lentas até o autovacuum rodar. Atualiza na hora.
+        with connection.cursor() as cursor:
+            cursor.execute("ANALYZE")
+
         self._resumo(ctx)
 
     # ------------------------------------------------------------------

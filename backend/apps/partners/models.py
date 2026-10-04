@@ -22,6 +22,9 @@ class Partner(models.Model):
         verbose_name = "Parceiro"
         verbose_name_plural = "Parceiros"
         ordering = ["name"]
+        # A busca por nome tem índice trigram em `UPPER(name)`, criado por SQL na
+        # migração (o Django 5.0 não monta índice de expressão com classe de
+        # operador).
         indexes = [models.Index(fields=["document"])]
 
     def __str__(self) -> str:

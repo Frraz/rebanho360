@@ -101,22 +101,20 @@ class ContasView(VeTitulosMixin, TemplateView):
         filtros = form.cleaned_data if form.is_valid() else {}
         situacao = filtros.get("situacao") or "abertos"
 
-        titulos = list(
-            selectors.listar_titulos_para(
-                user,
-                farm=farm,
-                direction=self.direction,
-                situacao=situacao,
-                payee=filtros.get("payee"),
-                de=filtros.get("de"),
-                ate=filtros.get("ate"),
-            )
+        # Querysets, não listas: a página pede 30 linhas ao banco e o resto vira
+        # soma lá mesmo, em vez de trazer todos os títulos para somar aqui.
+        titulos = selectors.listar_titulos_para(
+            user,
+            farm=farm,
+            direction=self.direction,
+            situacao=situacao,
+            payee=filtros.get("payee"),
+            de=filtros.get("de"),
+            ate=filtros.get("ate"),
         )
         # O resumo não obedece aos filtros: é o retrato do que está em aberto.
-        em_aberto = list(
-            selectors.listar_titulos_para(
-                user, farm=farm, direction=self.direction, situacao="abertos"
-            )
+        em_aberto = selectors.listar_titulos_para(
+            user, farm=farm, direction=self.direction, situacao="abertos"
         )
         pagina = Paginator(titulos, POR_PAGINA).get_page(self.request.GET.get("page"))
         a_receber = self.direction == Direction.RECEBER
@@ -125,13 +123,13 @@ class ContasView(VeTitulosMixin, TemplateView):
                 "filtro": form,
                 "page_obj": pagina,
                 "titulos": [(t, t.vencido(hoje)) for t in pagina.object_list],
-                "resumo": selectors.resumir_vencimentos(em_aberto, hoje=hoje),
+                "resumo": selectors.resumo_de_vencimentos(em_aberto, hoje=hoje),
                 "a_receber": a_receber,
                 "situacao": situacao,
                 "pode_lancar": pode_gerenciar_titulos(user),
-                "total_listado": sum((t.balance for t in titulos), start=0),
+                "total_listado": selectors.saldo_dos_titulos(titulos),
                 "sem_titulo": (
-                    sum(len(x) for x in selectors.operacoes_sem_titulo(user))
+                    selectors.contar_operacoes_sem_titulo(user)
                     if pode_gerenciar_titulos(user)
                     else 0
                 ),

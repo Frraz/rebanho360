@@ -1,6 +1,6 @@
 """Leitura. Consultas e agregações."""
 
-from django.db.models import Sum
+from django.db.models import Q, Sum
 
 from apps.herd.models import TWO_LINE_TYPES, HerdLedgerEntry, HerdMovement
 from apps.livestock.models import AnimalCategory, Lot
@@ -19,20 +19,21 @@ def posicao_do_rebanho(*, user, farm=None, season=None, until=None):
     if until is not None:
         qs = qs.filter(date__lte=until)
 
+    # Uma consulta para todas as categorias (eram duas por categoria).
+    somas = {
+        linha["category_id"]: linha
+        for linha in qs.values("category_id")
+        .annotate(
+            entradas=Sum("quantity", filter=Q(quantity__gt=0)),
+            saidas=Sum("quantity", filter=Q(quantity__lt=0)),
+        )
+        .order_by()
+    }
     linhas = []
     for categoria in AnimalCategory.objects.filter(is_active=True):
-        entradas = (
-            qs.filter(category=categoria, quantity__gt=0).aggregate(s=Sum("quantity"))[
-                "s"
-            ]
-            or 0
-        )
-        saidas = (
-            qs.filter(category=categoria, quantity__lt=0).aggregate(s=Sum("quantity"))[
-                "s"
-            ]
-            or 0
-        )
+        soma = somas.get(categoria.pk, {})
+        entradas = soma.get("entradas") or 0
+        saidas = soma.get("saidas") or 0
         linhas.append(
             {
                 "categoria": categoria,
@@ -74,13 +75,13 @@ def conciliar_transferencias(user=None):
 
 
 def listar_movimentos_para(user):
-    from django.db.models import Q
-
     from apps.herd.models import HerdMovement
 
     if user.has_broad_access:
         return HerdMovement.objects.all()
     fazendas = user.accessible_farms()
+    # Sem `distinct()`: o filtro não junta tabela de muitos, então não há linha
+    # repetida — e o `DISTINCT` obrigava o banco a ordenar a tabela inteira.
     return HerdMovement.objects.filter(
         Q(origin_farm__in=fazendas) | Q(destination_farm__in=fazendas)
-    ).distinct()
+    )

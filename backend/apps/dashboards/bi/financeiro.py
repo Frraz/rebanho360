@@ -42,27 +42,28 @@ FAIXAS = (
 )
 
 
-def _saldo(titulo) -> Decimal:
-    return titulo.amount - Decimal(titulo.paid_sum or 0)
+def _abertos(e: Escopo, direcao: str, *, so_com_saldo: bool = True):
+    return financeiro.titulos_em_aberto_com_saldo(
+        e.user, farm=e.farm, direction=direcao, so_com_saldo=so_com_saldo
+    )
 
 
-def em_aberto(e: Escopo, direcao: str) -> list:
-    """Títulos ativos com saldo a pagar/receber, no escopo do usuário."""
+def por_vencimento(e: Escopo, direcao: str) -> list[tuple]:
+    """`[(vencimento, quantidade, saldo)]` dos títulos com saldo a pagar/receber,
+    no escopo do usuário. A soma é do banco, um grupo por dia de vencimento: o
+    painel não carrega cada título para somar, então não depende de quantos há."""
 
     def calcular():
         return [
-            t
-            for t in financeiro.listar_titulos_para(
-                e.user, farm=e.farm, direction=direcao, situacao="abertos"
-            )
-            if _saldo(t) > 0
+            (g["due_date"], g["quantidade"], g["total"])
+            for g in financeiro.saldo_agrupado(_abertos(e, direcao), "due_date")
         ]
 
     return e.memo(f"abertos:{direcao}", calcular)
 
 
-def faixa_do_titulo(titulo, hoje: datetime.date) -> int:
-    dias = (titulo.due_date - hoje).days
+def faixa_do_titulo(vencimento: datetime.date, hoje: datetime.date) -> int:
+    dias = (vencimento - hoje).days
     for i, (_, de, ate) in enumerate(FAIXAS):
         if (de is None or dias >= de) and (ate is None or dias <= ate):
             return i
@@ -71,25 +72,27 @@ def faixa_do_titulo(titulo, hoje: datetime.date) -> int:
 
 def por_faixa(e: Escopo, direcao: str) -> list[Decimal]:
     saldos = [ZERO] * len(FAIXAS)
-    for t in em_aberto(e, direcao):
-        saldos[faixa_do_titulo(t, e.hoje)] += _saldo(t)
+    for vencimento, _, saldo in por_vencimento(e, direcao):
+        saldos[faixa_do_titulo(vencimento, e.hoje)] += saldo
     return saldos
 
 
+def _soma(grupos) -> tuple[int, Decimal]:
+    grupos = list(grupos)
+    return sum(q for _, q, _ in grupos), sum((v for _, _, v in grupos), ZERO)
+
+
 def vencido(e: Escopo, direcao: str) -> tuple[int, Decimal]:
-    titulos = [t for t in em_aberto(e, direcao) if t.due_date < e.hoje]
-    return len(titulos), sum((_saldo(t) for t in titulos), ZERO)
+    return _soma(g for g in por_vencimento(e, direcao) if g[0] < e.hoje)
 
 
 def total_em_aberto(e: Escopo, direcao: str) -> tuple[int, Decimal]:
-    titulos = em_aberto(e, direcao)
-    return len(titulos), sum((_saldo(t) for t in titulos), ZERO)
+    return _soma(por_vencimento(e, direcao))
 
 
 def proximos_7_dias(e: Escopo, direcao: str) -> tuple[int, Decimal]:
     fim = e.hoje + datetime.timedelta(days=6)
-    titulos = [t for t in em_aberto(e, direcao) if e.hoje <= t.due_date <= fim]
-    return len(titulos), sum((_saldo(t) for t in titulos), ZERO)
+    return _soma(g for g in por_vencimento(e, direcao) if e.hoje <= g[0] <= fim)
 
 
 def fluxo(e: Escopo):
@@ -254,20 +257,20 @@ def grafico_fluxo(e: Escopo) -> specs.Grafico:
 
 
 def grafico_pipeline(e: Escopo) -> specs.Grafico:
-    soma = defaultdict(lambda: ZERO)
-    contagem = defaultdict(int)
-    for t in financeiro.listar_titulos_para(
-        e.user, farm=e.farm, direction=Direction.PAGAR, situacao="abertos"
-    ):
-        soma[t.payment_status] += _saldo(t)
-        contagem[t.payment_status] += 1
+    grupos = {
+        g["payment_status"]: g
+        for g in financeiro.saldo_agrupado(
+            _abertos(e, Direction.PAGAR, so_com_saldo=False), "payment_status"
+        )
+    }
     etapas = []
     for situacao in SITUACOES_EM_ABERTO:
+        g = grupos.get(situacao, {"total": ZERO, "quantidade": 0})
         etapas.append(
             (
                 PaymentStatus(situacao).label,
-                soma[situacao],
-                f"{contagem[situacao]} título(s)",
+                g["total"],
+                f"{g['quantidade']} título(s)",
             )
         )
     return specs.funil(
@@ -282,8 +285,8 @@ def grafico_pipeline(e: Escopo) -> specs.Grafico:
 
 def grafico_por_tipo(e: Escopo) -> specs.Grafico:
     soma = defaultdict(lambda: ZERO)
-    for t in em_aberto(e, Direction.PAGAR):
-        soma[t.get_component_display()] += _saldo(t)
+    for g in financeiro.saldo_agrupado(_abertos(e, Direction.PAGAR), "component"):
+        soma[Component(g["component"]).label] += g["total"]
     cores = {
         Component.ANIMAIS.label: specs.COR_COMPRAS,
         Component.FRETE.label: specs.COR_CUSTOS,
@@ -300,14 +303,20 @@ def grafico_por_tipo(e: Escopo) -> specs.Grafico:
     )
 
 
-def grafico_favorecidos(e: Escopo) -> specs.Grafico:
+def _por_pessoa(e: Escopo, direcao: str, sem_nome: str) -> list[tuple]:
     soma = defaultdict(lambda: ZERO)
-    for t in em_aberto(e, Direction.PAGAR):
-        soma[t.payee.name if t.payee_id else "Sem favorecido definido"] += _saldo(t)
+    for g in financeiro.saldo_agrupado(_abertos(e, direcao), "payee__name"):
+        soma[g["payee__name"] if g["payee__name"] is not None else sem_nome] += g[
+            "total"
+        ]
+    return list(soma.items())
+
+
+def grafico_favorecidos(e: Escopo) -> specs.Grafico:
     return specs.ranking(
         "fin-favorecidos",
         "A quem se deve mais",
-        list(soma.items()),
+        _por_pessoa(e, Direction.PAGAR, "Sem favorecido definido"),
         formato="brl",
         nome_serie="Em aberto",
         largura="terco",
@@ -316,13 +325,10 @@ def grafico_favorecidos(e: Escopo) -> specs.Grafico:
 
 
 def grafico_clientes(e: Escopo) -> specs.Grafico:
-    soma = defaultdict(lambda: ZERO)
-    for t in em_aberto(e, Direction.RECEBER):
-        soma[t.payee.name if t.payee_id else "Sem cliente definido"] += _saldo(t)
     return specs.ranking(
         "fin-clientes",
         "Quem deve mais",
-        list(soma.items()),
+        _por_pessoa(e, Direction.RECEBER, "Sem cliente definido"),
         formato="brl",
         nome_serie="Em aberto",
         largura="terco",
@@ -333,9 +339,9 @@ def grafico_clientes(e: Escopo) -> specs.Grafico:
 def grafico_calendario(e: Escopo) -> specs.Grafico:
     fim = e.hoje + datetime.timedelta(days=180)
     dias = defaultdict(lambda: ZERO)
-    for t in em_aberto(e, Direction.PAGAR):
-        if e.hoje <= t.due_date <= fim:
-            dias[t.due_date] += _saldo(t)
+    for vencimento, _, saldo in por_vencimento(e, Direction.PAGAR):
+        if e.hoje <= vencimento <= fim:
+            dias[vencimento] += saldo
     return specs.calendario(
         "fin-calendario",
         "Vencimentos a pagar nos próximos 6 meses",
@@ -374,9 +380,12 @@ def grafico_pagamentos_por_metodo(e: Escopo) -> specs.Grafico:
 
 
 def tabela_proximos_vencimentos(e: Escopo) -> Tabela:
-    abertos = sorted(em_aberto(e, Direction.PAGAR), key=lambda t: (t.due_date, t.pk))[
-        :10
-    ]
+    # Só os dez que a tabela mostra, escolhidos pelo banco.
+    abertos = list(
+        _abertos(e, Direction.PAGAR)
+        .select_related("payee")
+        .order_by("due_date", "pk")[:10]
+    )
     linhas, links, marcas, saldos = [], [], {}, []
     for i, t in enumerate(abertos):
         atrasado = t.due_date < e.hoje
@@ -386,12 +395,12 @@ def tabela_proximos_vencimentos(e: Escopo) -> Tabela:
                 t.payee.name if t.payee_id else "—",
                 t.get_component_display(),
                 f"{t.due_date:%d/%m/%Y}",
-                specs.formatar(_saldo(t), "brl"),
+                specs.formatar(t.saldo, "brl"),
                 t.get_payment_status_display(),
             ]
         )
         links.append(reverse("finance:titulo_detalhe", args=[t.pk]))
-        saldos.append(_saldo(t))
+        saldos.append(t.saldo)
         if atrasado:
             marcas[(i, 3)] = ("ruim", f"vencido há {(e.hoje - t.due_date).days} dia(s)")
     tabela = Tabela(
@@ -425,13 +434,12 @@ def montar(e: Escopo) -> Painel:
         )
     )
     if (
-        not em_aberto(e, Direction.PAGAR)
-        and not em_aberto(e, Direction.RECEBER)
+        not por_vencimento(e, Direction.PAGAR)
+        and not por_vencimento(e, Direction.RECEBER)
         and sem_movimento
     ):
         painel.vazio = "Nenhum título lançado ainda."
-    sem_titulo = financeiro.operacoes_sem_titulo(e.user)
-    n_sem = sum(len(x) for x in sem_titulo)
+    n_sem = financeiro.contar_operacoes_sem_titulo(e.user)
     if n_sem:
         painel.avisos.append(
             f"{n_sem} compra(s) ou venda(s) confirmada(s) ainda sem título: o dinheiro delas não aparece aqui."

@@ -10,7 +10,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Min, OuterRef, Q, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 
 from apps.core.exceptions import Bloqueio
@@ -59,6 +60,7 @@ def listar_titulos_para(
             "season",
             "origin_purchase",
             "origin_sale",
+            "origin_settlement",
         )
         .annotate(
             paid_sum=Sum(
@@ -92,6 +94,54 @@ def listar_titulos_para(
     return qs.order_by("due_date", "id")
 
 
+def titulos_em_aberto_com_saldo(
+    user, *, farm=None, direction=None, so_com_saldo: bool = True
+):
+    """Títulos em aberto com o `saldo` (valor − baixado) como coluna, para
+    **somar no banco** em vez de trazer cada título para Python.
+
+    É o mesmo recorte de `listar_titulos_para(situacao="abertos")` (confirmados,
+    em aberto, de todas as safras). O baixado vem de uma subconsulta — e não de
+    um `Sum` com junção — para o resultado poder ser agrupado e somado de novo
+    sem conflito. `so_com_saldo`: tira o que já está quitado (padrão); o funil
+    por etapa conta todos os em aberto e passa `False`."""
+    baixado = (
+        Payment.objects.filter(invoice=OuterRef("pk"), status=Status.CONFIRMADA)
+        .order_by()
+        .values("invoice")
+        .annotate(total=Sum("amount"))
+        .values("total")
+    )
+    qs = (
+        Invoice.objects.for_user(user)
+        .filter(status=Status.CONFIRMADA, payment_status__in=SITUACOES_EM_ABERTO)
+        .annotate(saldo=F("amount") - Coalesce(Subquery(baixado), ZERO))
+    )
+    if farm is not None:
+        qs = qs.filter(farm=farm)
+    if direction:
+        qs = qs.filter(direction=direction)
+    if so_com_saldo:
+        qs = qs.filter(saldo__gt=0)
+    return qs
+
+
+def saldo_agrupado(titulos, *campos) -> list[dict]:
+    """Quantos títulos e quanto falta, agrupados por `campos`. Cada grupo vem
+    na ordem em que aparece na lista por vencimento (`due_date`, `id`)."""
+    return list(
+        titulos.order_by()
+        .values(*campos)
+        .annotate(
+            quantidade=Count("pk"),
+            total=Sum("saldo"),
+            _primeiro_venc=Min("due_date"),
+            _primeiro_id=Min("pk"),
+        )
+        .order_by("_primeiro_venc", "_primeiro_id")
+    )
+
+
 def pagamentos_para(
     user,
     *,
@@ -117,10 +167,7 @@ def pagamentos_para(
     return qs.order_by("-date", "-id")
 
 
-def operacoes_sem_titulo(user):
-    """Compras e vendas confirmadas que nunca passaram pelo financeiro — as
-    do histórico, importadas antes da Fase 4. Gerar o título é decisão de
-    quem conhece o caso (muitas já foram pagas fora do sistema)."""
+def _sem_titulo(user):
     from apps.purchases.models import Purchase
     from apps.sales.models import Sale
 
@@ -140,7 +187,21 @@ def operacoes_sem_titulo(user):
         .select_related("buyer", "farm")
         .order_by("-date", "-id")
     )
+    return compras, vendas
+
+
+def operacoes_sem_titulo(user):
+    """Compras e vendas confirmadas que nunca passaram pelo financeiro — as
+    do histórico, importadas antes da Fase 4. Gerar o título é decisão de
+    quem conhece o caso (muitas já foram pagas fora do sistema)."""
+    compras, vendas = _sem_titulo(user)
     return list(compras), list(vendas)
+
+
+def contar_operacoes_sem_titulo(user) -> int:
+    """Só quantas são — para o aviso. Não traz as operações para contá-las."""
+    compras, vendas = _sem_titulo(user)
+    return compras.count() + vendas.count()
 
 
 # --------------------------------------------------------------------------
@@ -197,6 +258,49 @@ def resumir_vencimentos(titulos, *, hoje: datetime.date | None = None):
         depois=FaixaDeVencimento("Depois disso", *soma["depois"]),
         em_aberto=FaixaDeVencimento("Em aberto", *soma["total"]),
     )
+
+
+def _faixas(hoje: datetime.date):
+    fim = hoje + datetime.timedelta(days=DIAS_DA_SEMANA - 1)
+    return {
+        "vencidos": Q(due_date__lt=hoje),
+        "hoje": Q(due_date=hoje),
+        "semana": Q(due_date__gt=hoje, due_date__lte=fim),
+        "depois": Q(due_date__gt=fim),
+        "total": Q(),
+    }
+
+
+def resumo_de_vencimentos(titulos, *, hoje: datetime.date | None = None):
+    """O mesmo que `resumir_vencimentos`, mas **no banco**: `titulos` é o
+    queryset de `listar_titulos_para` (em aberto), não uma lista carregada. O
+    número de linhas que o sistema tem não muda o que trafega — vêm 10 somas."""
+    hoje = hoje or datetime.date.today()
+    saldo = F("amount") - Coalesce(F("paid_sum"), ZERO)
+    medidas = {}
+    for nome, filtro in _faixas(hoje).items():
+        medidas[f"n_{nome}"] = Count("pk", filter=filtro)
+        medidas[f"s_{nome}"] = Coalesce(Sum(saldo, filter=filtro), ZERO)
+    r = titulos.order_by().aggregate(**medidas)
+
+    def faixa(rotulo, nome):
+        return FaixaDeVencimento(rotulo, r[f"n_{nome}"], r[f"s_{nome}"])
+
+    return ResumoDeVencimentos(
+        vencidos=faixa("Vencidos", "vencidos"),
+        hoje=faixa("Vencem hoje", "hoje"),
+        proximos_7_dias=faixa("Nos próximos 7 dias", "semana"),
+        depois=faixa("Depois disso", "depois"),
+        em_aberto=faixa("Em aberto", "total"),
+    )
+
+
+def saldo_dos_titulos(titulos) -> Decimal:
+    """Soma do que falta (valor − baixado) dos títulos listados, no banco."""
+    r = titulos.order_by().aggregate(
+        valor=Coalesce(Sum("amount"), ZERO), baixado=Coalesce(Sum("paid_sum"), ZERO)
+    )
+    return r["valor"] - r["baixado"]
 
 
 # --------------------------------------------------------------------------
@@ -355,29 +459,38 @@ def fluxo_de_caixa(
         return por_mes[_primeiro_dia(data)]
 
     resultado = FluxoDeCaixa()
-    abertos = listar_titulos_para(user, farm=farm, situacao="abertos")
-    for titulo in abertos:
-        saldo = _saldo_em_aberto(titulo)
-        if saldo <= 0:
-            continue
-        linha = linha_de(titulo.due_date)
-        a_receber = titulo.direction == Direction.RECEBER
+    # Somado no banco por direção e vencimento (uma linha por dia que tem título
+    # vencendo), não título a título: o fluxo não depende de quantos títulos há.
+    abertos = saldo_agrupado(
+        titulos_em_aberto_com_saldo(user, farm=farm), "direction", "due_date"
+    )
+    for grupo in abertos:
+        saldo, vencimento = grupo["total"], grupo["due_date"]
+        linha = linha_de(vencimento)
+        a_receber = grupo["direction"] == Direction.RECEBER
         if a_receber:
             linha.entradas_previstas += saldo
         else:
             linha.saidas_previstas += saldo
-        if titulo.due_date < hoje:
+        if vencimento < hoje:
             if a_receber:
                 resultado.vencido_a_receber += saldo
             else:
                 resultado.vencido_nao_pago += saldo
 
-    for baixa in pagamentos_para(user, farm=farm):
-        linha = linha_de(baixa.date)
-        if baixa.invoice.direction == Direction.RECEBER:
-            linha.entradas_realizadas += baixa.amount
+    baixas = (
+        pagamentos_para(user, farm=farm)
+        .select_related(None)
+        .order_by()
+        .values("invoice__direction", "date")
+        .annotate(total=Sum("amount"))
+    )
+    for grupo in baixas:
+        linha = linha_de(grupo["date"])
+        if grupo["invoice__direction"] == Direction.RECEBER:
+            linha.entradas_realizadas += grupo["total"]
         else:
-            linha.saidas_realizadas += baixa.amount
+            linha.saidas_realizadas += grupo["total"]
 
     ordem = [antes, *por_mes.values(), depois]
     acumulado = ZERO
@@ -479,23 +592,15 @@ def mapa_financeiro(
 
 
 def titulos_vencidos(user, *, farm=None, hoje: datetime.date | None = None):
-    """Títulos a pagar vencidos e ainda em aberto, no escopo do usuário."""
+    """Títulos a pagar vencidos e ainda em aberto, no escopo do usuário, como
+    queryset: quem quer contar, somar ou mostrar uns poucos faz isso no banco."""
     hoje = hoje or datetime.date.today()
-    return [
-        t
-        for t in listar_titulos_para(
-            user, farm=farm, direction=Direction.PAGAR, situacao="vencidos"
-        )
-        if t.due_date < hoje
-    ]
+    return titulos_em_aberto_com_saldo(
+        user, farm=farm, direction=Direction.PAGAR, so_com_saldo=False
+    ).filter(due_date__lt=hoje)
 
 
 def titulos_aguardando_aprovacao(user, *, farm=None):
-    return list(
-        listar_titulos_para(
-            user,
-            farm=farm,
-            direction=Direction.PAGAR,
-            situacao=PaymentStatus.PROGRAMADO,
-        )
-    )
+    return titulos_em_aberto_com_saldo(
+        user, farm=farm, direction=Direction.PAGAR, so_com_saldo=False
+    ).filter(payment_status=PaymentStatus.PROGRAMADO)

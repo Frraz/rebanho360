@@ -30,4 +30,5 @@
     </tbody>
   </table>
 </div>
+{% if t.omitidas %}<p class="dash-note">Mostrando {{ t.limite }} de {{ t.linhas|length }} linhas; o gráfico tem todas.</p>{% endif %}
 {% if analise %}</div>{% endif %}

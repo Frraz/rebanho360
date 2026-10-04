@@ -310,10 +310,8 @@ class CompromissoListView(VeOCicloMixin, TemplateView):
             user, season=season, farm=farm, situacao=situacao
         )
         pagina = Paginator(qs, self.paginate_by).get_page(self.request.GET.get("page"))
-        linhas = [
-            {"compromisso": c, "etapa": selectors.etapa_do_compromisso(c)}
-            for c in pagina.object_list
-        ]
+        etapas = selectors.etapas_dos_compromissos(pagina.object_list)
+        linhas = [{"compromisso": c, "etapa": etapas[c.pk]} for c in pagina.object_list]
         context.update(
             {
                 "page_obj": pagina,

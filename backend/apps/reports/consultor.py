@@ -28,9 +28,12 @@ from apps.costs import selectors as custos
 from apps.herd.models import DeathCause, HerdLedgerEntry, MovementType
 from apps.herd.mortality import taxa_de_mortalidade
 from apps.herd.selectors import listar_movimentos_para
-from apps.herd.weight_gain import desempenho_do_lote, pontos_de_peso
+from apps.herd.weight_gain import desempenho_dos_lotes, pontos_de_peso_dos_lotes
 from apps.livestock.models import Lot, LotRegime, LotStatus
-from apps.livestock.selectors import cabecas_que_entraram, financeiro_do_lote
+from apps.livestock.selectors import (
+    cabecas_que_entraram_por_lote,
+    financeiro_dos_lotes,
+)
 from apps.reports.services import (
     DINHEIRO,
     INTEIRO,
@@ -206,18 +209,22 @@ def curva_abc_de_custos(user, *, season, farm, start=None, end=None) -> Relatori
 # --------------------------------------------------------------------------
 
 
-def _cabecas_em(lote: Lot, ate: datetime.date) -> int:
-    return (
-        HerdLedgerEntry.objects.filter(lot=lote, date__lte=ate).aggregate(
-            s=Sum("quantity")
-        )["s"]
-        or 0
-    )
+def _cabecas_em(lotes, ate: datetime.date) -> dict:
+    """`{lot_id: cabeças}` na data, de vários lotes numa consulta."""
+    return {
+        lot_id: total or 0
+        for lot_id, total in HerdLedgerEntry.objects.filter(
+            lot_id__in=[lt.pk for lt in lotes], date__lte=ate
+        )
+        .values_list("lot_id")
+        .annotate(total=Sum("quantity"))
+        .order_by("lot_id")
+    }
 
 
-def _peso_medio_em(lote: Lot, ate: datetime.date) -> Decimal | None:
+def _peso_medio_em(pontos, ate: datetime.date) -> Decimal | None:
     """O último peso médio conhecido até a data (pesagem, ou o peso da compra)."""
-    pontos = [p for p in pontos_de_peso(lote) if p.date <= ate]
+    pontos = [p for p in pontos if p.date <= ate]
     return pontos[-1].peso_medio_kg if pontos else None
 
 
@@ -234,17 +241,20 @@ def valorizar_estoque(user, *, farm, ate: datetime.date, preco_arroba) -> list[d
     """O estoque de cada lote na data: cabeças, peso médio, @ vivas, custo
     acumulado e — com o preço da @ informado — o valor de mercado."""
     linhas = []
-    for lote in _lotes_do_escopo(user, farm=farm):
-        cabecas = _cabecas_em(lote, ate)
-        if cabecas <= 0:
-            continue
-        peso = _peso_medio_em(lote, ate)
+    todos = list(_lotes_do_escopo(user, farm=farm))
+    em_estoque = _cabecas_em(todos, ate)
+    lotes = [lt for lt in todos if em_estoque.get(lt.pk, 0) > 0]
+    pontos = pontos_de_peso_dos_lotes(lotes)
+    custos_dos_lotes = financeiro_dos_lotes(
+        lotes, entradas=cabecas_que_entraram_por_lote(lotes), ate=ate
+    )
+    for lote in lotes:
+        cabecas = em_estoque[lote.pk]
+        peso = _peso_medio_em(pontos[lote.pk], ate)
         arrobas = (
             safe_div(Decimal(cabecas) * peso, KG_POR_ARROBA_VIVA) if peso else None
         )
-        custo = financeiro_do_lote(
-            lote, cabecas_que_entraram=cabecas_que_entraram(lote), ate=ate
-        )["custo_total"]
+        custo = custos_dos_lotes[lote.pk]["custo_total"]
         mercado = (
             arrobas * Decimal(preco_arroba)
             if arrobas is not None and preco_arroba is not None
@@ -481,14 +491,20 @@ def confinamento(user, *, season, farm, **_) -> Relatorio:
     """Os lotes marcados como **confinamento**, com o desempenho que o sistema já
     mede: dias, GMD, @ produzida, custo e custo por @ (das vendas)."""
     linhas = []
-    for lote in _lotes_do_escopo(user, farm=farm, regime=LotRegime.CONFINAMENTO):
-        if season is not None and lote.season_id != season.pk:
-            continue
-        desempenho = desempenho_do_lote(lote)
+    lotes = [
+        lt
+        for lt in _lotes_do_escopo(user, farm=farm, regime=LotRegime.CONFINAMENTO)
+        if season is None or lt.season_id == season.pk
+    ]
+    desempenhos = desempenho_dos_lotes(lotes)
+    entradas = cabecas_que_entraram_por_lote(lotes)
+    financeiros = financeiro_dos_lotes(lotes, entradas=entradas)
+    for lote in lotes:
+        desempenho = desempenhos[lote.pk]
         entrada = next((p for p in desempenho.pontos if p.e_entrada), None)
         ultimo = desempenho.ultimo
-        entraram = cabecas_que_entraram(lote)
-        fin = financeiro_do_lote(lote, cabecas_que_entraram=entraram)
+        entraram = entradas.get(lote.pk, 0)
+        fin = financeiros[lote.pk]
         arrobas = desempenho.arrobas_produzidas
         linhas.append(
             {

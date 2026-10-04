@@ -196,6 +196,35 @@ class Escopo:
         qs = Lot.objects.for_user(self.user)
         return self._fazenda(qs, "farm")
 
+    def base_do_razao(self, farm):
+        """O razão da fazenda até o corte, em memória e uma vez por requisição:
+        cabeça-dia de qualquer janela sem voltar ao banco."""
+        from apps.costs.allocation import BaseDeRateio
+
+        return self.memo(
+            f"base_do_razao:{farm.pk}", lambda: BaseDeRateio(farm, ate=self.fim)
+        )
+
+    def financeiro_dos_lotes(self, lotes) -> dict:
+        """`{lot_id: financeiro}` dos lotes pedidos, calculado **uma vez por
+        requisição** e só para o que ainda não se calculou: a aba de vendas e a
+        de lotes pedem o mesmo custo (é a conta do `financeiro_do_lote`) e o
+        rateio, que é a parte cara, não se repete."""
+        from apps.livestock.selectors import (
+            cabecas_que_entraram_por_lote,
+            financeiro_dos_lotes,
+        )
+
+        guardado = self.memo("financeiro_dos_lotes", dict)
+        faltam = [lt for lt in lotes if lt.pk not in guardado]
+        if faltam:
+            guardado.update(
+                financeiro_dos_lotes(
+                    faltam, entradas=cabecas_que_entraram_por_lote(faltam)
+                )
+            )
+        return guardado
+
     def cor_da_fazenda(self, farm_id: int) -> int:
         """Posição fixa da fazenda na paleta categórica: a mesma fazenda tem a
         mesma cor em todo gráfico (a cor segue a entidade), e a oitava em diante
@@ -219,7 +248,10 @@ class Escopo:
 
         if self.farm is not None:
             return [self.farm]
-        return list(ctx.available_farms(self.user).order_by("name"))
+        # Várias abas e gráficos pedem a lista: uma consulta por requisição.
+        return self.memo(
+            "fazendas", lambda: list(ctx.available_farms(self.user).order_by("name"))
+        )
 
 
 ZERO = Decimal("0")

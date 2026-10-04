@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Prefetch, Sum
 from django.urls import reverse
 
 from apps.core.money import safe_div
@@ -60,13 +60,15 @@ def compromissos(e: Escopo) -> list:
     """Compromissos da safra no escopo, com a etapa derivada, sem os excluídos."""
 
     def calcular():
-        saida = []
-        for c in ciclo_sel.listar_compromissos_para(
-            e.user, season=e.season, farm=e.farm
-        ):
-            if c.status == Status.EXCLUIDA or c.date > e.fim:
-                continue
-            saida.append((c, ciclo_sel.etapa_do_compromisso(c)))
+        validos = [
+            c
+            for c in ciclo_sel.listar_compromissos_para(
+                e.user, season=e.season, farm=e.farm
+            )
+            if c.status != Status.EXCLUIDA and c.date <= e.fim
+        ]
+        etapas = ciclo_sel.etapas_dos_compromissos(validos)
+        saida = [(c, etapas[c.pk]) for c in validos]
         return sorted(saida, key=lambda t: (t[0].date, t[0].pk))
 
     return e.memo("compromissos", calcular)
@@ -139,6 +141,9 @@ def quebras(e: Escopo) -> list[tuple]:
                 trip__commitment_id__in=ids, status=Status.CONFIRMADA
             )
             .select_related("trip__commitment__seller")
+            .prefetch_related(
+                Prefetch("lines", queryset=ReceivingLine.objects.select_related("load"))
+            )
             .order_by("date", "id")
         ):
             q = receivings.quebra_da_viagem(r)
@@ -156,7 +161,7 @@ def quebra_media(e: Escopo) -> Decimal | None:
 
 
 def fretes(e: Escopo) -> list[tuple]:
-    return [(v, trips.frete_da_viagem(v)) for v in viagens(e)]
+    return e.memo("fretes", lambda: [(v, trips.frete_da_viagem(v)) for v in viagens(e)])
 
 
 # --------------------------------------------------------------------------

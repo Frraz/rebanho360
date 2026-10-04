@@ -7,6 +7,7 @@ rebanho e o desempenho dos lotes.
 
 from __future__ import annotations
 
+from collections import Counter
 from decimal import Decimal
 
 from django.urls import reverse
@@ -177,12 +178,13 @@ def tabela_por_fazenda(e: Escopo) -> Tabela:
     colunas += ["Mortalidade"]
     linhas, marcas, cabecas = [], {}, []
     fazendas = e.fazendas()
+    lotes_por_fazenda = Counter(lt.lote.farm_id for lt in lotes_)
     for i, f in enumerate(fazendas):
         cb = saldos.get(f.pk, 0)
         linha = [
             f.name,
             specs.formatar(cb),
-            specs.formatar(sum(1 for lt in lotes_ if lt.lote.farm_id == f.pk)),
+            specs.formatar(lotes_por_fazenda[f.pk]),
         ]
         if dinheiro:
             linha += [

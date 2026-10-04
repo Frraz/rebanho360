@@ -3,6 +3,7 @@
 Toda listagem passa por `for_user()` — nunca `.all()` (regra 4).
 """
 
+from collections import defaultdict
 from decimal import Decimal
 
 from django.db.models import Count, Sum
@@ -75,19 +76,24 @@ def compras_por_mes(user, *, season=None, farm=None):
 
 def custo_de_aquisicao_por_lote(user, *, season=None, farm=None):
     """Quanto custou formar cada lote: o que a planilha não tem."""
-    linhas, vistos = [], set()
+    linhas, vistos, primeiras = [], set(), []
     for compra in listar_compras_para(
         user, season=season, farm=farm, situacao=Status.CONFIRMADA
     ).filter(lot__isnull=False):
         if compra.lot_id in vistos:
             continue
         vistos.add(compra.lot_id)
-        compras_do_lote = [
-            c
-            for c in listar_compras_para(user, situacao=Status.CONFIRMADA).filter(
-                lot=compra.lot
-            )
-        ]
+        primeiras.append(compra)
+
+    # Todas as compras dos lotes numa só consulta (era uma por lote).
+    do_lote = defaultdict(list)
+    for c in listar_compras_para(user, situacao=Status.CONFIRMADA).filter(
+        lot_id__in=vistos
+    ):
+        do_lote[c.lot_id].append(c)
+
+    for compra in primeiras:
+        compras_do_lote = do_lote[compra.lot_id]
         cabecas = sum(c.head_count for c in compras_do_lote)
         animais = sum((c.animal_value for c in compras_do_lote), Decimal("0"))
         pesos = [c.total_weight_kg for c in compras_do_lote]

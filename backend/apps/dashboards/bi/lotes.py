@@ -13,9 +13,9 @@ from decimal import Decimal
 from django.urls import reverse
 
 from apps.core.money import safe_div
-from apps.herd.weight_gain import DesempenhoDoLote, desempenho_do_lote
+from apps.herd.weight_gain import DesempenhoDoLote, desempenho_dos_lotes
 from apps.livestock.models import LotStatus
-from apps.livestock.selectors import cabecas_que_entraram, financeiro_do_lote
+from apps.livestock.selectors import cabecas_que_entraram_por_lote
 from apps.sales.result import ResultadoDoLote
 
 from . import rebanho, specs, vendas
@@ -79,17 +79,20 @@ def linhas_de_lotes(e: Escopo) -> list[LinhaDeLote]:
         resultados = {r.lote.pk: r for r in vendas.resultados_dos_lotes(e)}
         lotes = {lt.lote.pk: lt.lote for lt in com_saldo.values()}
         lotes.update({pk: r.lote for pk, r in resultados.items()})
+        # Entradas e desempenho dos lotes todos de uma vez: o número de
+        # consultas não cresce com a quantidade de lotes.
+        entraram = cabecas_que_entraram_por_lote(lotes.values())
+        desempenhos = desempenho_dos_lotes(lotes.values())
         linhas = []
         for pk, lote in lotes.items():
-            entraram = cabecas_que_entraram(lote)
             fim = lote.exit_date or e.fim
             linhas.append(
                 LinhaDeLote(
                     lote=lote,
                     cabecas=com_saldo[pk].cabecas if pk in com_saldo else 0,
-                    entraram=entraram,
+                    entraram=entraram.get(pk, 0),
                     dias=max((min(fim, e.fim) - lote.entry_date).days, 0),
-                    desempenho=desempenho_do_lote(lote),
+                    desempenho=desempenhos[pk],
                     resultado=resultados.get(pk),
                 )
             )
@@ -105,11 +108,10 @@ def custos_por_cabeca(e: Escopo) -> dict[int, Decimal | None]:
     def calcular():
         if not e.ver_dinheiro:
             return {}
+        linhas = linhas_de_lotes(e)
+        financeiros = e.financeiro_dos_lotes([lt.lote for lt in linhas])
         return {
-            lt.lote.pk: financeiro_do_lote(lt.lote, cabecas_que_entraram=lt.entraram)[
-                "custo_por_cabeca"
-            ]
-            for lt in linhas_de_lotes(e)
+            lt.lote.pk: financeiros[lt.lote.pk]["custo_por_cabeca"] for lt in linhas
         }
 
     return e.memo("custos_por_cabeca", calcular)

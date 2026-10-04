@@ -14,6 +14,7 @@ Regras (docs/regras-negocio/05#rebanho):
 Tudo `Decimal`, sem arredondar no meio da conta (ADR 0005).
 """
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -68,15 +69,10 @@ class DesempenhoDoLote:
     motivos: list[str] = field(default_factory=list)
 
 
-def pontos_de_peso(lot) -> list[PontoDePeso]:
-    """Pesagens confirmadas do lote em ordem de data. Sem pesagem de entrada,
-    o peso informado na compra serve — mas só se **todas** as compras do lote
-    têm peso: parte delas não representa a entrada."""
-    from apps.purchases.models import Purchase
-
-    pesagens = Weighing.objects.filter(lot=lot, status=Status.CONFIRMADA).order_by(
-        "date", "id"
-    )
+def _pontos(pesagens, compras) -> list[PontoDePeso]:
+    """Os pontos de peso a partir de pesagens e compras **já carregadas**
+    (as pesagens em ordem de data). A regra é uma só, para um lote ou para
+    trezentos."""
     pontos = [
         PontoDePeso(
             date=p.date,
@@ -88,11 +84,6 @@ def pontos_de_peso(lot) -> list[PontoDePeso]:
         for p in pesagens
     ]
     if not any(p.e_entrada for p in pontos):
-        compras = list(
-            Purchase.objects.filter(lot=lot, status=Status.CONFIRMADA).order_by(
-                "date", "id"
-            )
-        )
         if compras and all(c.total_weight_kg for c in compras):
             cabecas = sum(c.head_count for c in compras)
             peso = sum((c.total_weight_kg for c in compras), Decimal("0"))
@@ -107,6 +98,43 @@ def pontos_de_peso(lot) -> list[PontoDePeso]:
             )
             pontos.sort(key=lambda p: p.date)
     return pontos
+
+
+def pontos_de_peso(lot) -> list[PontoDePeso]:
+    """Pesagens confirmadas do lote em ordem de data. Sem pesagem de entrada,
+    o peso informado na compra serve — mas só se **todas** as compras do lote
+    têm peso: parte delas não representa a entrada."""
+    return pontos_de_peso_dos_lotes([lot])[lot.pk]
+
+
+def _carregar(lots, *, com_abates=True):
+    """Pesagens, compras e abates confirmados de vários lotes: três consultas,
+    qualquer que seja o número de lotes. `{lot_id: [...]}` para cada um."""
+    from apps.purchases.models import Purchase
+    from apps.sales.models import Sale, SaleType
+
+    ids = [lt.pk for lt in lots]
+    pesagens, compras, abates = defaultdict(list), defaultdict(list), defaultdict(list)
+    for p in Weighing.objects.filter(lot_id__in=ids, status=Status.CONFIRMADA).order_by(
+        "date", "id"
+    ):
+        pesagens[p.lot_id].append(p)
+    for c in Purchase.objects.filter(lot_id__in=ids, status=Status.CONFIRMADA).order_by(
+        "date", "id"
+    ):
+        compras[c.lot_id].append(c)
+    if com_abates:
+        for a in Sale.objects.filter(
+            lot_id__in=ids, status=Status.CONFIRMADA, type=SaleType.ABATE
+        ):
+            abates[a.lot_id].append(a)
+    return pesagens, compras, abates
+
+
+def pontos_de_peso_dos_lotes(lots) -> dict:
+    """`{lot_id: [PontoDePeso]}` de vários lotes, com duas consultas."""
+    pesagens, compras, _ = _carregar(lots, com_abates=False)
+    return {lt.pk: _pontos(pesagens[lt.pk], compras[lt.pk]) for lt in lots}
 
 
 def _trechos(pontos) -> list[Trecho]:
@@ -130,33 +158,34 @@ def gmd_do_ultimo_trecho(lot) -> Decimal | None:
     return trechos[-1].gmd if trechos else None
 
 
+def _rendimento_das_compras(compras) -> Decimal | None:
+    informadas = [c for c in compras if c.entry_yield_percent is not None]
+    cabecas = sum(c.head_count for c in informadas)
+    if not cabecas:
+        return None
+    return sum(
+        (c.entry_yield_percent * c.head_count for c in informadas), Decimal("0")
+    ) / (cabecas)
+
+
 def rendimento_de_entrada_do_lote(lot) -> Decimal | None:
     """O rendimento estimado de entrada que o usuário **informou nas compras** do
     lote (cliente, 2026-10-03, #15a): média ponderada pelas cabeças. `None` se
     nenhuma compra o informou — o sistema não escolhe um valor."""
     from apps.purchases.models import Purchase
 
-    compras = [
-        c
-        for c in Purchase.objects.filter(lot=lot, status=Status.CONFIRMADA)
-        if c.entry_yield_percent is not None
-    ]
-    cabecas = sum(c.head_count for c in compras)
-    if not cabecas:
-        return None
-    return sum(
-        (c.entry_yield_percent * c.head_count for c in compras), Decimal("0")
-    ) / (cabecas)
+    return _rendimento_das_compras(
+        Purchase.objects.filter(lot=lot, status=Status.CONFIRMADA)
+    )
 
 
-def desempenho_do_lote(lot, *, rendimento_entrada=None) -> DesempenhoDoLote:
-    """GMD e @ produzida do lote. `rendimento_entrada` em % (48 = 48%): o que
-    vem na chamada vale; sem ele, o informado nas compras do lote; sem nenhum,
-    a @ produzida é `None`, com o motivo."""
-    pontos = pontos_de_peso(lot)
+def _montar_desempenho(
+    lot, pesagens, compras, abates, rendimento_entrada
+) -> DesempenhoDoLote:
+    pontos = _pontos(pesagens, compras)
     motivos: list[str] = []
     if rendimento_entrada is None:
-        rendimento_entrada = rendimento_de_entrada_do_lote(lot)
+        rendimento_entrada = _rendimento_das_compras(compras)
 
     gmd = dias = ganho = primeiro = ultimo = None
     desde_a_entrada = False
@@ -185,7 +214,7 @@ def desempenho_do_lote(lot, *, rendimento_entrada=None) -> DesempenhoDoLote:
                 )
 
     arrobas, estimada, abatidas, rendimento = _arrobas_produzidas(
-        lot, pontos, rendimento_entrada, motivos
+        abates, pontos, rendimento_entrada, motivos
     )
     return DesempenhoDoLote(
         pontos=tuple(pontos),
@@ -204,15 +233,31 @@ def desempenho_do_lote(lot, *, rendimento_entrada=None) -> DesempenhoDoLote:
     )
 
 
-def _arrobas_produzidas(lot, pontos, rendimento_entrada, motivos):
+def desempenho_dos_lotes(lots, *, rendimento_entrada=None) -> dict:
+    """`{lot_id: DesempenhoDoLote}` de vários lotes com três consultas no total
+    (pesagens, compras, abates), em vez de três ou quatro **por lote**."""
+    lots = list(lots)
+    pesagens, compras, abates = _carregar(lots)
+    return {
+        lt.pk: _montar_desempenho(
+            lt, pesagens[lt.pk], compras[lt.pk], abates[lt.pk], rendimento_entrada
+        )
+        for lt in lots
+    }
+
+
+def desempenho_do_lote(lot, *, rendimento_entrada=None) -> DesempenhoDoLote:
+    """GMD e @ produzida do lote. `rendimento_entrada` em % (48 = 48%): o que
+    vem na chamada vale; sem ele, o informado nas compras do lote; sem nenhum,
+    a @ produzida é `None`, com o motivo. Um lote é o caso de `desempenho_dos_lotes`
+    com uma só posição — a conta é a mesma na tela do lote e no dashboard."""
+    return desempenho_dos_lotes([lot], rendimento_entrada=rendimento_entrada)[lot.pk]
+
+
+def _arrobas_produzidas(abates, pontos, rendimento_entrada, motivos):
     """`(carcaça de saída − carcaça de entrada) ÷ 15`, sobre os animais
     abatidos. Devolve `(@, estimada?, cabeças abatidas, rendimento usado)`."""
-    from apps.sales.models import Sale, SaleType
-
     sem_dado = (None, False, None, None)
-    abates = list(
-        Sale.objects.filter(lot=lot, status=Status.CONFIRMADA, type=SaleType.ABATE)
-    )
     if not abates:
         motivos.append(
             "@ produzida indisponível: o lote não tem abate confirmado "

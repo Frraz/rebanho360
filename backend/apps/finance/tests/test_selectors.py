@@ -32,6 +32,62 @@ def novo_titulo(
     )
 
 
+class TestResumoNoBancoIgualAoDaLista:
+    """`resumo_de_vencimentos` (agregado no banco) tem de dar o mesmo que
+    `resumir_vencimentos` (percorrendo os títulos): é o número da tela."""
+
+    def test_mesmo_resultado_com_baixa_parcial_e_faixas_variadas(
+        self, financeiro, gestor, sao_francisco, vendedor
+    ):
+        dias = (-35, -1, 0, 0, 1, 6, 7, 8, 90)
+        for i, d in enumerate(dias):
+            titulo = novo_titulo(
+                financeiro,
+                sao_francisco,
+                valor=str(100 * (i + 1)),
+                vence=HOJE + datetime.timedelta(days=d),
+                payee=vendedor,
+            )
+            if i == 4:  # uma baixa parcial no meio das faixas
+                services.programar_titulo(
+                    titulo, usuario=financeiro, data=datetime.date.today()
+                )
+                services.aprovar_titulo(titulo, usuario=gestor)
+                baixa(titulo, financeiro, valor=D("150"))
+
+        titulos = selectors.listar_titulos_para(
+            financeiro, direction=Direction.PAGAR, situacao="abertos"
+        )
+        da_lista = selectors.resumir_vencimentos(list(titulos), hoje=HOJE)
+        do_banco = selectors.resumo_de_vencimentos(titulos, hoje=HOJE)
+
+        assert do_banco == da_lista
+        assert do_banco.em_aberto.quantidade == len(dias)
+
+    def test_sem_titulo_tudo_zera(self, financeiro):
+        titulos = selectors.listar_titulos_para(financeiro, situacao="abertos")
+        resumo = selectors.resumo_de_vencimentos(titulos, hoje=HOJE)
+        assert (resumo.em_aberto.quantidade, resumo.em_aberto.valor) == (0, D("0"))
+
+    def test_saldo_dos_titulos_desconta_o_baixado(
+        self, financeiro, gestor, sao_francisco, vendedor
+    ):
+        a = novo_titulo(
+            financeiro, sao_francisco, valor="1000", vence=HOJE, payee=vendedor
+        )
+        novo_titulo(financeiro, sao_francisco, valor="500", vence=HOJE, payee=vendedor)
+        services.programar_titulo(a, usuario=financeiro, data=datetime.date.today())
+        services.aprovar_titulo(a, usuario=gestor)
+        baixa(a, financeiro, valor=D("400"))
+
+        titulos = selectors.listar_titulos_para(financeiro, situacao="abertos")
+
+        assert selectors.saldo_dos_titulos(titulos) == D("1100")
+        assert selectors.saldo_dos_titulos(titulos) == sum(
+            (t.balance for t in titulos), start=D("0")
+        )
+
+
 class TestResumoDeVencimentos:
     def test_o_que_vence_esta_semana_e_quanto(
         self, financeiro, sao_francisco, vendedor

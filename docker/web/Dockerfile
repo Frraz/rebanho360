@@ -47,4 +47,5 @@ RUN sh bin/build_css.sh \
     && python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
+# Workers, threads e reciclagem em gunicorn.conf.py (ajustáveis por variável de ambiente).
+CMD ["gunicorn", "config.wsgi:application", "-c", "gunicorn.conf.py"]

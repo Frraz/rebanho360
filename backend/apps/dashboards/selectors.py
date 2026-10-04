@@ -11,7 +11,7 @@ import datetime
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from django.db.models import Max, Sum
+from django.db.models import Count, Max, Sum
 from django.urls import reverse
 
 from apps.core.formatting import dinheiro_br, numero_br
@@ -30,13 +30,12 @@ from apps.herd.models import (
 from apps.imports.models import BatchStatus, ImportKind, ImportRow, RowStatus
 from apps.imports.permissions import pode_importar
 from apps.livestock.models import Lot, LotStatus
-from apps.procurement import selectors as ciclo
 from apps.procurement.models import Commitment, ReceivingLine, Settlement
 from apps.procurement.permissions import pode_aprovar_o_acerto, pode_ver_o_ciclo
 from apps.purchases.models import Purchase
 from apps.sales import carcass
 from apps.sales.models import Sale, SaleType
-from apps.sales.result import resultado_do_lote
+from apps.sales.result import resultados_dos_lotes
 
 DIAS_SEM_PESAGEM = 90
 EXEMPLOS = 4
@@ -181,17 +180,18 @@ def _vendas_sem_carcaca(user, farm) -> Pendencia | None:
     )
     if farm is not None:
         qs = qs.filter(farm=farm)
-    vendas = list(qs.order_by("-date"))
-    if not vendas:
+    # Conta no banco e traz só os exemplos que a tela mostra.
+    quantas = qs.count()
+    if not quantas:
         return None
     return Pendencia(
         "sem_carcaca",
-        _plural(len(vendas), "venda sem peso de carcaça", "vendas sem peso de carcaça"),
-        len(vendas),
+        _plural(quantas, "venda sem peso de carcaça", "vendas sem peso de carcaça"),
+        quantas,
         reverse("sales:lista") + "?sem_carcaca=1&situacao=CONFIRMADA",
         tuple(
             f"{v.code} · {v.date:%d/%m/%Y} · {v.head_count} cb"
-            for v in vendas[:EXEMPLOS]
+            for v in qs.order_by("-date")[:EXEMPLOS]
         ),
     )
 
@@ -253,23 +253,26 @@ def _titulos_vencidos(user, farm, hoje) -> Pendencia | None:
     if not pode_ver_titulos(user):
         return None
     vencidos = financeiro.titulos_vencidos(user, farm=farm, hoje=hoje)
-    if not vencidos:
+    soma = vencidos.aggregate(quantos=Count("pk"), total=Sum("saldo"))
+    quantos, total = soma["quantos"], soma["total"]
+    if not quantos:
         return None
-    total = sum((t.balance for t in vencidos), start=Decimal("0"))
     return Pendencia(
         "titulos_vencidos",
         _plural(
-            len(vencidos),
+            quantos,
             "título a pagar vencido",
             "títulos a pagar vencidos",
         )
         + f", somando {dinheiro_br(total)}",
-        len(vencidos),
+        quantos,
         reverse("finance:contas_a_pagar") + "?situacao=vencidos",
         tuple(
             f"{t.code} · {t.payee.name if t.payee_id else 'favorecido a definir'} — "
-            f"{dinheiro_br(t.balance)}, venceu em {t.due_date:%d/%m/%Y}"
-            for t in vencidos[:EXEMPLOS]
+            f"{dinheiro_br(t.saldo)}, venceu em {t.due_date:%d/%m/%Y}"
+            for t in vencidos.select_related("payee").order_by("due_date", "pk")[
+                :EXEMPLOS
+            ]
         ),
     )
 
@@ -279,21 +282,24 @@ def _pagamentos_a_aprovar(user, farm) -> Pendencia | None:
     if not pode_aprovar_pagamento(user):
         return None
     esperando = financeiro.titulos_aguardando_aprovacao(user, farm=farm)
-    if not esperando:
+    quantos = esperando.aggregate(n=Count("pk"))["n"]
+    if not quantos:
         return None
     return Pendencia(
         "a_aprovar",
         _plural(
-            len(esperando),
+            quantos,
             "pagamento programado aguardando aprovação",
             "pagamentos programados aguardando aprovação",
         ),
-        len(esperando),
+        quantos,
         reverse("finance:contas_a_pagar") + "?situacao=PROGRAMADO",
         tuple(
             f"{t.code} · {t.payee.name if t.payee_id else '—'} — "
-            f"{dinheiro_br(t.balance)}, para {t.scheduled_date:%d/%m/%Y}"
-            for t in esperando[:EXEMPLOS]
+            f"{dinheiro_br(t.saldo)}, para {t.scheduled_date:%d/%m/%Y}"
+            for t in esperando.select_related("payee").order_by("due_date", "pk")[
+                :EXEMPLOS
+            ]
             if t.scheduled_date
         ),
     )
@@ -308,17 +314,28 @@ def _recebido_aguardando_acerto(user, farm) -> Pendencia | None:
     compromissos = Commitment.objects.for_user(user).filter(status=Status.CONFIRMADA)
     if farm is not None:
         compromissos = compromissos.filter(destination_farm=farm)
-    esperando = []
-    for c in compromissos.select_related("seller").order_by("date", "id"):
-        if ciclo.acerto_ativo(c) is not None:
-            continue
-        cabecas = ReceivingLine.objects.filter(
-            load__item__commitment=c,
+    compromissos = list(compromissos.select_related("seller").order_by("date", "id"))
+    # Com acerto aberto, o gado já tem para onde ir: sai da pendência.
+    com_acerto = set(
+        Settlement.objects.filter(commitment__in=compromissos)
+        .exclude(status=Status.EXCLUIDA)
+        .values_list("commitment_id", flat=True)
+    )
+    recebidas = dict(
+        ReceivingLine.objects.filter(
+            load__item__commitment__in=compromissos,
             receiving__status=Status.CONFIRMADA,
             load__trip__status=Status.CONFIRMADA,
-        ).aggregate(total=Sum("received_qty"))["total"]
-        if cabecas:
-            esperando.append((c, cabecas))
+        )
+        .values_list("load__item__commitment_id")
+        .annotate(total=Sum("received_qty"))
+        .order_by("load__item__commitment_id")
+    )
+    esperando = [
+        (c, recebidas[c.pk])
+        for c in compromissos
+        if c.pk not in com_acerto and recebidas.get(c.pk)
+    ]
     if not esperando:
         return None
     total = sum(cabecas for _, cabecas in esperando)
@@ -472,13 +489,13 @@ def cartao_da_safra(
     if farm is not None:
         encerrados = encerrados.filter(farm=farm)
     custo_total_arroba, arrobas, completos = Decimal("0"), Decimal("0"), 0
-    for lote in encerrados:
-        r = resultado_do_lote(lote)
+    encerrados = list(encerrados.select_related("farm"))
+    for r in resultados_dos_lotes(encerrados).values():
         if r.custo_considerado is not None and r.arrobas_vendidas:
             custo_total_arroba += r.custo_considerado
             arrobas += r.arrobas_vendidas
             completos += 1
-    quantos = encerrados.count()
+    quantos = len(encerrados)
     motivo = ""
     if not quantos:
         motivo = "nenhum lote encerrou na safra ainda"

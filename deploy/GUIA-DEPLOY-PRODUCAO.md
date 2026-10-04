@@ -85,8 +85,8 @@ Reúna estes itens. Sem eles o deploy trava no meio.
 ### Requisitos do servidor
 
 - Ubuntu 22.04 ou 24.04, arquitetura `x86_64` ou `aarch64` (o build do Tailwind só conhece essas duas).
-- **Memória:** os limites do compose somam ~2,8 GB (web 768M + worker 512M + beat 256M + db 1G + redis 256M). Com os outros sistemas do VPS, o ideal é **4 GB ou mais** livres. Confira com `free -h`.
-  - *Neste VPS (7,8 GB; ~3,9 GB em uso pelos outros sistemas; 2 GB de swap) cabe, mas sem folga: acompanhe `docker stats` e `free -h` nas primeiras semanas.*
+- **Memória:** os limites do compose somam ~8,4 GB (web 2304M + worker 1536M + beat 768M + db 3G + redis 768M). São **tetos, não reservas**: o consumo real fica bem abaixo (algo como 2 a 4 GB sob uso normal). Confira com `free -h` e `docker stats` antes e depois do deploy.
+  - *Este VPS tem 7,8 GB, com ~3,9 GB em uso pelos outros sistemas e 2 GB de swap: os limites passam do que sobra, então o teto só importa se a carga realmente subir. Se `free -h` mostrar pouca folga, baixe `WEB_CONCURRENCY` no `.env` (ver [12.6](#126-atualização-de-desempenho-índices-e-recursos)) antes de baixar os limites.*
 - **Disco:** pelo menos 10 GB livres para imagens, banco e backups.
 - **Saída para a internet** durante o build: a imagem baixa o Tailwind do GitHub e as dependências do PyPI/apt.
 
@@ -844,6 +844,25 @@ O que **nunca** fazer em produção: `dc down -v` · `docker volume rm` · `dock
 - Alerta se o backup externo parar de chegar.
 - `SENTRY_DSN` no `.env`, se quiser captura de erro não tratado.
 
+### 12.6 Atualização de desempenho (índices e recursos)
+
+Esta versão traz índices novos, o Postgres e o Redis ajustados, mais workers e limites ×3. **Nada disso foi aplicado no VPS ainda**; a ordem segura é:
+
+1. **Antes:** `free -h` e `docker stats --no-stream | grep rebanho360` (anote o consumo de hoje) e um backup (`./deploy/backup.sh`).
+2. **Atualizar o código:** `./deploy/deploy.sh`. As migrações criam os índices com `CREATE INDEX CONCURRENTLY`, que **não travam a escrita** (a tabela do razão continua aceitando lançamentos); em tabela grande a criação leva de segundos a poucos minutos. Instala também a extensão `pg_trgm` (busca por nome e descrição).
+3. **Aplicar o ajuste do banco e do Redis** (o `deploy.sh` só recria `web worker beat`):
+
+   ```bash
+   dc up -d db redis        # recria os dois com o novo ajuste; os dados ficam nos volumes
+   ```
+
+   O banco fica fora do ar por alguns segundos (o `web` reconecta sozinho, graças ao `conn_health_checks`). Faça fora do horário de lançamento.
+4. **Opcional, para achar consulta lenta:** `dc exec db psql -U rebanho360 -d rebanho360 -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"`. Depois, as consultas mais caras saem de `SELECT query, calls, mean_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;`. O Postgres já registra no log toda consulta acima de 500 ms (`dc logs db | grep duration`).
+5. **Conferir:** `docker stats` de novo, o dashboard abrindo e `dc logs web | grep -i "worker.*booted"` (devem aparecer 9 workers). Se a memória apertar, no `.env`: `WEB_CONCURRENCY=5` e `dc up -d --force-recreate web`.
+6. **Compressão:** se o nginx do VPS ainda não comprime respostas, copie o bloco `gzip` de `deploy/nginx.conf.example` (a aba mais pesada do dashboard cai uns 90%) e `sudo nginx -t && sudo systemctl reload nginx`.
+
+**Reverter:** `./deploy/rollback.sh` volta o código, mas os índices ficam (não atrapalham; só ocupam espaço). Para tirar o ajuste do banco, volte o `docker-compose.prod.yml` anterior e `dc up -d db redis`.
+
 ---
 
 ## 13. Solução de problemas
@@ -873,7 +892,7 @@ O que **nunca** fazer em produção: `dc down -v` · `docker volume rm` · `dock
 | Código do 2FA "inválido" para todos | Relógio do servidor desajustado | `timedatectl`; `sudo timedatectl set-ntp true`; `conferir_segundo_fator` |
 | Usuário perdeu celular e códigos do 2FA | — | `dc exec web python manage.py resetar_segundo_fator USUARIO --motivo "..."` (fica na auditoria) |
 | Sistema subiu com **banco vazio** após mexer no servidor | Pasta do projeto renomeada/movida: o Compose criou volumes novos | Volte a pasta ao nome/local originais (`/var/www/docker-instances/rebanho360`); os volumes antigos estão intactos (`docker volume ls | grep rebanho360`) |
-| `web` morto por falta de memória (`Killed`, exit 137) | Limite de 768M estourado (ex.: PDF grande) | `docker stats`; `dmesg -T | grep -i oom`; ver [seção 14](#14-lacunas-conhecidas) |
+| `web` morto por falta de memória (`Killed`, exit 137) | Limite de 2304M estourado (muitos workers + PDF grande) | `docker stats`; `dmesg -T | grep -i oom`; ver [seção 14](#14-lacunas-conhecidas) |
 | `address already in use` na 8013 | Outro serviço usa a porta | Escolher outra porta (ver [2.4](#24-conhecer-o-que-já-roda-no-servidor-sem-mexer)) |
 | `git pull` recusa (`Not possible to fast-forward`) | Alteração local ou histórico reescrito no GitHub | `git status`; descartar alteração local; se foi *force push*, falar com quem fez |
 | `Nenhuma imagem 'rebanho360_web:previous'` no rollback | Primeiro deploy | Esperado: não existe versão anterior para voltar |
@@ -894,7 +913,7 @@ Coisas que o repositório ainda **não** resolve — o guia não as esconde:
    ⚠️ O padrão do `daemon.json` vale para **todos** os containers **novos** do VPS, e aplicá-lo exige `sudo systemctl restart docker` — que **reinicia os containers de todos os sistemas** (a menos que `live-restore` esteja ativo). Faça em janela combinada. A alternativa sem tocar no host é acrescentar um bloco `logging:` aos cinco serviços do compose (mudança de código, via GitHub).
 3. **Backup não é agendado pelo sistema.** A documentação de arquitetura cita o `beat`, mas hoje o `beat` só agenda a manutenção das exportações. O agendamento é o cron da [seção 10.3](#103-agendar-cron).
 4. **Retenção do backup é simplificada** (90 dias por idade, não 7 diários + 4 semanais + 12 mensais). A política completa fica para quando houver cópia externa estável; use a regra de ciclo de vida do bucket.
-5. **Limite de memória do `web` (768M)** com 3 workers do Gunicorn e geração de PDF (WeasyPrint) pode ser apertado. Observe `docker stats` nas primeiras semanas; se estourar, o ajuste é no `docker-compose.prod.yml`.
+5. **Memória do `web` (2304M) com 9 workers do Gunicorn** e geração de PDF (WeasyPrint): observe `docker stats` nas primeiras semanas. O número de workers é `WEB_CONCURRENCY` no `.env` (padrão 9); o limite está em `docker-compose.prod.yml`.
 6. **`BACKUP_ROOT` não é lido do `.env`** (só do ambiente do shell) — ver [seção 5](#5-pastas-do-host).
 7. **E-mail só por STARTTLS (587).** SMTP com SSL direto (465) não é suportado sem alterar `prod.py`.
 8. **Tributos digitados, não calculados** e demais pendências de negócio: ver [docs/regras-negocio/99-pendencias.md](../docs/regras-negocio/99-pendencias.md). Nada disso bloqueia o deploy.

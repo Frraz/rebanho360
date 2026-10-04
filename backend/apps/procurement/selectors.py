@@ -94,35 +94,60 @@ def recebimentos_ativos(commitment: Commitment):
     )
 
 
-def etapa_do_compromisso(commitment: Commitment) -> str:
-    if commitment.status == Status.EXCLUIDA:
-        return Etapa.EXCLUIDO
-    if commitment.status == Status.RASCUNHO:
-        return Etapa.EM_NEGOCIACAO
-
-    acerto = acerto_ativo(commitment)
-    if acerto is not None:
-        return (
-            Etapa.ACERTO_APROVADO
-            if acerto.status == Status.CONFIRMADA
-            else Etapa.EM_ACERTO
-        )
-
-    viagens = viagens_ativas(commitment).aggregate(
-        total=Count("id", distinct=True),
-        recebidas=Count(
-            "id", filter=Q(receivings__status=Status.CONFIRMADA), distinct=True
-        ),
+def etapas_dos_compromissos(commitments) -> dict:
+    """`{pk: etapa}` de vários compromissos com duas consultas (acertos e
+    viagens), em vez de duas por compromisso. A etapa é derivada (ADR 0008)."""
+    commitments = list(commitments)
+    abertos = [
+        c for c in commitments if c.status not in (Status.EXCLUIDA, Status.RASCUNHO)
+    ]
+    ids = [c.pk for c in abertos]
+    # Há no máximo um acerto ativo por compromisso (restrição no banco).
+    acertos = dict(
+        Settlement.objects.filter(commitment_id__in=ids)
+        .exclude(status=Status.EXCLUIDA)
+        .values_list("commitment_id", "status")
     )
-    if viagens["total"]:
-        return (
-            Etapa.RECEBIDO
-            if viagens["recebidas"] == viagens["total"]
-            else Etapa.EM_VIAGEM
+    viagens = {
+        linha["commitment_id"]: linha
+        for linha in Trip.objects.filter(commitment_id__in=ids)
+        .exclude(status=Status.EXCLUIDA)
+        .values("commitment_id")
+        .annotate(
+            total=Count("id", distinct=True),
+            recebidas=Count(
+                "id", filter=Q(receivings__status=Status.CONFIRMADA), distinct=True
+            ),
         )
-    if commitment.pickup_date:
-        return Etapa.PROGRAMADO
-    return Etapa.APROVADO
+        .order_by("commitment_id")
+    }
+
+    etapas = {}
+    for c in commitments:
+        if c.status == Status.EXCLUIDA:
+            etapas[c.pk] = Etapa.EXCLUIDO
+        elif c.status == Status.RASCUNHO:
+            etapas[c.pk] = Etapa.EM_NEGOCIACAO
+        elif c.pk in acertos:
+            etapas[c.pk] = (
+                Etapa.ACERTO_APROVADO
+                if acertos[c.pk] == Status.CONFIRMADA
+                else Etapa.EM_ACERTO
+            )
+        elif c.pk in viagens and viagens[c.pk]["total"]:
+            v = viagens[c.pk]
+            etapas[c.pk] = (
+                Etapa.RECEBIDO if v["recebidas"] == v["total"] else Etapa.EM_VIAGEM
+            )
+        elif c.pickup_date:
+            etapas[c.pk] = Etapa.PROGRAMADO
+        else:
+            etapas[c.pk] = Etapa.APROVADO
+    return etapas
+
+
+def etapa_do_compromisso(commitment: Commitment) -> str:
+    return etapas_dos_compromissos([commitment])[commitment.pk]
 
 
 def listar_compromissos_para(user, *, season=None, farm=None, situacao: str = ""):

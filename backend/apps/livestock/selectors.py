@@ -24,24 +24,44 @@ def cabecas_que_entraram(lot: Lot) -> int:
     """Soma das linhas positivas do razão do lote: compra, saldo inicial,
     nascimento e entrada de transferência. Fonte única — a tela do lote e o
     resultado dele usam o mesmo número."""
+    return cabecas_que_entraram_por_lote([lot]).get(lot.pk, 0)
+
+
+def cabecas_que_entraram_por_lote(lots) -> dict:
+    """`cabecas_que_entraram` de vários lotes numa só consulta: `{lot_id: n}`.
+    Lote sem entrada não aparece; quem consulta usa `.get(pk, 0)`."""
+    from django.db.models import Sum
+
     from apps.herd.models import HerdLedgerEntry
 
-    return sum(
-        quantidade
-        for quantidade in HerdLedgerEntry.objects.filter(
-            lot=lot, quantity__gt=0
-        ).values_list("quantity", flat=True)
-    )
+    ids = [lt.pk for lt in lots]
+    return {
+        lot_id: total or 0
+        for lot_id, total in HerdLedgerEntry.objects.filter(
+            lot_id__in=ids, quantity__gt=0
+        )
+        .values_list("lot_id")
+        .annotate(total=Sum("quantity"))
+        .order_by("lot_id")
+    }
 
 
-def financeiro_do_lote(lot: Lot, *, cabecas_que_entraram: int, ate=None) -> dict:
-    """Aquisição, custos diretos e rateados do lote. O que não tem dado
-    fica `None` ("—" na tela), nunca zero:
+def financeiro_dos_lotes(lots, *, entradas=None, ate=None) -> dict:
+    """Aquisição, custos diretos e rateados de vários lotes: `{lot_id: dict}`,
+    cada dict igual ao de `financeiro_do_lote`. O que não tem dado fica `None`
+    ("—" na tela), nunca zero:
 
         custo_total = aquisição + custos apropriados + custos rateados
                                              (docs/regras-negocio/05#custo)
+
+    O número de consultas **não depende** de quantos lotes vêm: compras e
+    custos diretos entram agrupados e o rateio lê o razão e os custos indiretos
+    uma vez por fazenda (`BaseDeRateio`), não uma vez por lote e por centro.
+
+    `entradas`: `{lot_id: cabeças que entraram}`; sem ele, calcula.
     """
     import datetime
+    from collections import defaultdict
     from decimal import Decimal
 
     from django.db.models import Sum
@@ -49,68 +69,108 @@ def financeiro_do_lote(lot: Lot, *, cabecas_que_entraram: int, ate=None) -> dict
     from apps.core.exceptions import BusinessError
     from apps.core.money import safe_div
     from apps.core.reversible import Status
-    from apps.costs.allocation import ratear_custos_indiretos
+    from apps.costs.allocation import BaseDeRateio
     from apps.costs.models import CostEntry
     from apps.purchases.models import Purchase
     from apps.purchases.services import calcular_custo_da_compra
 
-    compras = list(Purchase.objects.filter(lot=lot, status=Status.CONFIRMADA))
-    aquisicao = None
-    if compras:
-        aquisicao = sum(
-            (
-                calcular_custo_da_compra(
-                    head_count=c.head_count,
-                    animal_value=c.animal_value,
-                    freight_value=c.freight_value,
-                    commission_value=c.commission_value,
-                    tax_value=c.tax_value,
-                ).custo_aquisicao
-                for c in compras
-            ),
-            Decimal("0"),
-        )
+    lots = list(lots)
+    if not lots:
+        return {}
+    ids = [lt.pk for lt in lots]
+    if entradas is None:
+        entradas = cabecas_que_entraram_por_lote(lots)
+
+    compras = defaultdict(list)
+    for c in Purchase.objects.filter(lot_id__in=ids, status=Status.CONFIRMADA):
+        compras[c.lot_id].append(c)
 
     # Os custos gerados pela compra já estão na aquisição: não contam duas vezes.
-    diretos = CostEntry.objects.filter(
-        lot=lot, status=Status.CONFIRMADA, source_purchase=None
-    ).aggregate(total=Sum("amount"))["total"]
-
-    rateados, aviso_rateio, criterios = None, None, []
-    fim = ate or lot.exit_date or datetime.date.today()
-    try:
-        resultado = ratear_custos_indiretos(
-            farm=lot.farm, start=lot.entry_date, end=fim
+    diretos = dict(
+        CostEntry.objects.filter(
+            lot_id__in=ids, status=Status.CONFIRMADA, source_purchase=None
         )
-        cota = resultado.cotas_por_lote.get(lot.pk)
-        if cota:
-            rateados = cota
-            criterios = sorted(
-                {c.criterio_rotulo for c in resultado.centros if lot.pk in c.cotas}
-            )
-    except BusinessError as exc:
-        aviso_rateio = f"Custo rateado indisponível: {exc}"
+        .values_list("lot_id")
+        .annotate(total=Sum("amount"))
+        .order_by("lot_id")
+    )
 
-    partes = [x for x in (aquisicao, diretos, rateados) if x is not None]
-    custo_total = sum(partes, Decimal("0")) if partes else None
-    custos_apropriados = [x for x in (diretos, rateados) if x is not None]
-    return {
-        "aquisicao": aquisicao,
-        "custos": sum(custos_apropriados, Decimal("0")) if custos_apropriados else None,
-        "custos_diretos": diretos,
-        "custos_rateados": rateados,
-        "criterios_de_rateio": criterios,
-        "custo_total": custo_total,
-        "custo_por_cabeca": (
-            safe_div(custo_total, cabecas_que_entraram)
-            if custo_total is not None
-            else None
-        ),
-        # Depende do peso de carcaça vendido: quem preenche é `detalhe_do_lote`,
-        # a partir de `SaleResultService` (Fase 3).
-        "custo_por_arroba": None,
-        "aviso_rateio": aviso_rateio,
-    }
+    hoje = datetime.date.today()
+    fim = {lt.pk: ate or lt.exit_date or hoje for lt in lots}
+    por_fazenda = defaultdict(list)
+    for lt in lots:
+        por_fazenda[lt.farm_id].append(lt)
+    rateios = {}  # lot_id → (RateioResultado | None, aviso | None)
+    for grupo in por_fazenda.values():
+        base = BaseDeRateio(grupo[0].farm, ate=max(fim[lt.pk] for lt in grupo))
+        for lt in grupo:
+            try:
+                rateios[lt.pk] = (
+                    base.ratear(start=lt.entry_date, end=fim[lt.pk]),
+                    None,
+                )
+            except BusinessError as exc:
+                rateios[lt.pk] = (None, f"Custo rateado indisponível: {exc}")
+
+    saida = {}
+    for lt in lots:
+        aquisicao = None
+        if compras[lt.pk]:
+            aquisicao = sum(
+                (
+                    calcular_custo_da_compra(
+                        head_count=c.head_count,
+                        animal_value=c.animal_value,
+                        freight_value=c.freight_value,
+                        commission_value=c.commission_value,
+                        tax_value=c.tax_value,
+                    ).custo_aquisicao
+                    for c in compras[lt.pk]
+                ),
+                Decimal("0"),
+            )
+        direto = diretos.get(lt.pk)
+
+        rateados, criterios = None, []
+        resultado, aviso_rateio = rateios[lt.pk]
+        if resultado is not None:
+            cota = resultado.cotas_por_lote.get(lt.pk)
+            if cota:
+                rateados = cota
+                criterios = sorted(
+                    {c.criterio_rotulo for c in resultado.centros if lt.pk in c.cotas}
+                )
+
+        partes = [x for x in (aquisicao, direto, rateados) if x is not None]
+        custo_total = sum(partes, Decimal("0")) if partes else None
+        apropriados = [x for x in (direto, rateados) if x is not None]
+        saida[lt.pk] = {
+            "aquisicao": aquisicao,
+            "custos": sum(apropriados, Decimal("0")) if apropriados else None,
+            "custos_diretos": direto,
+            "custos_rateados": rateados,
+            "criterios_de_rateio": criterios,
+            "custo_total": custo_total,
+            "custo_por_cabeca": (
+                safe_div(custo_total, entradas.get(lt.pk, 0))
+                if custo_total is not None
+                else None
+            ),
+            # Depende do peso de carcaça vendido: quem preenche é `detalhe_do_lote`,
+            # a partir de `SaleResultService` (Fase 3).
+            "custo_por_arroba": None,
+            "aviso_rateio": aviso_rateio,
+        }
+    return saida
+
+
+def financeiro_do_lote(lot: Lot, *, cabecas_que_entraram: int, ate=None) -> dict:
+    """Aquisição, custos diretos e rateados do lote — um lote é o caso de
+    `financeiro_dos_lotes` com uma só posição, então a tela do lote e o
+    dashboard produzem o mesmo número pelo mesmo código."""
+    return financeiro_dos_lotes(
+        [lot], entradas={lot.pk: cabecas_que_entraram}, ate=ate
+    )[lot.pk]
 
 
 def detalhe_do_lote(lot: Lot, *, rendimento_entrada=None) -> dict:

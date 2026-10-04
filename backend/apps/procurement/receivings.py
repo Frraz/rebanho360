@@ -67,7 +67,14 @@ def quebra_da_viagem(recebimento: Receiving) -> QuebraDeViagem | None:
     origem = Decimal("0")
     recebido = Decimal("0")
     pares = 0
-    linhas = list(recebimento.lines.select_related("load"))
+    # Quem calcula a quebra de muitas viagens traz as linhas junto
+    # (`prefetch_related`): aí não há consulta por viagem.
+    carregadas = getattr(recebimento, "_prefetched_objects_cache", {}).get("lines")
+    linhas = (
+        list(carregadas)
+        if carregadas is not None
+        else list(recebimento.lines.select_related("load"))
+    )
     for linha in linhas:
         peso_origem = linha.load.origin_weight_kg
         if peso_origem is not None and linha.received_weight_kg is not None:

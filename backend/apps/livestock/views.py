@@ -94,6 +94,8 @@ class LotListView(ScopedQuerysetMixin, ListView):
     model = Lot
     template_name = "livestock/lot_list.html"
     context_object_name = "lotes"
+    # Cada página pede 50 lotes ao banco; a lista inteira nunca vem de uma vez.
+    paginate_by = 50
 
     def get_queryset(self):
         return selectors.listar_lotes_para(self.request.user)

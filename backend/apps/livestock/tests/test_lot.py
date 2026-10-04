@@ -119,3 +119,28 @@ class TestTelasDeCadastro:
 
         assert "LT-SFR-001" in conteudo
         assert "LT-GOI-001" not in conteudo
+
+
+class TestListaPaginada:
+    def test_a_pagina_traz_so_cinquenta_lotes_e_leva_para_a_proxima(
+        self, client, farm, season
+    ):
+        admin = User.objects.create_user(username="adm", password="x", role=Role.ADMIN)
+        # 55 lotes direto no banco: o teste é da lista, não da criação.
+        Lot.objects.bulk_create(
+            Lot(
+                code=f"LT-PAG-{n:03d}",
+                farm=farm,
+                season=season,
+                entry_date=datetime.date(2025, 9, 18),
+            )
+            for n in range(55)
+        )
+        client.force_login(admin)
+
+        primeira = client.get(reverse("livestock:lote_lista"))
+        segunda = client.get(reverse("livestock:lote_lista") + "?page=2")
+
+        assert len(primeira.context["lotes"]) == 50
+        assert len(segunda.context["lotes"]) == 5
+        assert "Próxima" in primeira.content.decode("utf-8")

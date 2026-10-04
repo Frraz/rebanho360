@@ -26,14 +26,14 @@ from apps.finance import selectors as financeiro
 from apps.finance.models import Direction
 from apps.finance.permissions import pode_ver_titulos
 from apps.herd.models import Weighing
-from apps.herd.weight_gain import desempenho_do_lote
+from apps.herd.weight_gain import desempenho_dos_lotes as _desempenhos
 from apps.livestock.models import Lot, LotStatus
 from apps.procurement.permissions import pode_ver_o_ciclo
 from apps.purchases import selectors as compras
 from apps.sales import carcass
 from apps.sales import selectors as vendas_selectors
 from apps.sales.models import Sale
-from apps.sales.result import resultado_do_lote
+from apps.sales.result import resultados_dos_lotes as _resultados
 
 TEXTO, DINHEIRO, INTEIRO, PERCENTUAL, NUMERO = (
     "texto",
@@ -583,9 +583,16 @@ def desempenho_dos_lotes(
     com "—" e o motivo — nunca com um GMD inventado."""
     hoje = hoje or datetime.date.today()
     linhas = []
-    for lote in _lotes_do_escopo(user, season=season, farm=farm):
-        d = desempenho_do_lote(lote, rendimento_entrada=rendimento_entrada)
-        vendas = list(Sale.objects.filter(lot=lote, status=Status.CONFIRMADA))
+    lotes = list(_lotes_do_escopo(user, season=season, farm=farm))
+    desempenhos = _desempenhos(lotes, rendimento_entrada=rendimento_entrada)
+    vendas_por_lote = defaultdict(list)
+    for v in Sale.objects.filter(
+        lot_id__in=[lt.pk for lt in lotes], status=Status.CONFIRMADA
+    ):
+        vendas_por_lote[v.lot_id].append(v)
+    for lote in lotes:
+        d = desempenhos[lote.pk]
+        vendas = vendas_por_lote[lote.pk]
         agregado = carcass.agregar(vendas) if vendas else None
         fim = lote.exit_date or hoje
         linhas.append(
@@ -647,15 +654,16 @@ def resultado_dos_lotes(user, *, season, farm) -> Relatorio:
     """Receita − custos = resultado, e margem por @: *o boi pagou o que
     custou criar?* Bloco final no formato do legado
     `06_Historico_de_Abate_por_Pecuarista` (`R$ @`, `Custo @`)."""
-    lotes = (
+    lotes = list(
         _lotes_do_escopo(user, season=season, farm=farm)
         .filter(sales__status=Status.CONFIRMADA)
         .distinct()
     )
+    resultados = _resultados(lotes)
     linhas, fora_do_total = [], []
     soma = defaultdict(lambda: Decimal("0"))
     for lote in lotes:
-        r = resultado_do_lote(lote)
+        r = resultados[lote.pk]
         situacao = "Parcial" if r.parcial else "Encerrado" if r.encerrado else "Aberto"
         linhas.append(
             {
@@ -762,9 +770,10 @@ def pesagens_do_periodo(
 
     # A evolução (ganho e GMD do trecho) vem do `WeightGainService`.
     trechos = {}
-    for lot in {p.lot for p in pesagens}:
-        for t in desempenho_do_lote(lot).trechos:
-            trechos[(lot.pk, t.ate.date)] = t
+    lotes_pesados = list({p.lot_id: p.lot for p in pesagens}.values())
+    for lot_id, desempenho in _desempenhos(lotes_pesados).items():
+        for t in desempenho.trechos:
+            trechos[(lot_id, t.ate.date)] = t
 
     linhas = []
     for p in pesagens:

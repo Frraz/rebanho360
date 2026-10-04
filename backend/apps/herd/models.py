@@ -198,6 +198,12 @@ class HerdMovement(ReversibleModel):
         verbose_name = "Movimentação"
         verbose_name_plural = "Movimentações"
         ordering = ["-date", "-id"]
+        indexes = [
+            # A lista de movimentações (`ORDER BY -date, -id LIMIT 30`) e os
+            # filtros por tipo e período do dashboard.
+            models.Index(fields=["-date", "-id"], name="herd_mov_date_id_desc"),
+            models.Index(fields=["type", "date"], name="herd_mov_type_date"),
+        ]
         constraints = [
             models.CheckConstraint(
                 check=models.Q(quantity__gt=0), name="herdmovement_quantity_positive"
@@ -290,6 +296,14 @@ class HerdLedgerEntry(models.Model):
             models.Index(fields=["farm", "category", "date"]),
             models.Index(fields=["lot", "date"]),
             models.Index(fields=["season"]),
+            # `WHERE farm = ? AND date <= ?` agrupado por lote: cabeça-dia, base
+            # do rateio, saldo por fazenda. Cobre a consulta inteira (varredura
+            # só no índice), sem ir à tabela do razão.
+            models.Index(
+                fields=["farm", "date"],
+                include=["lot", "quantity"],
+                name="herd_ledger_farm_date_inc",
+            ),
         ]
         constraints = [
             models.CheckConstraint(
@@ -351,6 +365,10 @@ class Weighing(ReversibleModel):
         verbose_name = "Pesagem"
         verbose_name_plural = "Pesagens"
         ordering = ["-date", "-id"]
+        indexes = [
+            # GMD: as pesagens do lote em ordem de data.
+            models.Index(fields=["lot", "date"], name="weighing_lot_date"),
+        ]
         constraints = [
             models.CheckConstraint(
                 check=models.Q(head_count__gt=0), name="weighing_head_count_positive"

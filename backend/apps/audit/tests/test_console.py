@@ -78,3 +78,53 @@ class TestRestaurarPeloConsole:
             entity_id=str(registro.pk),
             action=AuditAction.RESTORE,
         ).exists()
+
+
+class TestFiltroPorData:
+    """O filtro de data virou uma faixa de instantes (para usar o índice de
+    `timestamp`); o recorte do dia, no fuso do sistema, tem de ser o mesmo que
+    `timestamp__date` fazia: inclusive nas duas pontas."""
+
+    def _evento(self, quando, entidade):
+        from freezegun import freeze_time
+
+        with freeze_time(quando):
+            return AuditEvent.objects.create(
+                action=AuditAction.CREATE, entity_type=entidade, entity_id="1"
+            )
+
+    def test_o_dia_vai_de_meia_noite_a_meia_noite_no_fuso_de_sao_paulo(self):
+        import datetime
+
+        from apps.audit import selectors
+
+        # 02:59 UTC de 10/03 ainda é 23:59 de 09/03 em São Paulo (UTC−3).
+        self._evento("2025-03-10 02:59:59+00:00", "Antes")
+        self._evento("2025-03-10 03:00:00+00:00", "AbreODia")
+        self._evento("2025-03-11 02:59:59+00:00", "FechaODia")
+        self._evento("2025-03-11 03:00:00+00:00", "Depois")
+        dia = datetime.date(2025, 3, 10)
+
+        achados = selectors.filter_events(date_from=dia, date_to=dia)
+
+        assert sorted(achados.values_list("entity_type", flat=True)) == [
+            "AbreODia",
+            "FechaODia",
+        ]
+
+    def test_aceita_o_texto_que_vem_da_tela(self):
+        from apps.audit import selectors
+
+        self._evento("2025-03-10 15:00:00+00:00", "NoDia")
+        self._evento("2025-03-20 15:00:00+00:00", "Fora")
+
+        achados = selectors.filter_events(date_from="2025-03-10", date_to="2025-03-12")
+
+        assert list(achados.values_list("entity_type", flat=True)) == ["NoDia"]
+
+    def test_data_invalida_nao_filtra_nem_quebra(self):
+        from apps.audit import selectors
+
+        self._evento("2025-03-10 15:00:00+00:00", "Qualquer")
+
+        assert selectors.filter_events(date_from="lixo", date_to="").count() == 1

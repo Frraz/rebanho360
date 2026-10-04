@@ -20,6 +20,7 @@ Decisões registradas na pendência #14 (reversíveis, isoladas neste módulo):
   resultado: "—", com o motivo. Nunca um lucro inventado.
 """
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -59,14 +60,9 @@ class ResultadoDoLote:
     motivos: list = field(default_factory=list)
 
 
-def resultado_do_lote(lot, *, financeiro=None) -> ResultadoDoLote:
-    """`financeiro` já calculado (a tela do lote o tem em mãos) evita
-    repetir o rateio, que é a parte cara."""
-    from apps.herd import services as herd_services
-    from apps.livestock.selectors import cabecas_que_entraram, financeiro_do_lote
-
-    vendas = list(Sale.objects.filter(lot=lot, status=Status.CONFIRMADA))
-    saldo_atual = herd_services.saldo(lot=lot)["head_count"]
+def _montar_resultado(lot, vendas, saldo_atual, financeiro) -> ResultadoDoLote:
+    """O resultado do lote a partir de vendas, saldo e `financeiro` já
+    carregados. `financeiro` só é lido se há venda."""
     encerrado = lot.status == "ENCERRADO"
 
     if not vendas:
@@ -93,9 +89,6 @@ def resultado_do_lote(lot, *, financeiro=None) -> ResultadoDoLote:
     else:
         arrobas = kg_to_arroba(sum((v.carcass_weight_kg for v in vendas), Decimal("0")))
 
-    financeiro = financeiro or financeiro_do_lote(
-        lot, cabecas_que_entraram=cabecas_que_entraram(lot)
-    )
     base = {
         "lote": lot,
         "vendas": len(vendas),
@@ -151,3 +144,39 @@ def resultado_do_lote(lot, *, financeiro=None) -> ResultadoDoLote:
         ),
         motivos=motivos,
     )
+
+
+def resultados_dos_lotes(lots, *, financeiros=None) -> dict:
+    """`{lot_id: ResultadoDoLote}` de vários lotes, com um número fixo de
+    consultas (vendas, saldos e o `financeiro` dos lotes que têm venda).
+
+    `financeiros`: `{lot_id: dict}` já calculado (a aba de lotes tem o dos
+    lotes todos); o que faltar é calculado aqui, só para lote com venda."""
+    from apps.herd import services as herd_services
+    from apps.livestock.selectors import financeiro_dos_lotes
+
+    lots = list(lots)
+    vendas = defaultdict(list)
+    for v in Sale.objects.filter(
+        lot_id__in=[lt.pk for lt in lots], status=Status.CONFIRMADA
+    ):
+        vendas[v.lot_id].append(v)
+    saldos = herd_services.saldo_por_lote(lots)
+
+    financeiros = dict(financeiros or {})
+    faltam = [lt for lt in lots if vendas[lt.pk] and lt.pk not in financeiros]
+    financeiros.update(financeiro_dos_lotes(faltam))
+    return {
+        lt.pk: _montar_resultado(
+            lt, vendas[lt.pk], saldos.get(lt.pk, 0), financeiros.get(lt.pk)
+        )
+        for lt in lots
+    }
+
+
+def resultado_do_lote(lot, *, financeiro=None) -> ResultadoDoLote:
+    """`financeiro` já calculado (a tela do lote o tem em mãos) evita repetir o
+    rateio, que é a parte cara. Um lote é o caso de `resultados_dos_lotes`."""
+    return resultados_dos_lotes(
+        [lot], financeiros={lot.pk: financeiro} if financeiro else None
+    )[lot.pk]

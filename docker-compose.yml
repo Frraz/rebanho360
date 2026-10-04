@@ -13,6 +13,12 @@ services:
       - ./backend:/app
     ports:
       - "127.0.0.1:8000:8000"
+    # Mesmos limites da produção (docker-compose.prod.yml, já ×3): o que se mede
+    # aqui se parece com o que roda no VPS.
+    deploy:
+      resources:
+        limits:
+          memory: 2304M
     depends_on:
       db:
         condition: service_healthy
@@ -24,12 +30,16 @@ services:
       context: ./backend
       dockerfile: ../docker/web/Dockerfile
       target: dev
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info --concurrency=6
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
     volumes:
       - ./backend:/app
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +57,10 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.dev
     volumes:
       - ./backend:/app
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     depends_on:
       db:
         condition: service_healthy
@@ -59,8 +73,42 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-rebanho360}
       POSTGRES_USER: ${POSTGRES_USER:-rebanho360}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rebanho360}
+    # Mesmo ajuste da produção, mais o log de consulta lenta em 200 ms para
+    # achar o que dói (`pg_stat_statements` também fica ligado). Mudar exige
+    # `docker compose up -d db` para recriar o contêiner.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=768MB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_wal_size=3GB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_compression=on
+      - -c
+      - jit=off
+      - -c
+      - log_min_duration_statement=200
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+    shm_size: 1gb
     volumes:
       - rebanho360_pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 3G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rebanho360}"]
       interval: 5s
@@ -69,6 +117,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     volumes:
       - rebanho360_redis_dev:/data
     healthcheck:

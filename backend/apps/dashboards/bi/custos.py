@@ -16,7 +16,6 @@ from django.db.models.functions import TruncMonth
 from django.urls import reverse
 
 from apps.core.money import safe_div
-from apps.costs.allocation import cabecas_dia_por_lote
 
 from . import rebanho, specs
 from .escopo import Escopo
@@ -112,9 +111,7 @@ def cabecas_dia_por_mes(e: Escopo) -> list[Decimal]:
             )
             soma = ZERO
             for f in fazendas:
-                soma += sum(
-                    cabecas_dia_por_lote(farm=f, start=inicio, end=fim).values(), ZERO
-                )
+                soma += sum(e.base_do_razao(f).cabecas_dia(inicio, fim).values(), ZERO)
             saida.append(soma)
         return saida
 

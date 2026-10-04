@@ -266,10 +266,13 @@ Criar apenas os que consultas reais pedem:
 
 | Tabela | Índice |
 |---|---|
-| `HerdLedgerEntry` | `(farm, category, date)`, `(lot, date)`, `(season)`, `reverses_entry` |
-| `CostEntry` | `(farm, season, date)`, `(cost_center, season)`, `(lot)` |
-| `Purchase` | `(season, date)`, `(destination_farm, date)`, `code` único |
-| `Sale` | `(season, date)`, `(lot)`, `code` único |
+| `HerdLedgerEntry` | `(farm, category, date)`, `(lot, date)`, `(season)`, `reverses_entry`, **`(farm, date) INCLUDE (lot, quantity)`** — a consulta do rateio e da cabeça-dia (`WHERE farm = ? AND date <= ?` agrupado por lote) é respondida só pelo índice |
+| `HerdMovement` | **`(-date, -id)`** (a lista de movimentações), **`(type, date)`** |
+| `Weighing` | **`(lot, date)`** (GMD: pesagens do lote em ordem de data) |
+| `CostEntry` | `(farm, season)`, `(cost_center, season)`, `(lot)`, **`(farm, date)` parcial `WHERE lot IS NULL AND status = 'CONFIRMADA'`** (custo indireto, base do rateio), **trigram em `UPPER(description)`** (busca) |
+| `Partner` | `document`, **trigram em `UPPER(name)`** (busca) |
+| `Purchase` | `code` único (e o índice das chaves estrangeiras `season`, `destination_farm`, `lot`) |
+| `Sale` | `(farm, season)`, `(lot, status)`, `code` único |
 | `AuditEvent` | `(entity_type, entity_id)`, `(actor, timestamp)`, `request_id`, `cascade_root` |
 
 Toda listagem filtra `status != EXCLUIDA` por padrão — incluir `status` nos índices compostos das tabelas transacionais.
