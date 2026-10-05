@@ -1235,6 +1235,40 @@
     @apply opacity-60 transition-opacity;
   }
 
+  /* Troca de safra/fazenda e de aba do dashboard: a página fica parada por até
+     um segundo enquanto o servidor calcula. A barra no topo e o cursor dizem que
+     o clique foi entendido (sem isso o usuário clica de novo). `carregando` é
+     posta no <html> pelo script de base.html. */
+  .progresso-topo {
+    @apply pointer-events-none fixed inset-x-0 top-0 z-[70] h-[3px] overflow-hidden opacity-0 transition-opacity duration-150;
+  }
+  .progresso-topo::after {
+    content: "";
+    @apply absolute inset-y-0 left-0 w-2/5 rounded-full bg-brand-500;
+  }
+  html.carregando .progresso-topo {
+    @apply opacity-100;
+  }
+  html.carregando,
+  html.carregando * {
+    cursor: progress;
+  }
+  html.carregando .ctx-bar {
+    @apply pointer-events-none opacity-70;
+  }
+  html.carregando #dash {
+    @apply opacity-60 transition-opacity;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html.carregando .progresso-topo::after {
+      animation: progresso-topo 1.1s ease-in-out infinite;
+    }
+  }
+  @keyframes progresso-topo {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
+  }
+
   /* ---------- Autenticação ---------- */
   .auth-aside {
     background-image: radial-gradient(120% 90% at 0% 0%, theme("colors.brand.800") 0%, theme("colors.brand.950") 70%);

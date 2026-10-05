@@ -94,7 +94,10 @@ DATABASES = {
     "default": dj_database_url.config(
         env="DATABASE_URL",
         default="postgres://rebanho360:rebanho360@localhost:5432/rebanho360",
-        conn_max_age=60,
+        # Contado desde que a conexão abriu, não desde o último uso: com 60 s,
+        # quase toda requisição em tráfego baixo reabria a conexão (TCP + SCRAM).
+        # São ~18 conexões web + 6 do Celery, longe do `max_connections`.
+        conn_max_age=600,
         # Conexão reaproveitada que o servidor já fechou (reinício do Postgres,
         # rede) é detectada antes da requisição, em vez de virar erro 500.
         conn_health_checks=True,
@@ -173,6 +176,10 @@ CACHES = {
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
     }
 }
+
+# Cache de resultados do dashboard e do Início (apps/core/result_cache.py):
+# invalidado por escrita, nunca por tempo. CACHE_DE_RESULTADOS=0 desliga.
+CACHE_DE_RESULTADOS = config("CACHE_DE_RESULTADOS", default=True, cast=bool)
 
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL

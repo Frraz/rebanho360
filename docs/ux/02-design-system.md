@@ -169,7 +169,7 @@ Nasceu dos componentes acima, sem classe nova. Convenções: formulário em `.fo
 
 Decisão de 03/10/2026: a análise ganhou tela própria (**Dashboard**, abaixo de *Início*), com gráficos. Regras e abas em [`docs/regras-negocio/11`](../regras-negocio/11-dashboard-analitico.md). Nasceu dos componentes acima; as classes novas (`.dash-*`, `.kpi*`, `.delta*`, `.insight*`, `.mark*`, `.cell-bar`) estão em `input.css`, no fim da camada `components`.
 
-**Biblioteca.** ECharts 5.5 (Apache-2.0), **hospedado** em `static/vendor/echarts.min.js`, sem CDN (mesma regra das fontes: abre rápido com sinal ruim e não depende de terceiros). Só a tela do Dashboard o carrega. Justifica-se porque mapa de calor, árvore, Sankey, calendário e cascata não são viáveis à mão; não é biblioteca por moda.
+**Biblioteca.** ECharts 5.5 (Apache-2.0), **hospedado** em `static/vendor/echarts-5.6.0.min.js` (a versão vai no nome do arquivo: ao atualizar a biblioteca, o nome muda e o cache longo do navegador não serve a antiga), sem CDN (mesma regra das fontes: abre rápido com sinal ruim e não depende de terceiros). Só a tela do Dashboard o carrega. Justifica-se porque mapa de calor, árvore, Sankey, calendário e cascata não são viáveis à mão; não é biblioteca por moda.
 
 **Divisão de trabalho.** O servidor monta a especificação do gráfico (`bi/specs.py`: dados já calculados, rótulos, tabela equivalente); `static/js/dashboard.js` só desenha. Nada é recalculado no JavaScript e o template não calcula.
 

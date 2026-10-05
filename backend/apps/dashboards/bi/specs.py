@@ -230,6 +230,12 @@ class Tabela:
 #: Teto de linhas da tabela gêmea de cada gráfico (ver `Tabela.limite`).
 LIMITE_DA_TABELA_GEMEA = 100
 
+#: Teto da altura do canvas de um gráfico, em px. Um gráfico horizontal com uma
+#: barra por lote chegava a 17.000 px com 585 lotes — acima do limite de canvas
+#: dos navegadores (o card saía em branco) e inútil de ler. O ECharts omite os
+#: rótulos que se sobrepõem; o detalhe está na tabela gêmea e na tabela de lotes.
+ALTURA_MAXIMA_DO_GRAFICO = 1400
+
 LARGURAS = {
     "quarto": "dash-col-3",
     "terco": "dash-col-4",
@@ -257,8 +263,16 @@ class Grafico:
     aviso_vazio: str = ""
 
     def __post_init__(self):
-        if self.tabela is not None and self.tabela.limite is None:
-            self.tabela.limite = LIMITE_DA_TABELA_GEMEA
+        self.altura = min(self.altura, ALTURA_MAXIMA_DO_GRAFICO)
+        self.com_tabela(self.tabela)
+
+    def com_tabela(self, tabela: Tabela | None) -> None:
+        """Define a tabela gêmea já com o teto de linhas. Quem monta a tabela
+        depois de criar o gráfico (ex.: curvas, onde o `x` não a descreve) usa
+        isto: atribuir `g.tabela = ...` direto deixa a tabela sem limite."""
+        self.tabela = tabela
+        if tabela is not None and tabela.limite is None:
+            tabela.limite = LIMITE_DA_TABELA_GEMEA
 
     @property
     def mensagem_vazia(self) -> str:

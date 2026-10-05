@@ -668,6 +668,12 @@
   // ------------------------------------------------------------ ciclo de vida
   const instancias = new Map(); // elemento → { chart, spec, compact, observer }
 
+  const PONTOS_PARA_NAO_ANIMAR = 400;
+  function pontosDe(opcao) {
+    const series = Array.isArray(opcao.series) ? opcao.series : [];
+    return series.reduce((a, s) => a + (Array.isArray(s.data) ? s.data.length : 0), 0);
+  }
+
   function montar(el, spec) {
     // Elemento restaurado do histórico do HTMX traz o <canvas> antigo, sem instância.
     if (!instancias.has(el) && !window.echarts.getInstanceByDom(el)) el.replaceChildren();
@@ -680,9 +686,16 @@
     const opcao = Object.assign(base(compact), construir(spec.opcoes, { compact, el, spec }));
     // `base()` traz o tooltip comum; o do gráfico (formatter) o completa.
     opcao.tooltip = Object.assign({}, base(compact).tooltip, opcao.tooltip || {});
+    // Animar centenas de pontos (curva de peso de cada lote: milhares) trava a
+    // thread principal na abertura da aba, e ninguém acompanha a animação.
+    if (opcao.animation && pontosDe(opcao) > PONTOS_PARA_NAO_ANIMAR) opcao.animation = false;
     chart.setOption(opcao, true);
     if (!reg) {
+      // O ResizeObserver avisa uma vez ao começar a observar; se o gráfico já foi
+      // desenhado com largura, esse aviso só o redesenharia à toa.
+      let pular = el.clientWidth > 0;
       const obs = new ResizeObserver(() => {
+        if (pular) { pular = false; return; }
         if (!el.clientWidth) return; // aba oculta (tabela aberta)
         const r = instancias.get(el);
         if (!r) return;
@@ -697,9 +710,33 @@
     }
   }
 
+  // Gráficos fora da tela só são desenhados quando se aproximam dela: uma aba
+  // com 15 gráficos não precisa pagar os 15 no clique, e a página abre antes.
+  const pendentes = new Map(); // elemento → spec ainda não desenhada
+  const vigia = "IntersectionObserver" in window
+    ? new IntersectionObserver((entradas) => {
+        entradas.forEach((en) => {
+          if (!en.isIntersecting) return;
+          const spec = pendentes.get(en.target);
+          vigia.unobserve(en.target);
+          pendentes.delete(en.target);
+          if (spec && en.target.isConnected) montar(en.target, spec);
+        });
+      }, { rootMargin: "300px 0px" })
+    : null;
+
+  function agendar(el, spec) {
+    if (!vigia || instancias.has(el)) { montar(el, spec); return; }
+    pendentes.set(el, spec);
+    vigia.observe(el);
+  }
+
   function limpar() {
     instancias.forEach((reg, el) => {
       if (!el.isConnected) { reg.observer.disconnect(); reg.chart.dispose(); instancias.delete(el); }
+    });
+    pendentes.forEach((spec, el) => {
+      if (!el.isConnected) { if (vigia) vigia.unobserve(el); pendentes.delete(el); }
     });
   }
 
@@ -711,7 +748,7 @@
     try { dados = tag ? JSON.parse(tag.textContent) : {}; } catch (e) { dados = {}; }
     document.querySelectorAll("[data-chart]").forEach((el) => {
       const spec = dados[el.dataset.chart];
-      if (spec) montar(el, spec);
+      if (spec) agendar(el, spec);
     });
   }
 
@@ -719,6 +756,12 @@
     const botao = ev.target.closest("[data-dash-png]");
     if (!botao) return;
     const el = document.querySelector(`[data-chart="${CSS.escape(botao.dataset.dashPng)}"]`);
+    if (el && pendentes.has(el)) { // ainda não desenhado: desenha antes de exportar
+      const spec = pendentes.get(el);
+      vigia.unobserve(el);
+      pendentes.delete(el);
+      montar(el, spec);
+    }
     const reg = el && instancias.get(el);
     if (!reg) return;
     const a = document.createElement("a");
@@ -748,5 +791,7 @@
   document.addEventListener("DOMContentLoaded", iniciar);
   document.addEventListener("htmx:afterSettle", iniciar);
   document.addEventListener("htmx:historyRestore", iniciar);
-  if (document.readyState !== "loading") iniciar();
+  // Script com `defer` roda em "interactive" e o DOMContentLoaded vem logo depois:
+  // chamar `iniciar` aqui também montava todos os gráficos duas vezes.
+  if (document.readyState === "complete") iniciar();
 })();

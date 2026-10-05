@@ -307,8 +307,10 @@ def grafico_curvas_de_peso(e: Escopo) -> specs.Grafico:
         for s in series
         for d in s["dados"]
     ]
-    g.tabela = Tabela(
-        ["Lote", "Dias desde a 1ª pesagem", "Peso médio"], linhas, numericas=[1, 2]
+    g.com_tabela(
+        Tabela(
+            ["Lote", "Dias desde a 1ª pesagem", "Peso médio"], linhas, numericas=[1, 2]
+        )
     )
     return g
 

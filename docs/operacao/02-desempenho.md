@@ -85,7 +85,7 @@ Criados com `CREATE INDEX CONCURRENTLY` (não travam a escrita no deploy). Os do
 
 - **Sessão em cache (`cached_db`)**: rejeitado. `encerrar_sessoes` revoga apagando linhas de `django_session`; com sessão em cache, a revogada continuaria válida no Redis. Ganharia 1 consulta por requisição e custaria uma falha de segurança.
 - **Hash nos arquivos estáticos**: o nginx já trata `output.css` e `icons.svg` sem hash com cache de 1 h por escolha; trocar exige que toda referência passe por `{% static %}`. Risco sem ganho claro.
-- **Cache de resultado do dashboard**: só se, com as consultas corrigidas, alguma aba ainda passar de ~1 s. Se vier, com chave versionada e invalidação a cada escrita, nunca por tempo.
+- **Cache de resultado do dashboard**: ficou para depois, "só se alguma aba ainda passar de ~1 s". Feito na rodada 2 (§6), com chave versionada e invalidação por escrita, nunca por tempo.
 - **Rendimento fora da faixa (tela Início)** continua percorrendo as vendas de abate: reescrevê-lo em SQL duplicaria a fórmula oficial de rendimento (informado × calculado), e a regra 6 manda um lugar só. Custo proporcional ao número de vendas; medir antes de mexer.
 - **Relatórios** (PDF e planilha) que listam título a título continuam trazendo as linhas: é o que eles mostram. Rodam em fila (Celery), fora do clique do usuário.
 
@@ -141,3 +141,63 @@ O que a tabela mostra:
 3. Indicador por lote vai para a versão em lote; a de um lote chama a de lote.
 4. Índice novo só com `EXPLAIN` mostrando uso; índice que não é usado só encarece a escrita.
 5. Mexeu em consulta do dashboard? `medir_desempenho --salvar` antes e `--comparar` depois.
+
+---
+
+## 6. Rodada 2 (2026-10-04): o que o usuário sente
+
+Com as consultas corrigidas, sobrou a lentidão que a contagem de consultas não mostra: trocar de safra e abrir o dashboard ainda levavam de 0,8 a 1,5 s **sem nenhum sinal de que o clique foi entendido**. Medido no banco de 585 lotes, sem toolbar; a tela abre em ~1 s e fica parada.
+
+### O que foi encontrado e feito
+
+| Problema | Correção |
+|---|---|
+| Troca de safra/fazenda: POST → 302 → página inteira, sem retorno visual; o `next` era o caminho da carga (voltava para a aba errada e perdia os filtros); destino sem validação (open redirect) | Barra de progresso no topo, cursor de espera e barra de contexto travada durante a troca (`html.carregando`, script em `base.html`). `next` = página em que o usuário está agora, com filtros. Destino só da própria aplicação (`ctx.destino_seguro`). Troca de aba do dashboard marca a aba na hora |
+| Tabela gêmea da curva de peso sem limite: 2.458 linhas, 828 KB de um HTML de 1,14 MB | `Grafico.com_tabela` aplica o teto também a tabelas atribuídas depois. Aba Lotes: **1,14 MB → 393 KB** |
+| Gráfico horizontal "uma barra por lote" chegava a 17.000 px (acima do limite de canvas; o card podia sair em branco) | `ALTURA_MAXIMA_DO_GRAFICO` = 1.400 px |
+| Rateio calculado duas vezes na Visão geral (`Escopo` e `cartao_da_safra`) | `cartao_da_safra(financeiro_de=...)` reaproveita o do `Escopo` (−20% da aba) |
+| `dashboard.js`: gráficos montados duas vezes na carga, `ResizeObserver` redesenhando à toa, animação de milhares de pontos, todos os gráficos de uma vez | Uma montagem só, gráficos fora da dobra só quando se aproximam (`IntersectionObserver`), animação desligada acima de 400 pontos |
+| Empresa, safra e fazenda consultadas de novo na view, no `Escopo` e na barra do topo; também em fragmento HTMX e no polling de 2 s | `ctx.memoizado`: uma consulta por requisição (`RequestContext.memo`; fora de requisição não guarda nada). Context processor preguiçoso: fragmento não paga a barra |
+| `TOTPDevice` consultado em toda requisição | Chave da sessão testada antes (quem já provou o segundo fator não paga) |
+| `CONN_MAX_AGE=60` reabria a conexão com o Postgres quase a cada requisição | 600 s |
+| Estáticos de terceiros com `expires 1h` | Versão no nome (`echarts-5.6.0.min.js`, `htmx-1.9.12…`, `alpine-3.14.3…`) e `expires 30d immutable` em `/static/vendor/` (`deploy/nginx.conf.example`). Ao atualizar a biblioteca, o nome muda |
+| Logo de 44 KB mostrado a 24–36 px; fonte 600 sem `preload` | Logo 12 KB; `preload` da fonte 600 |
+| Debug toolbar sempre ligado em dev (metade do tempo medido) | Desligado por padrão; `DJANGO_DEBUG_TOOLBAR=1` liga |
+
+### Cache de resultados (`apps/core/result_cache.py`)
+
+O que é guardado: o **fragmento HTML de cada aba do dashboard** (por usuário, aba, safra, fazenda e dia) e o **cartão da safra** da tela Início. A casca da página (menu, barra do topo) nunca é guardada.
+
+- **Nunca por tempo.** Há uma *época* global no Redis. Ela sobe, **depois do commit**, a cada escrita: `post_save`/`post_delete` dos modelos de negócio (`apps/core/signals.py`) e toda ação auditada que muda dado (`registrar_auditoria`; login, logout, falha de login, exportação e consulta não invalidam, para um ataque de senha não esvaziar o cache de todos). Transação desfeita não invalida; transação grande agenda uma vez só. A época entra na chave: subir a época deixa tudo antigo inalcançável, sem apagar.
+- **A chave também tem:** a *versão do código* (impressão digital dos `.py` e `.html`: um deploy invalida sozinho) e quem pede. Permissão (403) e escopo (404) são checados **antes** do cache.
+- **Falha aberta.** Redis fora do ar, cheio (`noeviction`) ou valor ilegível: calcula normalmente; o usuário nunca vê erro nem número velho por causa do cache. O valor vai comprimido e com um prazo de **limpeza** de 1 h, que não é regra de validade: só impede resultados de épocas passadas de ocuparem o Redis que também guarda a fila do Celery.
+- **Transparência.** O rodapé de cada aba diz "atualizado em dd/mm hh:mm" e tem **Recalcular agora** (`?recalcular=1`).
+- **O que não invalida sozinho:** SQL manual, restauração de backup e `bulk_create` fora dos comandos de seed. Os comandos de seed invalidam ao terminar (`InvalidaCacheDeResultados`); nos outros casos, `python manage.py limpar_cache_de_resultados`.
+- **Desligar:** `CACHE_DE_RESULTADOS=0` no `.env`. A suíte roda com o cache desligado (`backend/conftest.py`); os testes do cache o ligam com um cache em memória.
+
+### Resultados (banco de 585 lotes)
+
+`manage.py medir_desempenho --com-cache` abre cada tela a frio e de novo a quente. Conteúdo conferido com `--comparar` (idêntico; a única diferença na aba Lotes é a altura do gráfico limitada).
+
+| Aba | A frio antes | A frio agora | A quente |
+|---|---|---|---|
+| Visão geral | 1,10 s · 238 consultas | **0,85 s · 204** | **0,01 s · 5** |
+| Lotes | 0,89 s · 99 | **0,77 s · 96** | **0,01 s · 5** |
+| Vendas e resultado | 0,35 s · 55 | 0,34 s · 52 | 0,01 s · 5 |
+| Rebanho · Mortes · Compras · Custos · Financeiro · Ciclo | 0,08 a 0,25 s | 0,08 a 0,22 s | 0,01 s · 5 |
+
+No navegador (Chromium, tela de lotes com 585 lotes): TTFB ~20 ms a quente; carregamento completo em 140 a 375 ms; Início com TTFB ~125 ms. A frio, o que sobra é o rateio de custos por lote (~0,4 s), que é conta de verdade e o cache evita repetir.
+
+### Ainda não feito (decisão consciente)
+
+- **gzip no vhost real.** O `nginx.conf.example` o tem, mas nunca foi aplicado no VPS. Conferir: `curl -sI -H 'Accept-Encoding: gzip' https://<dominio>/dashboard/lotes/ | grep -i content-encoding`. Sem compressão, a aba Lotes trafega 382 KB em vez de ~48 KB.
+- **Build customizado do ECharts** (~40 a 55% do tamanho): ganho só no primeiro acesso, com cache frio.
+- **`.values()`/`.only()` nas somas do dashboard**: ganho estimado de 50 a 100 ms a frio, contra o risco de mexer em cálculo financeiro.
+- **VPS**: conferir `free -h` e o uso de swap no horário de pico; se houver swap, `WEB_CONCURRENCY=5` (§ de deploy).
+
+### Regras novas para código novo
+
+1. Tabela gêmea de gráfico se atribui com `grafico.com_tabela(...)`, nunca `g.tabela = ...`.
+2. Código que precisa de empresa/safra/fazenda da requisição usa `apps.core.context` (memoizado); não consulte `Company`/`Season`/`Farm` por conta própria na view.
+3. Resultado caro e repetido vai para `result_cache.obter(namespace, partes, calcular)`. **`partes` tem de ter tudo o que muda o resultado** (usuário, safra, fazenda, dia, parâmetros); o que ficar de fora é compartilhado entre quem não deveria.
+4. Modelo novo de negócio em app fora da lista de `apps/core/signals.py` (`APPS_DE_DADOS`) **não invalida o cache**: acrescente o app lá.

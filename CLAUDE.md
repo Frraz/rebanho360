@@ -162,7 +162,7 @@ Sem cobertura artificial. O que não pode faltar:
 
 **Integridade** — saldo não fica negativo · confirmação concorrente cria um movimento, não dois · importar o mesmo arquivo duas vezes é detectado · **confirmar duas vezes gera um título, e clique duplo na baixa paga uma vez só** · soma das baixas nunca passa do título.
 
-**Desempenho** — o número de consultas de uma aba/tela **não cresce com a quantidade de lotes** (`dashboards/tests/test_desempenho.py`); consulta dentro de laço é bug, indicador por lote tem versão em lote ([`docs/operacao/02-desempenho.md`](docs/operacao/02-desempenho.md)). Mexeu em consulta do dashboard? `manage.py medir_desempenho --salvar` antes e `--comparar` depois.
+**Desempenho** — o número de consultas de uma aba/tela **não cresce com a quantidade de lotes** (`dashboards/tests/test_desempenho.py`); consulta dentro de laço é bug, indicador por lote tem versão em lote ([`docs/operacao/02-desempenho.md`](docs/operacao/02-desempenho.md)). Mexeu em consulta do dashboard? `manage.py medir_desempenho --salvar` antes e `--comparar` depois. Resultado caro e repetido usa o cache com invalidação por escrita (`apps/core/result_cache.py`, nunca por tempo; a chave leva tudo que muda o resultado).
 
 **Segurança** — sem permissão dá `403` · fora do escopo dá `404` · inativo não autentica · POST sem CSRF é recusado · quem aprova não paga (havendo outro) · quem ativou o segundo fator não entra sem ele.
 

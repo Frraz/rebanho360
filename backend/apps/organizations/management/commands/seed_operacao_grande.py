@@ -31,6 +31,7 @@ from django.db import connection
 from django.utils import timezone
 
 from apps.core.context import current_company
+from apps.core.management.mixins import InvalidaCacheDeResultados
 from apps.core.request_context import use_context
 from apps.herd.models import HerdLedgerEntry, HerdMovement
 from apps.organizations.models import Season
@@ -45,7 +46,7 @@ from apps.organizations.seed_operacao.contexto import Contexto, descobrir_atores
 from apps.properties.models import Farm
 
 
-class Command(BaseCommand):
+class Command(InvalidaCacheDeResultados, BaseCommand):
     help = (
         "Popula o sistema com 3 safras de uma operação pecuária grande (12 fazendas)."
     )

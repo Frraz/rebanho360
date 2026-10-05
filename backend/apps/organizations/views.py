@@ -3,7 +3,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 from django.views.generic.edit import FormView
 
@@ -162,4 +162,4 @@ class TrocarSafraView(LoginRequiredMixin, FormView):
         company = ctx.current_company()
         season = ctx.available_seasons(company).filter(pk=season_id).first()
         ctx.set_current_season(request, season)
-        return redirect(request.POST.get("next") or "dashboards:inicio")
+        return redirect(ctx.destino_seguro(request, reverse("dashboards:inicio")))

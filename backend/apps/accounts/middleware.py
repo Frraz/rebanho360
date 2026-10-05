@@ -96,8 +96,10 @@ class TwoFactorMiddleware:
             usuario is not None
             and usuario.is_authenticated
             and not request.path.startswith(PREFIXOS_LIBERADOS)
-            and two_factor.precisa_de_segundo_fator(usuario)
+            # A chave da sessão primeiro: quem já provou o segundo fator não paga
+            # a consulta ao `TOTPDevice` em toda requisição.
             and not two_factor.sessao_verificada(request)
+            and two_factor.precisa_de_segundo_fator(usuario)
         ):
             # Dispositivo confiável: a senha já foi dada; o código é dispensado.
             if two_factor.dispositivo_confirmado(usuario):

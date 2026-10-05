@@ -146,12 +146,15 @@ def _montar_resultado(lot, vendas, saldo_atual, financeiro) -> ResultadoDoLote:
     )
 
 
-def resultados_dos_lotes(lots, *, financeiros=None) -> dict:
+def resultados_dos_lotes(lots, *, financeiros=None, financeiro_de=None) -> dict:
     """`{lot_id: ResultadoDoLote}` de vários lotes, com um número fixo de
     consultas (vendas, saldos e o `financeiro` dos lotes que têm venda).
 
     `financeiros`: `{lot_id: dict}` já calculado (a aba de lotes tem o dos
-    lotes todos); o que faltar é calculado aqui, só para lote com venda."""
+    lotes todos); o que faltar é calculado aqui, só para lote com venda.
+    `financeiro_de`: função `lotes -> {lot_id: dict}` que calcula esse resto
+    (o `Escopo.financeiro_dos_lotes` guarda o que já calculou e não repete o
+    rateio entre abas); sem ela, o cálculo é feito aqui."""
     from apps.herd import services as herd_services
     from apps.livestock.selectors import financeiro_dos_lotes
 
@@ -165,7 +168,8 @@ def resultados_dos_lotes(lots, *, financeiros=None) -> dict:
 
     financeiros = dict(financeiros or {})
     faltam = [lt for lt in lots if vendas[lt.pk] and lt.pk not in financeiros]
-    financeiros.update(financeiro_dos_lotes(faltam))
+    if faltam:
+        financeiros.update((financeiro_de or financeiro_dos_lotes)(faltam))
     return {
         lt.pk: _montar_resultado(
             lt, vendas[lt.pk], saldos.get(lt.pk, 0), financeiros.get(lt.pk)

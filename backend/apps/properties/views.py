@@ -3,7 +3,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 from django.views.generic.edit import FormView
 
@@ -101,4 +101,4 @@ class TrocarFazendaView(LoginRequiredMixin, FormView):
         if farm_id:
             farm = ctx.available_farms(request.user).filter(pk=farm_id).first()
         ctx.set_current_farm(request, farm)
-        return redirect(request.POST.get("next") or "dashboards:inicio")
+        return redirect(ctx.destino_seguro(request, reverse("dashboards:inicio")))

@@ -10,8 +10,9 @@
   <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
   <link rel="preload" href="{% static 'fonts/ibm-plex-sans-latin-400.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{% static 'fonts/ibm-plex-sans-latin-500.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'fonts/ibm-plex-sans-latin-600.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'css/output.css' %}">
-  <meta name="htmx-config" content='{"scrollBehavior":"instant"}'>
+  <meta name="htmx-config" content='{"scrollBehavior":"instant","historyCacheSize":4}'>
   <script>
     /* Toda tela abre no topo. Sem isto o navegador restaura a rolagem da visita
        anterior e rola até campos com `autofocus`; com o conteúdo dos gráficos
@@ -28,12 +29,46 @@
       window.addEventListener("pageshow", function (ev) { if (ev.persisted) noTopo(); });
     })();
   </script>
-  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
-  <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
+  <script>
+    /* Retorno imediato ao clique (docs/operacao/02-desempenho.md): troca de safra
+       ou fazenda recarrega a tela, troca de aba do dashboard busca um fragmento;
+       nos dois casos o servidor leva até ~1 s e a tela ficava parada. */
+    (function () {
+      var raiz = document.documentElement;
+      function ocupado(on) { raiz.classList.toggle("carregando", on); }
+      /* A barra de contexto troca a tela inteira: o destino é a página em que o
+         usuário está agora (aba do dashboard e filtros incluídos), não a da carga. */
+      document.addEventListener("change", function (ev) {
+        var sel = ev.target;
+        if (!sel || !sel.classList || !sel.classList.contains("ctx-select")) return;
+        var form = sel.form;
+        if (!form) return;
+        var prox = form.querySelector('input[name="next"]');
+        if (prox) prox.value = location.pathname + location.search;
+        ocupado(true);
+        form.submit();
+      });
+      document.addEventListener("htmx:beforeRequest", function (ev) {
+        var el = ev.detail.elt;
+        if (!el || !el.closest || !el.closest(".dash-tabs")) return;
+        ocupado(true);
+        var nav = el.closest(".dash-tabs");
+        nav.querySelectorAll("[aria-current]").forEach(function (a) { a.removeAttribute("aria-current"); });
+        el.setAttribute("aria-current", "page");
+      });
+      ["htmx:afterOnLoad", "htmx:responseError", "htmx:sendError", "htmx:timeout"].forEach(function (n) {
+        document.addEventListener(n, function () { ocupado(false); });
+      });
+      window.addEventListener("pageshow", function (ev) { if (ev.persisted) ocupado(false); });
+    })();
+  </script>
+  <script src="{% static 'vendor/htmx-1.9.12.min.js' %}" defer></script>
+  <script src="{% static 'vendor/alpine-3.14.3.min.js' %}" defer></script>
   <script src="{% static 'js/combobox.js' %}" data-icons="{% static 'img/icons.svg' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="min-h-full" x-data="{ menuAberto: false, contextoAberto: false }" @keydown.escape.window="menuAberto = false; contextoAberto = false">
+  <div class="progresso-topo" aria-hidden="true"></div>
   {% if user.is_authenticated and not layout_minimo %}
   <a href="#conteudo" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-float">Ir para o conteúdo</a>
 

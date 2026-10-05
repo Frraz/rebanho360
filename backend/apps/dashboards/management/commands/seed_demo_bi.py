@@ -23,6 +23,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.commercial.models import CarcassClass
 from apps.core.exceptions import BusinessError
+from apps.core.management.mixins import InvalidaCacheDeResultados
 from apps.costs.models import CostCenter, CostClass
 from apps.costs.services import registrar_custo
 from apps.finance import services as financeiro
@@ -94,7 +95,7 @@ def q2(x) -> Decimal:
     return Decimal(x).quantize(D("0.01"))
 
 
-class Command(BaseCommand):
+class Command(InvalidaCacheDeResultados, BaseCommand):
     help = "Cria o histórico de duas safras (compras, pesagens, mortes, vendas, custos, títulos, baixas e compromissos) para o dashboard."
 
     def add_arguments(self, parser):

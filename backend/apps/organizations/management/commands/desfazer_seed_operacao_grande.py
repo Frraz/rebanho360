@@ -17,11 +17,12 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
+from apps.core.management.mixins import InvalidaCacheDeResultados
 from apps.organizations.seed_operacao import purga
 from apps.organizations.seed_operacao.contexto import descobrir_atores
 
 
-class Command(BaseCommand):
+class Command(InvalidaCacheDeResultados, BaseCommand):
     help = "Desfaz o seed_operacao_grande, sem tocar em usuários nem na auditoria."
 
     def add_arguments(self, parser):

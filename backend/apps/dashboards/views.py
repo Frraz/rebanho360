@@ -1,17 +1,21 @@
 """Fino. Recebe request, chama os seletores do painel, devolve template."""
 
+import datetime
 import time
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.http import Http404
+from django.http import Http404, HttpResponse
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.cache import patch_vary_headers
+from django.utils.safestring import mark_safe
 from django.views.generic import TemplateView
 
 from apps.accounts import two_factor
 from apps.core import context as ctx
+from apps.core import result_cache
 from apps.dashboards import selectors
 from apps.dashboards.bi import abas as registro
 from apps.dashboards.bi.escopo import Escopo
@@ -37,9 +41,7 @@ class InicioView(LoginRequiredMixin, TemplateView):
                     user, farm=farm, season=season
                 ),
                 "rebanho": rebanho,
-                "safra": selectors.cartao_da_safra(
-                    user, season=season, farm=farm, cabecas_atuais=rebanho.cabecas
-                ),
+                "safra": self._cartao_da_safra(user, season, farm, rebanho.cabecas),
                 "season": season,
                 "farm": farm,
                 "sugerir_segundo_fator": two_factor.recomenda_segundo_fator(user),
@@ -47,6 +49,26 @@ class InicioView(LoginRequiredMixin, TemplateView):
             }
         )
         return context
+
+    def _cartao_da_safra(self, user, season, farm, cabecas):
+        """O Custo/@ refaz o rateio de todos os lotes encerrados: é 2/3 do tempo
+        desta tela. Vale enquanto nenhum dado mudar (`result_cache`)."""
+        if season is None:
+            return None
+        partes = (
+            user.pk,
+            season.pk,
+            farm.pk if farm else None,
+            datetime.date.today().isoformat(),
+            cabecas,
+        )
+        return result_cache.obter(
+            "cartao-da-safra",
+            partes,
+            lambda: selectors.cartao_da_safra(
+                user, season=season, farm=farm, cabecas_atuais=cabecas
+            ),
+        )
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -56,17 +78,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     fragmento (`HX-Request`). O recorte — safra e fazenda — é o do topo da tela:
     não há segundo filtro para dessincronizar. Docs:
     docs/regras-negocio/11-dashboard-analitico.md.
+
+    O fragmento da aba (a parte cara) fica no cache de resultados enquanto nenhum
+    dado mudar (`apps/core/result_cache.py`); a casca da página é sempre montada,
+    porque traz a barra do topo, que é de quem pede.
     """
 
     template_name = "dashboards/dashboard.html"
     template_fragmento = "dashboards/_aba.html"
 
-    def get_template_names(self):
-        if self.request.headers.get("HX-Request") and not self.request.headers.get(
-            "HX-History-Restore-Request"
-        ):
-            return [self.template_fragmento]
-        return [self.template_name]
+    def _e_fragmento(self) -> bool:
+        return bool(self.request.headers.get("HX-Request")) and not (
+            self.request.headers.get("HX-History-Restore-Request")
+        )
 
     def get_context_data(self, aba=registro.PADRAO, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -80,9 +104,37 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         season = ctx.current_season(self.request, ctx.current_company())
         farm = ctx.current_farm(self.request, user)
-        escopo = Escopo.criar(user, season=season, farm=farm)
-
+        hoje = datetime.date.today()
         context.update(
+            season=season,
+            farm=farm,
+            dados_ate=Escopo.fim_do_recorte(season, hoje) if season else None,
+            aba_html=mark_safe(  # noqa: S308 — HTML do nosso próprio template
+                self._html_da_aba(atual, user, season, farm, hoje)
+            ),
+        )
+        return context
+
+    def _html_da_aba(self, atual, user, season, farm, hoje) -> str:
+        """O fragmento da aba, pronto. Tudo o que o muda está na chave: quem pede
+        (a aba e o dinheiro dependem do papel), a safra, a fazenda e o dia."""
+        partes = (
+            user.pk,
+            atual.slug,
+            season.pk if season else None,
+            farm.pk if farm else None,
+            hoje.isoformat(),
+        )
+        return result_cache.obter(
+            "dashboard-aba",
+            partes,
+            lambda: self._montar_a_aba(atual, user, season, farm, hoje),
+            recalcular=bool(self.request.GET.get("recalcular")),
+        )
+
+    def _montar_a_aba(self, atual, user, season, farm, hoje) -> str:
+        escopo = Escopo.criar(user, season=season, farm=farm, hoje=hoje)
+        context = dict(
             abas=registro.abas_visiveis(user),
             aba=atual,
             season=season,
@@ -103,10 +155,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 graficos_json=quadro.json_dos_graficos(),
                 segundos=round(time.perf_counter() - inicio, 2),
             )
-        return context
+        return render_to_string(self.template_fragmento, context)
 
     def render_to_response(self, context, **kwargs):
-        resposta = super().render_to_response(context, **kwargs)
+        if self._e_fragmento():
+            resposta = HttpResponse(context["aba_html"])
+        else:
+            resposta = super().render_to_response(context, **kwargs)
         # A mesma URL devolve página inteira ou fragmento: sem isto, um cache
         # serviria o fragmento a quem abriu o endereço direto.
         patch_vary_headers(resposta, ["HX-Request"])

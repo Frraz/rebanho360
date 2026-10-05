@@ -35,7 +35,11 @@ def kpi_custo_por_arroba(e: Escopo) -> Kpi:
     """O mesmo número do painel inicial ("Custo/@ — lotes encerrados"), do
     mesmo seletor — não uma segunda definição."""
     cartao = painel_selectors.cartao_da_safra(
-        e.user, season=e.season, farm=e.farm, cabecas_atuais=rebanho.total_de_cabecas(e)
+        e.user,
+        season=e.season,
+        farm=e.farm,
+        cabecas_atuais=rebanho.total_de_cabecas(e),
+        financeiro_de=e.financeiro_dos_lotes,
     )
     return Kpi(
         "Custo/@ (lotes encerrados)",

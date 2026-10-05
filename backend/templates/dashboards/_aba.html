@@ -78,7 +78,10 @@
   {% endfor %}
 
   <p class="dash-note mt-8">
-    Dados até {{ escopo.fim|date:"d/m/Y" }} · {{ calculado_em|date:"d/m/Y H:i" }} · calculado em {{ segundos|numero:2 }} s.
+    Dados até {{ escopo.fim|date:"d/m/Y" }} · atualizado em {{ calculado_em|date:"d/m/Y H:i" }} (levou {{ segundos|numero:2 }} s).
+    <a class="link" href="{% url 'dashboards:dashboard_aba' aba.slug %}?recalcular=1"
+       hx-get="{% url 'dashboards:dashboard_aba' aba.slug %}?recalcular=1" hx-target="#dash" hx-swap="innerHTML show:none"
+       title="Refaz os cálculos desta aba agora">Recalcular agora</a>.
     Cada indicador vem do mesmo serviço da tela do registro: o número é o mesmo em qualquer lugar.
   </p>
   {% endif %}

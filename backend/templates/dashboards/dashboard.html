@@ -2,7 +2,7 @@
 {% load static core_tags %}
 {% block title %}Dashboard · Rebanho360{% endblock %}
 {% block extra_head %}
-<script src="{% static 'vendor/echarts.min.js' %}" defer></script>
+<script src="{% static 'vendor/echarts-5.6.0.min.js' %}" defer></script>
 <script src="{% static 'js/dashboard.js' %}" defer></script>
 {% endblock %}
 {% block content %}
@@ -12,7 +12,7 @@
       <h1 class="page-title">Dashboard</h1>
       {% info "dashboard" %}
     </div>
-    <p class="page-subtitle">{% if season %}Safra {{ season.name }}{% else %}Sem safra escolhida{% endif %} · {% if farm %}{{ farm.name }}{% else %}Todas as fazendas{% endif %}{% if escopo %} · dados até {{ escopo.fim|date:"d/m/Y" }}{% endif %}</p>
+    <p class="page-subtitle">{% if season %}Safra {{ season.name }}{% else %}Sem safra escolhida{% endif %} · {% if farm %}{{ farm.name }}{% else %}Todas as fazendas{% endif %}{% if dados_ate %} · dados até {{ dados_ate|date:"d/m/Y" }}{% endif %}</p>
   </div>
   <div class="page-actions dash-actions" x-data="{ ativo: false,
               init() { try { this.ativo = localStorage.getItem('dashTexturas') === '1' } catch (e) {} },
@@ -29,6 +29,6 @@
 </header>
 
 <div id="dash" class="dash" data-dash>
-  {% include "dashboards/_aba.html" %}
+  {{ aba_html }}
 </div>
 {% endblock %}

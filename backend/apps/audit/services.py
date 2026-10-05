@@ -6,8 +6,18 @@ que falha e deixa o dado passar é pior que não ter auditoria.
 
 import uuid
 
-from apps.audit.models import AuditEvent, OperationEvent
-from apps.core import request_context
+from apps.audit.models import AuditAction, AuditEvent, OperationEvent
+from apps.core import request_context, result_cache
+
+ACOES_QUE_NAO_MUDAM_DADO = frozenset(
+    {
+        AuditAction.LOGIN,
+        AuditAction.LOGIN_FAILED,
+        AuditAction.LOGOUT,
+        AuditAction.EXPORT,
+        AuditAction.VIEW,
+    }
+)
 
 
 def registrar_auditoria(
@@ -34,6 +44,12 @@ def registrar_auditoria(
         entity_id = str(getattr(entity, "pk", ""))
 
     ctx = request_context.get_current()
+    # Ação que muda dado: o cache de resultados do dashboard recomeça (só depois
+    # do commit; desfeita a transação, nada se invalida). Entrar, sair, tentar
+    # entrar, consultar e exportar não mudam número: uma sequência de tentativas
+    # de login não pode ficar esvaziando o cache de todo mundo.
+    if action not in ACOES_QUE_NAO_MUDAM_DADO:
+        result_cache.avancar_ao_confirmar()
     return AuditEvent.objects.create(
         actor=actor if actor is not None else ctx.actor,
         action=action,

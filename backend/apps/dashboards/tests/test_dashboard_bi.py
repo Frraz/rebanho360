@@ -331,7 +331,7 @@ class TestTelas:
     def test_pagina_inteira_sem_htmx_tem_o_resto_do_site(self, client, gestor, season):
         client.force_login(gestor)
         html = client.get(reverse("dashboards:dashboard")).content.decode()
-        assert "<html" in html and "echarts.min.js" in html and "dashboard.js" in html
+        assert "<html" in html and "vendor/echarts-" in html and "dashboard.js" in html
 
     def test_campo_nao_entra_em_aba_com_dinheiro(self, client, campo_baixao, season):
         client.force_login(campo_baixao)

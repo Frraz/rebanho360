@@ -11,9 +11,9 @@
   {% if available_seasons %}
   <form method="post" action="{% url 'organizations:trocar_safra' %}" class="ctx-cell {% if painel %}w-full{% else %}w-44 shrink-0{% endif %}">
     {% csrf_token %}
-    <input type="hidden" name="next" value="{{ request.path }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
     <span class="ctx-label" id="ctx-safra-{% if painel %}m{% else %}d{% endif %}">Safra</span>
-    <select name="season_id" onchange="this.form.submit()" class="ctx-select" aria-labelledby="ctx-safra-{% if painel %}m{% else %}d{% endif %}">
+    <select name="season_id" class="ctx-select" aria-labelledby="ctx-safra-{% if painel %}m{% else %}d{% endif %}">
       {% for safra in available_seasons %}
       <option value="{{ safra.pk }}" {% if current_season and safra.pk == current_season.pk %}selected{% endif %}>
         {{ safra.name }}{% if safra.status == "ENCERRADA" %} (encerrada){% endif %}
@@ -28,9 +28,9 @@
   {% if available_farms %}
   <form method="post" action="{% url 'properties:trocar_fazenda' %}" class="ctx-cell {% if painel %}w-full{% else %}w-52 shrink-0{% endif %}">
     {% csrf_token %}
-    <input type="hidden" name="next" value="{{ request.path }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
     <span class="ctx-label" id="ctx-fazenda-{% if painel %}m{% else %}d{% endif %}">Fazenda</span>
-    <select name="farm_id" onchange="this.form.submit()" class="ctx-select" aria-labelledby="ctx-fazenda-{% if painel %}m{% else %}d{% endif %}">
+    <select name="farm_id" class="ctx-select" aria-labelledby="ctx-fazenda-{% if painel %}m{% else %}d{% endif %}">
       <option value="">Todas as fazendas</option>
       {% for fazenda in available_farms %}
       <option value="{{ fazenda.pk }}" {% if current_farm and fazenda.pk == current_farm.pk %}selected{% endif %}>

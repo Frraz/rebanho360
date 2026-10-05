@@ -47,6 +47,16 @@ server {
         access_log off;
     }
 
+    # Bibliotecas de terceiros: a versão está no nome do arquivo
+    # (echarts-5.6.0.min.js), então trocar a biblioteca troca a URL e o cache
+    # longo é seguro. Sem isto o navegador revalidava 1 MB de ECharts a cada hora.
+    location /static/vendor/ {
+        alias /var/www/rebanho360/static/vendor/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
     # Fontes e logotipo mudam raramente: cache longo.
     location /static/fonts/ {
         alias /var/www/rebanho360/static/fonts/;

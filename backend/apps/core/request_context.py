@@ -8,7 +8,7 @@ o ator, o IP, o user-agent e o `request_id`.
 import uuid
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -17,6 +17,10 @@ class RequestContext:
     ip_address: str | None = None
     user_agent: str = ""
     request_id: uuid.UUID | None = None
+    # Resultados de consultas repetidas dentro de UMA requisição (ver
+    # `apps.core.context.memoizado`). Cada requisição cria o seu contexto, então
+    # nada sobrevive de uma para outra.
+    memo: dict = field(default_factory=dict, compare=False, repr=False)
 
 
 _current: ContextVar[RequestContext] = ContextVar(

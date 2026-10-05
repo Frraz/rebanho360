@@ -5,6 +5,7 @@ from django.db import transaction
 
 from apps.accounts.models import Role, User, UserFarmAccess
 from apps.commercial.seed import garantir_cadastros_comerciais
+from apps.core.management.mixins import InvalidaCacheDeResultados
 from apps.costs.seed import garantir_classes_e_centros
 from apps.livestock.models import AnimalCategory, Breed, Sex
 from apps.organizations.models import BusinessUnit, Company, Season, SeasonStatus
@@ -46,7 +47,7 @@ USERS = [
 ]
 
 
-class Command(BaseCommand):
+class Command(InvalidaCacheDeResultados, BaseCommand):
     help = (
         "Povoa um banco limpo com dados de desenvolvimento: empresa, safra "
         "2025/2026, as fazendas, um usuário por papel, categorias e centros "

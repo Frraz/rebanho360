@@ -26,6 +26,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.core import context as ctx
+from apps.core import result_cache
 from apps.dashboards.bi.abas import ABAS
 
 # Telas além do dashboard: (rótulo, nome da rota). Só as que listam muito.
@@ -100,6 +101,11 @@ class Command(BaseCommand):
         parser.add_argument("--repetidas", type=int, default=3)
         parser.add_argument("--salvar", help="pasta onde guardar o conteúdo das abas")
         parser.add_argument("--comparar", help="pasta guardada antes, para conferir")
+        parser.add_argument(
+            "--com-cache",
+            action="store_true",
+            help="liga o cache de resultados: cada tela é aberta a frio e de novo, a quente",
+        )
 
     def handle(self, *args, **o):
         if not settings.DEBUG:
@@ -115,6 +121,12 @@ class Command(BaseCommand):
             DEBUG_TOOLBAR_CONFIG={"SHOW_TOOLBAR_CALLBACK": lambda request: False}
         )
         self._sem_toolbar.enable()
+        # Sem `--com-cache` a medição é sempre a do cálculo (cache desligado): é o
+        # que mostra se a consulta ficou mais lenta ou mais rápida.
+        self._cache = override_settings(CACHE_DE_RESULTADOS=bool(o["com_cache"]))
+        self._cache.enable()
+        if o["com_cache"]:
+            result_cache.avancar()  # começa a frio
         cliente = Client(HTTP_HOST="localhost")
         cliente.force_login(usuario)
         sessao = cliente.session
@@ -151,6 +163,20 @@ class Command(BaseCommand):
                 resposta = cliente.get(url, HTTP_HX_REQUEST="true")
                 dt = time.perf_counter() - t0
             linhas.append((rotulo, resposta.status_code, dt, consultas))
+            if o["com_cache"]:
+                quente = Coletor()
+                with connection.execute_wrapper(quente):
+                    t0 = time.perf_counter()
+                    resposta_quente = cliente.get(url, HTTP_HX_REQUEST="true")
+                    dt_quente = time.perf_counter() - t0
+                linhas.append(
+                    (
+                        f"{rotulo} (cache)",
+                        resposta_quente.status_code,
+                        dt_quente,
+                        quente,
+                    )
+                )
 
             html = resposta.content.decode("utf-8", "replace")
             achado = _DADOS.search(html)

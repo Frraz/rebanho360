@@ -457,8 +457,10 @@ class CartaoDaSafra:
 
 
 def cartao_da_safra(
-    user, *, season, farm=None, cabecas_atuais: int = 0
+    user, *, season, farm=None, cabecas_atuais: int = 0, financeiro_de=None
 ) -> CartaoDaSafra | None:
+    """`financeiro_de`: ver `resultados_dos_lotes` — o dashboard passa o do
+    `Escopo`, para o rateio dos lotes não ser refeito dentro da mesma aba."""
     if season is None:
         return None
     compras = Purchase.objects.for_user(user).filter(
@@ -490,7 +492,7 @@ def cartao_da_safra(
         encerrados = encerrados.filter(farm=farm)
     custo_total_arroba, arrobas, completos = Decimal("0"), Decimal("0"), 0
     encerrados = list(encerrados.select_related("farm"))
-    for r in resultados_dos_lotes(encerrados).values():
+    for r in resultados_dos_lotes(encerrados, financeiro_de=financeiro_de).values():
         if r.custo_considerado is not None and r.arrobas_vendidas:
             custo_total_arroba += r.custo_considerado
             arrobas += r.arrobas_vendidas

@@ -73,6 +73,12 @@ class Escopo:
     # Construção
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def fim_do_recorte(season, hoje) -> datetime.date:
+        """O recorte vai até hoje, ou até o fim da safra se ela já acabou. Safra
+        futura: o primeiro dia, vazio, em vez de um intervalo invertido."""
+        return max(season.start_date, min(hoje, season.end_date))
+
     @classmethod
     def criar(cls, user, *, season, farm=None, hoje=None) -> Escopo | None:
         """`None` sem safra: não há recorte de tempo, e o painel diz isso."""
@@ -80,9 +86,7 @@ class Escopo:
             return None
         hoje = hoje or datetime.date.today()
         inicio = season.start_date
-        # Safra futura: o recorte é o primeiro dia, vazio, em vez de um intervalo
-        # invertido.
-        fim = max(inicio, min(hoje, season.end_date))
+        fim = cls.fim_do_recorte(season, hoje)
         base = cls(
             user=user,
             season=season,
@@ -96,7 +100,7 @@ class Escopo:
         )
         previa = (
             Season.objects.filter(
-                company=season.company, start_date__lt=season.start_date
+                company_id=season.company_id, start_date__lt=season.start_date
             )
             .order_by("-start_date")
             .first()
@@ -249,9 +253,9 @@ class Escopo:
         if self.farm is not None:
             return [self.farm]
         # Várias abas e gráficos pedem a lista: uma consulta por requisição.
-        return self.memo(
-            "fazendas", lambda: list(ctx.available_farms(self.user).order_by("name"))
-        )
+        # `Farm` já ordena por nome; a lista é a mesma que a barra do topo usa
+        # (`ctx.available_farms` é uma consulta só por requisição).
+        return self.memo("fazendas", lambda: list(ctx.available_farms(self.user)))
 
 
 ZERO = Decimal("0")
