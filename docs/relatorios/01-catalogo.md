@@ -46,7 +46,7 @@ Todos filtráveis por: período, safra, fazenda, lote, categoria, parceiro, cent
 |---|---|---|
 | **Custos por centro de custo** | Onde o dinheiro foi (com filtro de **fazenda**) | `DASH FINANCEIRO` |
 | **Custos por fazenda** | Qual fazenda consome mais | Tabela dinâmica manual |
-| **Custos por fazenda (detalhado)** | Cada lançamento de custo de uma fazenda no período (filtros: fazenda e datas), para conferir mês a mês e exportar | Aba `CUSTO FAZENDA` |
+| **Custos por fazenda (detalhado)** | Cada lançamento de custo de uma fazenda no período (filtros: fazenda e datas), para conferir mês a mês e exportar | O relatório de custo por fazenda da planilha |
 | **Custeio × investimento** | Quanto é gasto, quanto é imobilizado | Coluna `CLASSE` |
 | **Compras do período** | O que foi comprado, de quem, por quanto | `COMPRA DE GADO` + `DASH COMPRAS` |
 | **Custo de aquisição por lote** | Quanto custou formar o lote | Não existe |
@@ -76,7 +76,7 @@ Mapa financeiro · Contas a pagar (e a receber) · Pagamentos realizados · Flux
 
 ### Fase 5 — Ciclo de compra
 
-Oito relatórios, com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calcular_acerto`, viagem, recebimento). Escopo por fazenda; **negados ao `CAMPO`** (preço, comissão e frete são dado comercial). Não levam dado bancário.
+Sete relatórios, com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calcular_acerto`, viagem, recebimento). Escopo por fazenda; **negados ao `CAMPO`** (preço, comissão e frete são dado comercial). Não levam dado bancário. O oitavo item, o **contrato de compra**, não é tabela: é a lista dos compromissos aprovados com o botão que gera o PDF (dado bancário só para quem pode vê-lo, como no detalhe do compromisso).
 
 | Relatório | Legado de referência |
 |---|---|

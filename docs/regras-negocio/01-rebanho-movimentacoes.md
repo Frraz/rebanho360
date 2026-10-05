@@ -240,6 +240,8 @@ Evento separado, que **não** altera saldo — só peso.
 
 `WeightGainService` usa pesagens sucessivas do mesmo lote para calcular GMD e @ produzida.
 
+**Corrigir e excluir pesagem.** Como todo registro confirmado ([06](06-edicao-exclusao-e-auditoria.md)), a pesagem tem detalhe, **editar** (data, motivo, cabeças e peso, com o motivo da correção), **excluir** (lógico, com motivo) e **restaurar**. Valem as regras do lançamento: data futura é recusada e é preciso permissão de escrita na fazenda; fazenda e lote não mudam (lote errado = excluir e lançar de novo). Pesagem excluída sai do cálculo do GMD. Editar a data é o que desfaz o caso de duas pesagens no mesmo dia (GMD em "—"). Editar e excluir: `ESCRITORIO`, `GESTOR` e `ADMIN`; excluir e restaurar: `GESTOR` e `ADMIN`.
+
 ## Pendências
 
 Duas perguntas em aberto sobre este documento, registradas em [99-pendencias](99-pendencias.md):

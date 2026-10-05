@@ -35,7 +35,7 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 | [regras-negocio/08-ciclo-de-compra](regras-negocio/08-ciclo-de-compra.md) | Compromisso, viagem, recebimento, romaneio e acerto (Fase 5) |
 | [regras-negocio/09-usuarios-e-solicitacao-de-acesso](regras-negocio/09-usuarios-e-solicitacao-de-acesso.md) | Gerenciar usuários e o pedido de acesso pela tela de entrada |
 | [regras-negocio/10-exportacao-de-dados](regras-negocio/10-exportacao-de-dados.md) | Exportar tudo ou parte, em CSV, Excel, JSON e PDF, em segundo plano e com o escopo de quem pede |
-| [regras-negocio/11-dashboard-analitico](regras-negocio/11-dashboard-analitico.md) | O Dashboard: oito abas de análise (KPIs com comparação, gráficos, leituras automáticas), do mesmo número que o resto do sistema |
+| [regras-negocio/11-dashboard-analitico](regras-negocio/11-dashboard-analitico.md) | O Dashboard: nove abas de análise (KPIs com comparação, gráficos, leituras automáticas), do mesmo número que o resto do sistema |
 | [regras-negocio/12-decisoes-do-cliente-2026-10-03](regras-negocio/12-decisoes-do-cliente-2026-10-03.md) | As 34 respostas do cliente e o que cada uma mudou no sistema |
 | [regras-negocio/14-roteiro-de-validacao-com-os-usuarios](regras-negocio/14-roteiro-de-validacao-com-os-usuarios.md) | O que mostrar e perguntar na reunião com os usuários finais (respostas do cliente são provisórias) |
 | [regras-negocio/13-gestao-a-pasto-e-indicadores-do-consultor](regras-negocio/13-gestao-a-pasto-e-indicadores-do-consultor.md) | Reprodução, infraestrutura e máquinas, mortalidade por causa, confinamento, inventário valorizado, curva ABC e TIR |

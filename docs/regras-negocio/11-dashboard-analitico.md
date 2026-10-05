@@ -89,7 +89,7 @@ Os limiares são **leitura, não regra**: constantes nomeadas em `bi/insights.py
 O papel define **o quê**; o escopo de fazenda, **onde** (ADR 0003).
 
 - Qualquer usuário autenticado entra no Dashboard.
-- `CAMPO` vê *Visão geral* (sem KPIs de dinheiro), *Rebanho* e *Lotes* (sem custo e resultado). Compras, Vendas, Custos, Financeiro e Ciclo dão **403** — preço, custo e comissão são dado comercial (pendência #48).
+- `CAMPO` vê *Visão geral* (sem KPIs de dinheiro), *Rebanho*, *Mortes* e *Lotes* (sem custo e resultado). Compras, Vendas, Custos, Financeiro e Ciclo dão **403** — preço, custo e comissão são dado comercial (pendência #48).
 - *Financeiro* exige `pode_ver_titulos`; *Ciclo*, `pode_ver_o_ciclo` (as mesmas permissões das telas de origem).
 - Aba que não existe dá 404.
 
@@ -114,3 +114,5 @@ Cache de resultado (Redis) ficou **de fora de propósito**: só entra se, com as
 ## Testes
 
 `apps/dashboards/tests/test_dashboard_bi.py`: recorte e safra anterior no mesmo ponto · variação sem base (`None`, nunca ∞) · `ROUND_HALF_UP` na fronteira `Decimal → float` · grade que nunca deixa buraco · **cada indicador igual ao do serviço de origem** · escopo por fazenda (quem só tem a fazenda X não vê Y) · `403` por papel · fragmento HTMX · falta de dado como "—" · leituras automáticas · todo tipo de gráfico tem desenhista no JavaScript · template não calcula.
+
+`apps/dashboards/tests/test_mortes.py`: a aba Mortes — totais por mês, causa, categoria e fazenda fecham · causa vazia vira "Não informada" · total igual ao do serviço de mortalidade · taxa por faixa com divisor zero é "—" · morte desfeita sai dos totais · escopo por fazenda · sem alerta de mortalidade. `test_desempenho.py` inclui as abas Rebanho, Mortes e Financeiro (o número de consultas não cresce com os lotes).
