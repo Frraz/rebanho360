@@ -30,6 +30,7 @@
 <div class="alert-warning mb-3" role="status">{% icon "triangle-alert" %}<p>Cancelado por {{ titulo.deleted_by }}{% if titulo.delete_reason %}: "{{ titulo.delete_reason }}"{% endif %}{% if operacao_cancelada %} — a operação de origem também está excluída; restaure-a e o título volta junto.{% endif %}</p></div>
 {% endif %}
 
+{% if complemento_frete %}<div class="alert-info mb-4">{% icon "info" %}<p>Este título acompanha um complemento de frete. Programe, aprove e registre os pagamentos aqui. Para corrigir valores, transportadora ou vencimento, <a class="link" href="{% url 'procurement:frete_detalhe' complemento_frete.pk %}">abra o complemento de frete</a>.</p></div>{% endif %}
 <section class="card mt-3" aria-label="Dados do título">
   <dl class="facts">
     <div><dt>{{ titulo.favorecido_rotulo }}</dt><dd>{% if titulo.payee %}<a class="link" href="{% url 'partners:detalhe' titulo.payee.pk %}">{{ titulo.payee.name }}</a>{% else %}<span class="text-amber-800">A definir</span>{% endif %}</dd></div>

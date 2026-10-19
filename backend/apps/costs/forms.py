@@ -5,6 +5,7 @@ from decimal import Decimal
 from django import forms
 
 from apps.core import context as ctx
+from apps.core.operation_types import OperationType
 from apps.costs.models import CostCenter, CostClass
 from apps.livestock.models import Lot
 from apps.partners.models import Partner
@@ -31,6 +32,9 @@ class CostEntryForm(forms.Form):
     """Fazenda, centro e classe são obrigatórios — mudança consciente em
     relação à planilha (docs/regras-negocio/02#obrigatoriedade...)."""
 
+    operation_type = forms.ChoiceField(
+        label="Tipo de operação", choices=[("", "Selecione")] + OperationType.choices
+    )
     date = forms.DateField(label="Data", widget=ISO_DATE, input_formats=["%Y-%m-%d"])
     farm = forms.ModelChoiceField(label="Fazenda", queryset=Farm.objects.none())
     cost_center = forms.ModelChoiceField(
@@ -45,6 +49,9 @@ class CostEntryForm(forms.Form):
         max_digits=14,
         decimal_places=2,
         widget=forms.NumberInput(attrs={"inputmode": "decimal", "step": "0.01"}),
+    )
+    reference = forms.CharField(
+        label="Referência da despesa", max_length=100, required=False
     )
     description = forms.CharField(label="Descrição", max_length=200)
     payer = forms.ModelChoiceField(
@@ -64,6 +71,8 @@ class CostEntryForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if "operation_type" in self.initial and not self.initial["operation_type"]:
+            self.fields["operation_type"].required = False
         self.fields["farm"].queryset = (
             ctx.available_farms(user) if user else Farm.objects.none()
         )
@@ -101,6 +110,8 @@ class CostFilterForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if "operation_type" in self.initial and not self.initial["operation_type"]:
+            self.fields["operation_type"].required = False
         self.fields["farm"].queryset = (
             ctx.available_farms(user) if user else Farm.objects.none()
         )

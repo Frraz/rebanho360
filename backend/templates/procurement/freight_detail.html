@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}{{ frete }} · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header"><div><a class="crumb" href="{% url 'procurement:compromisso_detalhe' frete.commitment_id %}">{{ frete.commitment.code }}</a><div class="page-title-row"><h1 class="page-title">{{ frete }}</h1>{% info "compromisso" %}</div></div></header>
+<section class="card"><dl class="dl"><div><dt>Situação</dt><dd>{{ frete.get_status_display }}</dd></div><div><dt>Transportadora</dt><dd>{{ frete.carrier }}</dd></div><div><dt>Data</dt><dd>{{ frete.date|date:"d/m/Y" }}</dd></div><div><dt>Vencimento</dt><dd>{{ frete.due_date|date:"d/m/Y" }}</dd></div><div><dt>Valor</dt><dd>{{ frete.amount|brl }}</dd></div><div><dt>Caminhões / placa</dt><dd>{{ frete.trucks }} · {{ frete.truck|default:"—" }}</dd></div></dl>
+{% for linha in frete.allocations.all %}<p>{{ linha.purchase.code }}: {{ linha.amount|brl }}</p>{% endfor %}
+{% if frete.invoice_id %}<p><a class="link" href="{% url 'finance:titulo_detalhe' frete.invoice_id %}">Título {{ frete.invoice.code }}</a></p>{% endif %}
+<div class="mt-4 flex flex-wrap gap-3">{% if pode_editar and frete.status != "EXCLUIDA" %}<a class="btn-secondary" href="{% url 'procurement:frete_editar' frete.commitment_id frete.pk %}">Editar</a>{% if frete.status == "RASCUNHO" %}<form method="post" action="{% url 'procurement:frete_confirmar' frete.pk %}">{% csrf_token %}<button class="btn-primary" type="submit">Confirmar frete</button></form>{% endif %}{% endif %}{% if pode_excluir and frete.status != "EXCLUIDA" %}<a class="btn-danger-outline" href="{% url 'procurement:frete_excluir' frete.pk %}">Excluir</a>{% endif %}</div>
+{% for efeito in impacto.efeitos %}<p class="mt-3 text-sm">{{ efeito }}</p>{% endfor %}{% for bloqueio in impacto.bloqueios %}<p class="alert-warning mt-3">{{ bloqueio }}</p>{% endfor %}
+{% if pode_restaurar %}<form method="post" action="{% url 'procurement:frete_restaurar' frete.pk %}" class="mt-4">{% csrf_token %}<button class="btn-secondary" type="submit">Restaurar complemento de frete</button></form>{% endif %}
+</section>{% endblock %}

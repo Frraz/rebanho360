@@ -452,6 +452,26 @@ CONJUNTOS: tuple[Conjunto, ...] = (
         pai_excluido="settlement__status",
         permitido=pode_ver_o_ciclo,
     ),
+    Conjunto(
+        "complementos-de-frete",
+        "procurement.FreightSupplement",
+        CICLO,
+        escopo=("commitment__destination_farm",),
+        data="date",
+        safra="commitment__season",
+        exclusao="status",
+        permitido=pode_ver_o_ciclo,
+    ),
+    Conjunto(
+        "distribuicao-de-frete",
+        "procurement.FreightAllocation",
+        CICLO,
+        escopo=("supplement__commitment__destination_farm",),
+        data="supplement__date",
+        safra="supplement__commitment__season",
+        pai_excluido="supplement__status",
+        permitido=pode_ver_o_ciclo,
+    ),
     # ----------------------------------------------------------- Financeiro
     Conjunto(
         "titulos",

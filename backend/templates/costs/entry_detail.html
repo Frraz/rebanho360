@@ -26,7 +26,9 @@
 {% if custo.status == "EXCLUIDA" %}
 <div class="alert-warning mb-4" role="status">{% icon "triangle-alert" %}<p>Excluído por {{ custo.deleted_by }}{% if custo.delete_reason %}: "{{ custo.delete_reason }}"{% endif %}</p></div>
 {% endif %}
-{% if gerado_por_compra %}
+{% if custo.source_freight_id %}
+<div class="alert-info mb-4">{% icon "info" %}<p>Este custo foi gerado por um complemento de frete. Corrija ou exclua o complemento para atualizar o custo e o título juntos. <a class="link" href="{% url 'procurement:frete_detalhe' custo.source_freight_id %}">Abrir complemento de frete</a></p></div>
+{% elif gerado_por_compra %}
 <div class="alert-info mb-4">
   {% icon "info" %}
   <p>Este custo foi gerado pela compra <strong>{{ custo.source_purchase.code }}</strong>. Para corrigir ou excluir, vá até a compra — os custos acompanham.
@@ -38,6 +40,8 @@
   <p class="stat-label">Valor</p>
   <p class="stat-value mt-1.5">{{ custo.amount|brl }}</p>
   <dl class="facts mt-6 border-t border-gray-100 pt-5">
+    <div><dt>Tipo de operação</dt><dd>{{ custo.get_operation_type_display|default:"Sem classificação" }}</dd></div>
+    <div><dt>Referência da despesa</dt><dd>{{ custo.reference|default:"—" }}</dd></div>
     <div><dt>Data</dt><dd>{{ custo.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ custo.season.name }}</span></dd></div>
     <div><dt>Fazenda</dt><dd>{{ custo.farm.name }}</dd></div>
     <div><dt>Centro</dt><dd>{{ custo.cost_center.name }} <span class="text-gray-500">· {{ custo.cost_class.name }}</span></dd></div>

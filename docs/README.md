@@ -6,6 +6,10 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 
 ## Índice
 
+[Atualização solicitada pelo cliente em 18/10/2026](atualizacoes/2026-10-18-pedidos-cliente.md): rastreabilidade, regras confirmadas, avaliação da importação e roteiro de homologação.
+
+[Validação para publicação em 19/10/2026](atualizacoes/2026-10-19-validacao-producao.md): revisão de integridade, ensaio de migração e restauração, imagem de produção e conferência das telas.
+
 ### Fundamentos
 | Documento | Assunto |
 |---|---|

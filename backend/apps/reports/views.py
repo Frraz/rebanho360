@@ -72,6 +72,44 @@ class ContratosView(VeOCicloMixin, View):
         if texto:
             qs = qs.filter(Q(code__icontains=texto) | Q(seller__name__icontains=texto))
 
+        from apps.reports.filters import OperationalFilterForm, filtrar_compromissos
+
+        filtros = OperationalFilterForm(
+            request.GET,
+            user=request.user,
+            fields=(
+                "unidade",
+                "fazenda",
+                "comprador",
+                "produtor",
+                "categoria",
+                "operacao",
+                "situacao_operacao",
+                "tipo_operacao",
+            ),
+        )
+        if filtros.is_valid():
+            opcoes = dict(filtros.cleaned_data)
+            escolhida = opcoes.pop("fazenda", None)
+            qs = filtrar_compromissos(qs, **opcoes)
+            if escolhida:
+                qs = qs.filter(destination_farm=escolhida)
+        else:
+            qs = qs.none()
+        from django.db.models import OuterRef, Subquery
+
+        from apps.procurement.models import CommitmentItem
+
+        quantidades = (
+            CommitmentItem.objects.filter(commitment_id=OuterRef("pk"))
+            .values("commitment_id")
+            .annotate(total=Sum("head_count"))
+            .values("total")
+        )
+        qs = qs.annotate(cabecas=Subquery(quantidades))
+        filtros.fields["operacao"].queryset = Commitment.objects.for_user(
+            request.user
+        ).filter(pk__in=qs.values("pk"))
         pagina = Paginator(qs, self.por_pagina).get_page(request.GET.get("page"))
         compromissos = list(pagina.object_list)
         # O último contrato gerado de cada compromisso da página (uma consulta).
@@ -90,6 +128,7 @@ class ContratosView(VeOCicloMixin, View):
             {
                 "page_obj": pagina,
                 "compromissos": compromissos,
+                "filtros": filtros,
                 "season": season,
                 "compradores": compradores_do_escopo(request.user),
                 "de": request.GET.get("de", ""),

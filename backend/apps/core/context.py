@@ -69,8 +69,12 @@ def available_farms(user):
 
     def montar():
         if user.has_broad_access:
-            return Farm.objects.filter(is_active=True)
-        return user.accessible_farms().filter(is_active=True)
+            return Farm.objects.filter(is_active=True).select_related("business_unit")
+        return (
+            user.accessible_farms()
+            .filter(is_active=True)
+            .select_related("business_unit")
+        )
 
     return memoizado(("farms", user.pk), montar)
 

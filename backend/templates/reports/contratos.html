@@ -18,13 +18,7 @@
     <label class="field-label" for="q">Registro ou produtor</label>
     <input type="search" id="q" name="q" value="{{ q }}" class="field-input" placeholder="Ex.: OP-000049 ou secchi" autocomplete="off">
   </div>
-  <div>
-    <label class="field-label" for="comprador">Comprador</label>
-    <select id="comprador" name="comprador" class="field-input">
-      <option value="">Todos os compradores</option>
-      {% for p in compradores %}<option value="{{ p.pk }}" {% if comprador == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
-    </select>
-  </div>
+  {% for field in filtros %}{% include "partials/_field.html" %}{% endfor %}
   <div>
     <label class="field-label" for="de">De</label>
     <input type="date" id="de" name="de" value="{{ de }}" class="field-input">

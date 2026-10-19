@@ -16,7 +16,9 @@ class TestSeedDemo:
 
         assert Farm.objects.count() == 6
         assert AnimalCategory.objects.count() == 11
-        assert CostCenter.objects.count() == 12  # os 11 da planilha + FRETE
+        assert (
+            CostCenter.objects.count() == 14
+        )  # originais, FRETE legado e dois centros de frete distintos
         assert Season.objects.filter(is_current=True).count() == 1
         assert User.objects.filter(role=Role.CAMPO).exists()
 

@@ -48,20 +48,24 @@ def _regra_em_texto(comissao) -> str | None:
     return comissao.regra_em_texto() if comissao is not None else None
 
 
-def _compromissos(user, *, season, farm, aprovados=True):
+def _compromissos(user, *, season, farm, aprovados=True, **filtros):
     qs = Commitment.objects.for_user(user).select_related(
         "seller", "destination_farm", "commissioned", "season"
     )
-    qs = (
-        qs.filter(status=Status.CONFIRMADA)
-        if aprovados
-        else qs.exclude(status=Status.EXCLUIDA)
-    )
+    situacao = filtros.get("situacao_operacao")
+    if situacao == Status.EXCLUIDA:
+        qs = qs.filter(status=Status.EXCLUIDA)
+    elif aprovados and situacao != Status.RASCUNHO:
+        qs = qs.filter(status=Status.CONFIRMADA)
+    else:
+        qs = qs.exclude(status=Status.EXCLUIDA)
     if season is not None:
         qs = qs.filter(season=season)
     if farm is not None:
         qs = qs.filter(destination_farm=farm)
-    return qs
+    from apps.reports.filters import filtrar_compromissos
+
+    return filtrar_compromissos(qs, **filtros)
 
 
 def _filtro_de_comprador(comprador) -> list[str]:
@@ -88,8 +92,19 @@ def _faixas_em_texto(item) -> str | None:
 # --------------------------------------------------------------------------
 
 
-def programacao_de_embarque(user, *, season, farm, start=None, end=None) -> Relatorio:
+def programacao_de_embarque(
+    user, *, season, farm, start=None, end=None, **filtros
+) -> Relatorio:
     viagens = Trip.objects.for_user(user).exclude(status=Status.EXCLUIDA)
+    viagens = viagens.filter(
+        commitment__in=_compromissos(
+            user,
+            season=season,
+            farm=farm,
+            comprador=filtros.get("comprador"),
+            **{k: v for k, v in filtros.items() if k != "comprador"},
+        )
+    )
     viagens = viagens.filter(commitment__status=Status.CONFIRMADA).select_related(
         "commitment__seller", "commitment__destination_farm", "carrier"
     )
@@ -159,9 +174,11 @@ def _condicao_em_texto(operacao) -> str:
     return f"{operacao.payment_days} dias" if operacao.payment_days else "à vista"
 
 
-def programacao_de_abate(user, *, season, farm, start=None, end=None) -> Relatorio:
+def programacao_de_abate(
+    user, *, season, farm, start=None, end=None, **filtros
+) -> Relatorio:
     """Por compromisso aprovado: quem, onde, quando e a que preço por faixa."""
-    qs = _compromissos(user, season=season, farm=farm)
+    qs = _compromissos(user, season=season, farm=farm, **filtros)
     if start:
         qs = qs.filter(slaughter_date__gte=start)
     if end:
@@ -171,6 +188,8 @@ def programacao_de_abate(user, *, season, farm, start=None, end=None) -> Relator
     for c in qs.order_by("slaughter_date", "pickup_date", "id"):
         comissoes = commitments.comissoes_do(c)
         for item in c.items.select_related("category").order_by("number"):
+            if filtros.get("categoria") and item.category_id != filtros["categoria"].pk:
+                continue
             linhas.append(
                 {
                     "compromisso": c.code,
@@ -461,13 +480,13 @@ def conferencia_do_acerto(user, *, season, farm, acerto: Settlement | None = Non
 
 
 def comissao_por_comprador(
-    user, *, season, farm, start=None, end=None, comprador=None
+    user, *, season, farm, start=None, end=None, comprador=None, **filtros
 ) -> Relatorio:
     """A comissão **gravada na operação** (snapshot), não a do cadastro de hoje.
     Com `comprador`, só as linhas dele: um compromisso com vários compradores
     mostra a comissão de quem foi escolhido, não a dos outros."""
     qs = (
-        _compromissos(user, season=season, farm=farm)
+        _compromissos(user, season=season, farm=farm, **filtros)
         .filter(commissions__isnull=False)
         .distinct()
     )
@@ -560,8 +579,19 @@ def comissao_por_comprador(
     )
 
 
-def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
+def fretes_e_quebra(
+    user, *, season, farm, start=None, end=None, **filtros
+) -> Relatorio:
     viagens = Trip.objects.for_user(user).exclude(status=Status.EXCLUIDA)
+    viagens = viagens.filter(
+        commitment__in=_compromissos(
+            user,
+            season=season,
+            farm=farm,
+            comprador=filtros.get("comprador"),
+            **{k: v for k, v in filtros.items() if k != "comprador"},
+        )
+    )
     viagens = viagens.filter(commitment__status=Status.CONFIRMADA).select_related(
         "commitment__destination_farm", "carrier"
     )
@@ -600,12 +630,43 @@ def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
                 "quebra": quebra.quebra_percentual if quebra else None,
             }
         )
+    from apps.procurement.models import FreightSupplement
+
+    complementos = (
+        FreightSupplement.objects.for_user(user)
+        .filter(
+            status=Status.CONFIRMADA,
+            commitment__in=_compromissos(user, season=season, farm=farm, **filtros),
+        )
+        .select_related("commitment", "carrier")
+    )
+    if start:
+        complementos = complementos.filter(date__gte=start)
+    if end:
+        complementos = complementos.filter(date__lte=end)
+    for frete in complementos.order_by("date", "pk"):
+        linhas.append(
+            {
+                "retirada": _data(frete.date),
+                "viagem": str(frete),
+                "compromisso": frete.commitment.code,
+                "transportador": frete.carrier.name,
+                "cabecas": 0,
+                "distancia": None,
+                "previsto": None,
+                "realizado": frete.amount,
+                "diferenca": None,
+                "origem": None,
+                "recebido": None,
+                "quebra": None,
+            }
+        )
     return Relatorio(
         titulo="Fretes e quebra de viagem",
         descricao="Por viagem: frete previsto × realizado e a quebra de viagem informada no recebimento.",
         colunas=[
             Coluna("retirada", "Retirada"),
-            Coluna("viagem", "Viagem"),
+            Coluna("viagem", "Viagem / complemento"),
             Coluna("compromisso", "Compromisso"),
             Coluna("transportador", "Transportador"),
             Coluna("cabecas", "Cabeças", INTEIRO),
@@ -644,7 +705,7 @@ def fretes_e_quebra(user, *, season, farm, start=None, end=None) -> Relatorio:
 
 
 def historico_por_pecuarista(
-    user, *, season, farm, start=None, end=None, comprador=None
+    user, *, season, farm, start=None, end=None, comprador=None, **filtros
 ) -> Relatorio:
     """Só acerto aprovado: o que virou compra. R$/@ e custo/@ só existem para
     quem vendeu por @ de carcaça. Mostra o comprador de cada acerto e filtra
@@ -661,11 +722,26 @@ def historico_por_pecuarista(
         acertos = acertos.filter(commitment__season=season)
     if farm is not None:
         acertos = acertos.filter(commitment__destination_farm=farm)
+    acertos = acertos.filter(
+        commitment__in=_compromissos(user, season=season, farm=farm, **filtros)
+    )
     if start:
         acertos = acertos.filter(date__gte=start)
     if end:
         acertos = acertos.filter(date__lte=end)
 
+    from django.db.models import Sum
+
+    from apps.procurement.models import FreightSupplement
+
+    fretes_posteriores = dict(
+        FreightSupplement.objects.filter(
+            status=Status.CONFIRMADA, commitment_id__in=acertos.values("commitment_id")
+        )
+        .values("commitment_id")
+        .annotate(total=Sum("amount"))
+        .values_list("commitment_id", "total")
+    )
     linhas = []
     for a in acertos.order_by("commitment__seller__name", "date", "id"):
         c = a.commitment
@@ -697,10 +773,13 @@ def historico_por_pecuarista(
                 "media_arrobas": safe_div(arrobas, calculo.cabecas_recebidas),
                 "valor": calculo.valor_dos_animais,
                 "comissao": calculo.comissao_total,
-                "frete": calculo.frete,
+                "frete": calculo.frete + fretes_posteriores.get(c.pk, ZERO),
                 "distancia": c.distance_km,
                 "preco_arroba": safe_div(calculo.valor_dos_animais, arrobas),
-                "custo_arroba": safe_div(calculo.custo_aquisicao, arrobas),
+                "custo_arroba": safe_div(
+                    calculo.custo_aquisicao + fretes_posteriores.get(c.pk, ZERO),
+                    arrobas,
+                ),
             }
         )
     return Relatorio(
@@ -763,10 +842,12 @@ def _porque_nao(dados) -> str | None:
     return "; ".join(motivos) or None
 
 
-def programado_x_realizado(user, *, season, farm, start=None, end=None) -> Relatorio:
+def programado_x_realizado(
+    user, *, season, farm, start=None, end=None, **filtros
+) -> Relatorio:
     """Onde a operação divergiu do previsto. É o relatório que a Fase 3 deixou
     de fora por falta de fonte: o "programado" é o compromisso."""
-    qs = _compromissos(user, season=season, farm=farm)
+    qs = _compromissos(user, season=season, farm=farm, **filtros)
     if start:
         qs = qs.filter(date__gte=start)
     if end:
@@ -778,6 +859,11 @@ def programado_x_realizado(user, *, season, farm, start=None, end=None) -> Relat
         viagens = list(selectors.viagens_ativas(c))
         primeira = min((v.pickup_date for v in viagens), default=None)
         for d in calculo.itens:
+            if (
+                filtros.get("categoria")
+                and d.item.category_id != filtros["categoria"].pk
+            ):
+                continue
             diferenca = (
                 d.cabecas_recebidas - d.cabecas_previstas if d.recebido else None
             )

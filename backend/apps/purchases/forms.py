@@ -7,6 +7,7 @@ from django import forms
 
 from apps.commercial.models import PaymentCondition
 from apps.core import context as ctx
+from apps.core.operation_types import OperationType
 from apps.livestock.models import AnimalCategory, Lot
 from apps.partners.models import Partner, PartnerRoleChoice
 from apps.properties.models import Farm
@@ -26,6 +27,9 @@ def _dinheiro(label, *, obrigatorio=False):
 
 
 class PurchaseForm(forms.Form):
+    operation_type = forms.ChoiceField(
+        label="Tipo de operação", choices=[("", "Selecione")] + OperationType.choices
+    )
     date = forms.DateField(
         label="Data",
         widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
@@ -92,6 +96,19 @@ class PurchaseForm(forms.Form):
             "na data da compra; depois o vencimento se ajusta no próprio título."
         ),
     )
+    buyer = forms.ModelChoiceField(
+        label="Comprador",
+        queryset=Partner.objects.filter(
+            is_active=True, roles__role=PartnerRoleChoice.COMISSIONADO
+        ).distinct(),
+        required=False,
+    )
+    origin_property = forms.CharField(
+        label="Propriedade de origem", max_length=150, required=False
+    )
+    origin_city = forms.CharField(
+        label="Cidade de origem", max_length=100, required=False
+    )
     partnership = forms.CharField(label="Parceria", max_length=100, required=False)
     notes = forms.CharField(
         label="Observações", required=False, widget=forms.Textarea(attrs={"rows": 2})
@@ -99,6 +116,8 @@ class PurchaseForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if "operation_type" in self.initial and not self.initial["operation_type"]:
+            self.fields["operation_type"].required = False
         self.fields["destination_farm"].queryset = (
             ctx.available_farms(user) if user else Farm.objects.none()
         )

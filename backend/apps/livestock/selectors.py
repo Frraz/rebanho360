@@ -121,7 +121,7 @@ def financeiro_dos_lotes(lots, *, entradas=None, ate=None) -> dict:
                     calcular_custo_da_compra(
                         head_count=c.head_count,
                         animal_value=c.animal_value,
-                        freight_value=c.freight_value,
+                        freight_value=c.freight_value + c.supplemental_freight,
                         commission_value=c.commission_value,
                         tax_value=c.tax_value,
                     ).custo_aquisicao

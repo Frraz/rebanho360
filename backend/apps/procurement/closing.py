@@ -435,6 +435,10 @@ def bloqueios_do_acerto(acerto: Settlement) -> list:
     if acerto.status != Status.CONFIRMADA:
         return []
     bloqueios, vistos = [], set()
+    if acerto.commitment.freight_supplements.exclude(status=Status.EXCLUIDA).exists():
+        bloqueios.append(
+            "a operação tem complementos de frete. Exclua os complementos antes de reabrir ou excluir o acerto."
+        )
     for compra in _compras_do_acerto(acerto):
         for bloqueio in compra.bloqueios():
             if str(bloqueio) not in vistos:
@@ -509,6 +513,10 @@ def aplicar_efeitos_do_acerto(acerto: Settlement, *, usuario) -> None:
         campos = dict(
             date=dados.primeiro_recebimento,
             seller=compromisso.seller,
+            buyer=compromisso.commissioned,
+            origin_property=compromisso.origin_property,
+            origin_city=compromisso.origin_city,
+            operation_type=compromisso.operation_type,
             destination_farm=compromisso.destination_farm,
             category=item.category,
             head_count=dados.cabecas_recebidas,

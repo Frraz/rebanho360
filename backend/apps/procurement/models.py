@@ -15,6 +15,7 @@ from django.db import models
 from django.db.models import Q
 
 from apps.core.managers import ScopedManager
+from apps.core.operation_types import OperationType
 from apps.core.reversible import ReversibleModel, Status
 
 BAND_VALIDATORS = [MinValueValidator(1), MaxValueValidator(5)]
@@ -150,6 +151,14 @@ class Commitment(ReversibleModel):
     )
     closure_note = models.CharField(
         "Observação do encerramento", max_length=300, blank=True
+    )
+
+    operation_type = models.CharField(
+        "Tipo de operação",
+        max_length=16,
+        choices=OperationType.choices,
+        blank=True,
+        default="",
     )
 
     objects = ScopedManager()
@@ -978,3 +987,101 @@ class SettlementAllocation(models.Model):
 
     def __str__(self) -> str:
         return f"{self.settlement.code} · item {self.item.number}"
+
+
+class FreightSupplement(ReversibleModel):
+    """Frete posterior: não reabre acerto nem altera o razão (atualizacao/8, 2–5)."""
+
+    SCOPE_FARM_FIELD = "commitment__destination_farm"
+    commitment = models.ForeignKey(
+        Commitment,
+        verbose_name="Operação",
+        related_name="freight_supplements",
+        on_delete=models.PROTECT,
+    )
+    carrier = models.ForeignKey(
+        "partners.Partner", verbose_name="Transportadora", on_delete=models.PROTECT
+    )
+    date = models.DateField("Data do frete")
+    due_date = models.DateField("Vencimento")
+    amount = models.DecimalField("Valor do frete", max_digits=14, decimal_places=2)
+    trucks = models.PositiveSmallIntegerField("Quantidade de caminhões")
+    truck = models.CharField("Caminhão / placa", max_length=100, blank=True)
+    notes = models.TextField("Observações", blank=True)
+    invoice = models.OneToOneField(
+        "finance.Invoice",
+        verbose_name="Título do frete",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
+    objects = ScopedManager()
+
+    class Meta:
+        verbose_name = "Complemento de frete"
+        verbose_name_plural = "Complementos de frete"
+        constraints = [
+            models.CheckConstraint(
+                check=Q(amount__gt=0), name="supplement_amount_positive"
+            ),
+            models.CheckConstraint(
+                check=Q(trucks__gt=0), name="supplement_trucks_positive"
+            ),
+            models.CheckConstraint(
+                check=Q(due_date__gte=models.F("date")),
+                name="supplement_due_after_date",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.commitment.code}/F{self.pk}"
+
+    def bloqueios(self):
+        from apps.organizations.models import SeasonStatus
+
+        bloqueios = list(self.invoice.bloqueios()) if self.invoice_id else []
+        if self.commitment.season.status == SeasonStatus.ENCERRADA:
+            bloqueios.append(
+                "a safra da operação está encerrada. Reabra a safra antes de corrigir o frete."
+            )
+        return bloqueios
+
+    def aplicar_efeitos(self, *, usuario):
+        from apps.procurement.freight import aplicar
+
+        aplicar(self, usuario=usuario)
+
+    def desfazer_efeitos(self, *, usuario):
+        from apps.procurement.freight import desfazer
+
+        desfazer(self, usuario=usuario)
+
+    def descrever_efeitos(self):
+        return [
+            f"custos do complemento {self} são desfeitos",
+            f"o título de frete de R$ {self.amount} é cancelado; os animais e seus pagamentos são preservados",
+        ]
+
+
+class FreightAllocation(models.Model):
+    supplement = models.ForeignKey(
+        FreightSupplement, related_name="allocations", on_delete=models.PROTECT
+    )
+    purchase = models.ForeignKey(
+        "purchases.Purchase",
+        related_name="freight_allocations",
+        on_delete=models.PROTECT,
+    )
+    amount = models.DecimalField("Valor distribuído", max_digits=14, decimal_places=2)
+
+    class Meta:
+        verbose_name = "Distribuição do complemento de frete"
+        verbose_name_plural = "Distribuições dos complementos de frete"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["supplement", "purchase"], name="uniq_supplement_purchase"
+            ),
+            models.CheckConstraint(
+                check=Q(amount__gt=0), name="freight_allocation_positive"
+            ),
+        ]

@@ -142,6 +142,7 @@ class TestFluxoPelasTelas:
         resposta = client.post(
             reverse("procurement:compromisso_novo"),
             {
+                "operation_type": "PROPRIO",
                 "date": "2025-09-01",
                 "seller": produtor.pk,
                 "destination_farm": sao_francisco.pk,
@@ -403,6 +404,7 @@ class TestFormularios:
         resposta = client.post(
             reverse("procurement:compromisso_novo"),
             {
+                "operation_type": "PROPRIO",
                 "date": "2025-09-01",
                 "seller": produtor.pk,
                 "destination_farm": sao_francisco.pk,
@@ -420,6 +422,7 @@ class TestFormularios:
         resposta = client.post(
             reverse("procurement:compromisso_novo"),
             {
+                "operation_type": "PROPRIO",
                 "date": "2025-09-01",
                 "seller": comissionado.pk,  # não é produtor nem fornecedor
                 "destination_farm": sao_francisco.pk,
@@ -455,6 +458,7 @@ class TestFormularios:
         resposta = client.post(
             reverse("procurement:compromisso_editar", args=[compromisso.pk]),
             {
+                "operation_type": "PROPRIO",
                 "date": "2025-09-01",
                 "seller": produtor.pk,
                 "destination_farm": sao_francisco.pk,

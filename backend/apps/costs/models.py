@@ -6,6 +6,7 @@ Ver docs/regras-negocio/02-custos-centro-de-custo.md.
 from django.db import models
 
 from apps.core.managers import ScopedManager
+from apps.core.operation_types import OperationType
 from apps.core.reversible import ReversibleModel
 
 
@@ -125,7 +126,24 @@ class CostEntry(ReversibleModel):
         related_name="cost_entries",
         on_delete=models.PROTECT,
     )
+    reference = models.CharField("Referência da despesa", max_length=100, blank=True)
+    source_freight = models.ForeignKey(
+        "procurement.FreightSupplement",
+        null=True,
+        blank=True,
+        related_name="cost_entries",
+        on_delete=models.PROTECT,
+        verbose_name="Complemento de frete",
+    )
     notes = models.TextField("Observações", blank=True)
+
+    operation_type = models.CharField(
+        "Tipo de operação",
+        max_length=16,
+        choices=OperationType.choices,
+        blank=True,
+        default="",
+    )
 
     objects = ScopedManager()
 

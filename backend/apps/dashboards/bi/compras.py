@@ -83,7 +83,9 @@ def agregar(compras) -> Agregado:
         compras=len(compras),
         cabecas=sum(c.head_count for c in compras),
         animais=sum((c.animal_value for c in compras), ZERO),
-        frete=sum((c.freight_value or ZERO for c in compras), ZERO),
+        frete=sum(
+            ((c.freight_value or ZERO) + c.supplemental_freight for c in compras), ZERO
+        ),
         comissao=sum((c.commission_value or ZERO for c in compras), ZERO),
         impostos=sum((c.tax_value or ZERO for c in compras), ZERO),
         cabecas_com_peso=sum(c.head_count for c in com_peso),
@@ -91,7 +93,7 @@ def agregar(compras) -> Agregado:
         custo_com_peso=sum(
             (
                 c.animal_value
-                + (c.freight_value or ZERO)
+                + ((c.freight_value or ZERO) + c.supplemental_freight)
                 + (c.commission_value or ZERO)
                 + (c.tax_value or ZERO)
                 for c in com_peso
@@ -414,7 +416,7 @@ def grafico_dispersao(e: Escopo) -> specs.Grafico:
         custo = calcular_custo_da_compra(
             head_count=c.head_count,
             animal_value=c.animal_value,
-            freight_value=c.freight_value,
+            freight_value=c.freight_value + c.supplemental_freight,
             commission_value=c.commission_value,
             tax_value=c.tax_value,
             total_weight_kg=c.total_weight_kg,
@@ -447,7 +449,7 @@ def tabela_maiores_compras(e: Escopo) -> Tabela:
         key=lambda c: -calcular_custo_da_compra(
             head_count=c.head_count,
             animal_value=c.animal_value,
-            freight_value=c.freight_value,
+            freight_value=c.freight_value + c.supplemental_freight,
             commission_value=c.commission_value,
             tax_value=c.tax_value,
         ).custo_aquisicao,
@@ -457,7 +459,7 @@ def tabela_maiores_compras(e: Escopo) -> Tabela:
         custo = calcular_custo_da_compra(
             head_count=c.head_count,
             animal_value=c.animal_value,
-            freight_value=c.freight_value,
+            freight_value=c.freight_value + c.supplemental_freight,
             commission_value=c.commission_value,
             tax_value=c.tax_value,
             total_weight_kg=c.total_weight_kg,

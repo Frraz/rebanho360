@@ -777,6 +777,23 @@ CAMPOS_LIVRES_SEM_ORIGEM = (
 )
 
 
+def complemento_do_titulo(titulo):
+    """Título de frete acompanha o complemento; financeiro continua cuidando das baixas."""
+    from apps.procurement.models import FreightSupplement
+
+    return FreightSupplement.objects.filter(invoice_id=titulo.pk).first()
+
+
+def _exigir_correcao_pela_origem_do_frete(titulo):
+    complemento = complemento_do_titulo(titulo)
+    if complemento is not None:
+        raise BusinessError(
+            f"Este título pertence ao complemento de frete {complemento}. "
+            "Corrija, exclua ou restaure o complemento na operação de compra: "
+            "o título e os custos acompanham. A programação e a baixa continuam no Financeiro."
+        )
+
+
 def campos_editaveis(titulo: Invoice) -> tuple[str, ...]:
     if titulo.origem is None:
         return CAMPOS_LIVRES_SEM_ORIGEM
@@ -796,6 +813,7 @@ def editar_titulo(titulo: Invoice, dados: dict, *, usuario, motivo: str) -> Invo
     titulo = _travar(titulo)
     _exigir_ativo(titulo)
     _exigir_escrita_na_fazenda(titulo, usuario)
+    _exigir_correcao_pela_origem_do_frete(titulo)
     bloqueios = titulo.bloqueios()
     if bloqueios:
         raise BlockingDependencyError(f"Não é possível editar: {bloqueios[0]}")
@@ -839,6 +857,9 @@ def excluir_titulo(
 ) -> Invoice:
     if not pode_excluir_confirmado(usuario):
         raise BusinessError("Você não tem permissão para excluir título.")
+    titulo = _travar(titulo)
+    _exigir_escrita_na_fazenda(titulo, usuario)
+    _exigir_correcao_pela_origem_do_frete(titulo)
     return reversible.excluir(titulo, usuario=usuario, motivo=motivo, cascata=cascata)
 
 
@@ -847,6 +868,8 @@ def restaurar_titulo(titulo: Invoice, *, usuario) -> Invoice:
     if not pode_excluir_confirmado(usuario):
         raise BusinessError("Você não tem permissão para restaurar título.")
     titulo = _travar(titulo)
+    _exigir_escrita_na_fazenda(titulo, usuario)
+    _exigir_correcao_pela_origem_do_frete(titulo)
     origem = titulo.origem
     if origem is not None and origem.status == Status.EXCLUIDA:
         raise BlockingDependencyError(

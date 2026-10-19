@@ -19,6 +19,7 @@ from apps.commercial.payment import aplicar_condicao
 from apps.core import reversible
 from apps.core.exceptions import BlockingDependencyError, BusinessError
 from apps.core.money import kg_to_arroba, safe_div
+from apps.core.operation_types import validar_tipo
 from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmado
 from apps.core.reversible import Status
 from apps.core.serialization import diff_fields, snapshot
@@ -46,7 +47,7 @@ from apps.purchases.permissions import pode_confirmar_compra, pode_lancar_compra
 #: (docs/regras-negocio/03#custos-gerados). A ordem é a ordem dos lançamentos.
 CUSTOS_GERADOS = (
     ("animal_value", "DESPESA GADO", "animais"),
-    ("freight_value", "FRETE", "frete"),
+    ("freight_value", "FRETE DE COMPRA", "frete"),
     ("commission_value", "COMISSÃO", "comissão"),
     ("tax_value", "IMPOSTO E TAXAS", "impostos"),
 )
@@ -104,10 +105,19 @@ def calcular_custo_da_compra(
 
 
 def custo_da_compra(compra: Purchase) -> CustoDaCompra:
+    # select_related não executa as anotações do manager da compra relacionada.
+    if hasattr(compra, "supplemental_freight"):
+        complemento = compra.supplemental_freight
+    else:
+        from django.db.models import Sum
+
+        complemento = compra.freight_allocations.filter(
+            supplement__status=Status.CONFIRMADA
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
     return calcular_custo_da_compra(
         head_count=compra.head_count,
         animal_value=compra.animal_value,
-        freight_value=compra.freight_value,
+        freight_value=compra.freight_value + complemento,
         commission_value=compra.commission_value,
         tax_value=compra.tax_value,
         total_weight_kg=compra.total_weight_kg,
@@ -150,6 +160,7 @@ def _validar_dados(dados: dict, *, usuario) -> Season:
         "100"
     ):
         raise BusinessError("O rendimento estimado de entrada fica entre 1% e 100%.")
+    validar_tipo(dados.get("operation_type"))
     if dados["date"] > timezone.localdate():
         raise BusinessError("Compra com data futura não é permitida.")
 
@@ -167,6 +178,15 @@ def _validar_dados(dados: dict, *, usuario) -> Season:
         raise BusinessError(
             f"{seller} não tem o papel de Fornecedor nem de Produtor. "
             "Acrescente o papel no cadastro do parceiro."
+        )
+
+    buyer = dados.get("buyer")
+    if (
+        buyer is not None
+        and not buyer.roles.filter(role=PartnerRoleChoice.COMISSIONADO).exists()
+    ):
+        raise BusinessError(
+            "O comprador precisa ter o papel de Comissionado no cadastro de parceiros."
         )
 
     lot = dados.get("lot")
@@ -194,6 +214,7 @@ def _validar_dados(dados: dict, *, usuario) -> Season:
 
 
 CAMPOS_EDITAVEIS = (
+    "operation_type",
     "date",
     "seller",
     "destination_farm",
@@ -209,6 +230,9 @@ CAMPOS_EDITAVEIS = (
     "payment_condition",
     "entry_yield_percent",
     "partnership",
+    "buyer",
+    "origin_property",
+    "origin_city",
     "notes",
 )
 
@@ -238,7 +262,10 @@ def criar_compra(*, usuario, **dados) -> Purchase:
         "commission_value": dados.get("commission_value") or 0,
         "tax_value": dados.get("tax_value") or 0,
         "partnership": dados.get("partnership") or "",
+        "origin_property": dados.get("origin_property") or "",
+        "origin_city": dados.get("origin_city") or "",
         "notes": dados.get("notes") or "",
+        "operation_type": dados.get("operation_type") or "",
     }
     dados = aplicar_condicao(dados)
     season = _validar_dados(dados, usuario=usuario)
@@ -463,6 +490,7 @@ def _gerar_custos(compra: Purchase, lote: Lot, *, usuario) -> None:
                 lot=lote,
                 season=compra.season,
                 source_purchase=compra,
+                operation_type=compra.operation_type,
             )
 
 

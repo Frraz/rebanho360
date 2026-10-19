@@ -254,9 +254,11 @@ class TituloDetailView(VeTitulosMixin, TemplateView):
                     f"({(hoje - titulo.due_date).days} dias)."
                 )
 
+        complemento = services.complemento_do_titulo(titulo)
         context.update(
             {
                 "titulo": titulo,
+                "complemento_frete": complemento,
                 "hoje": hoje,
                 "baixas": titulo.payments.select_related("created_by").order_by(
                     "date", "id"
@@ -284,9 +286,15 @@ class TituloDetailView(VeTitulosMixin, TemplateView):
                 and pode_executar_pagamento(user)
                 and titulo.payment_status
                 in services.situacoes_que_aceitam_baixa(titulo),
-                "pode_editar": ativo and pode_gerenciar_titulos(user) and sem_baixa,
-                "pode_excluir": ativo and pode_excluir_confirmado(user),
-                "pode_restaurar": titulo.status == Status.EXCLUIDA
+                "pode_editar": complemento is None
+                and ativo
+                and pode_gerenciar_titulos(user)
+                and sem_baixa,
+                "pode_excluir": complemento is None
+                and ativo
+                and pode_excluir_confirmado(user),
+                "pode_restaurar": complemento is None
+                and titulo.status == Status.EXCLUIDA
                 and pode_excluir_confirmado(user),
                 "bloqueios": titulo.bloqueios() if ativo else [],
                 "operacao_cancelada": titulo.origem is not None
@@ -318,6 +326,13 @@ class TituloUpdateView(GerenciaTitulosMixin, View):
 
     def get(self, request, pk):
         titulo = _get_titulo(request, pk)
+        complemento = services.complemento_do_titulo(titulo)
+        if complemento is not None:
+            messages.info(
+                request,
+                "A correção deste título é feita pelo complemento de frete, para manter os custos e a obrigação juntos.",
+            )
+            return redirect("procurement:frete_detalhe", pk=complemento.pk)
         form = TituloEditForm(
             user=request.user,
             initial=self._initial(titulo),
@@ -327,6 +342,13 @@ class TituloUpdateView(GerenciaTitulosMixin, View):
 
     def post(self, request, pk):
         titulo = _get_titulo(request, pk)
+        complemento = services.complemento_do_titulo(titulo)
+        if complemento is not None:
+            messages.info(
+                request,
+                "A correção deste título é feita pelo complemento de frete, para manter os custos e a obrigação juntos.",
+            )
+            return redirect("procurement:frete_detalhe", pk=complemento.pk)
         form = TituloEditForm(
             request.POST,
             user=request.user,

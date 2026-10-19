@@ -58,7 +58,16 @@ def _parametros_para_gravar(extras: dict, *, season, farm) -> dict:
             params[chave] = valor.isoformat()
         elif chave == "lote":
             params["lote_id"] = valor.pk
-        elif chave in ("acerto", "comprador", "fazenda"):
+        elif chave in (
+            "acerto",
+            "comprador",
+            "fazenda",
+            "unidade",
+            "produtor",
+            "categoria",
+            "operacao",
+            "centro_custo",
+        ):
             params[f"{chave}_id"] = valor.pk
         else:
             params[chave] = str(valor)
@@ -99,6 +108,29 @@ def _extras_a_partir_dos_parametros(params: dict, user) -> dict:
         extras["rendimento_entrada"] = Decimal(params["rendimento_entrada"])
     if params.get("preco_arroba"):
         extras["preco_arroba"] = Decimal(params["preco_arroba"])
+    from apps.core.exceptions import BusinessError
+    from apps.reports.filters import OperationalFilterForm
+
+    nomes = (
+        "unidade",
+        "produtor",
+        "categoria",
+        "operacao",
+        "centro_custo",
+        "comprador",
+        "fazenda",
+        "tipo_operacao",
+        "situacao_operacao",
+    )
+    origem = {nome: params.get(f"{nome}_id", params.get(nome, "")) for nome in nomes}
+    form = OperationalFilterForm(origem, user=user, fields=nomes)
+    if not form.is_valid():
+        raise BusinessError(
+            "Os filtros do relatório não estão mais disponíveis no seu acesso."
+        )
+    extras.update(
+        {k: v for k, v in form.cleaned_data.items() if v is not None and v != ""}
+    )
     return extras
 
 

@@ -305,10 +305,37 @@ class CompromissoListView(VeOCicloMixin, TemplateView):
         user = self.request.user
         season = ctx.current_season(self.request, ctx.current_company())
         farm = ctx.current_farm(self.request, user)
-        situacao = self.request.GET.get("situacao", "")
-        qs = selectors.listar_compromissos_para(
-            user, season=season, farm=farm, situacao=situacao
+        from apps.reports.filters import OperationalFilterForm
+
+        dados = self.request.GET.copy()
+        if "situacao" in dados and "situacao_operacao" not in dados:
+            dados["situacao_operacao"] = dados["situacao"]
+        filtros = OperationalFilterForm(
+            dados,
+            user=user,
+            fields=(
+                "unidade",
+                "fazenda",
+                "comprador",
+                "produtor",
+                "de",
+                "ate",
+                "situacao_operacao",
+                "tipo_operacao",
+            ),
         )
+        validos = filtros.is_valid()
+        opcoes = dict(filtros.cleaned_data) if validos else {}
+        inicio, fim = opcoes.pop("de", None), opcoes.pop("ate", None)
+        farm = opcoes.pop("fazenda", None) or farm
+        situacao = opcoes.get("situacao_operacao", "")
+        qs = selectors.listar_compromissos_para(
+            user, season=season, farm=farm, start=inicio, end=fim, **opcoes
+        )
+        qs = qs.filter(season__company=ctx.current_company())
+        if not validos:
+            qs = qs.none()
+        context["filtros"] = filtros
         pagina = Paginator(qs, self.paginate_by).get_page(self.request.GET.get("page"))
         etapas = selectors.etapas_dos_compromissos(pagina.object_list)
         linhas = [{"compromisso": c, "etapa": etapas[c.pk]} for c in pagina.object_list]
@@ -450,7 +477,11 @@ class CompromissoEditarView(LancaNoCicloMixin, View):
 
     def post(self, request, pk):
         c = _compromisso(request, pk)
-        form = CommitmentEditForm(request.POST, user=request.user)
+        form = CommitmentEditForm(
+            request.POST,
+            user=request.user,
+            initial={"operation_type": c.operation_type},
+        )
         formset = _formset_de_itens(request, data=request.POST)
         compradores = _formset_de_compradores(data=request.POST)
         contexto = _contexto_do_compromisso(form, formset, compradores, compromisso=c)

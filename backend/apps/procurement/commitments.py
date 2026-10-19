@@ -21,6 +21,7 @@ from apps.core.exceptions import (
     Bloqueio,
     BusinessError,
 )
+from apps.core.operation_types import validar_tipo
 from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmado
 from apps.core.reversible import Status
 from apps.core.serialization import diff_fields, snapshot
@@ -53,6 +54,7 @@ from apps.procurement.permissions import (
 PAPEIS_DE_PRODUTOR = (PartnerRoleChoice.PRODUTOR, PartnerRoleChoice.FORNECEDOR)
 
 CAMPOS_EDITAVEIS = (
+    "operation_type",
     "date",
     "seller",
     "destination_farm",
@@ -131,6 +133,7 @@ def exigir_operacao_aberta(commitment: Commitment, acao: str = "mudar isto") -> 
 
 
 def _validar_compromisso(dados: dict, *, usuario) -> Season:
+    validar_tipo(dados.get("operation_type"))
     if dados["date"] > timezone.localdate():
         raise BusinessError("Compromisso com data de movimento futura não é permitido.")
     farm = dados["destination_farm"]
@@ -308,6 +311,7 @@ def criar_compromisso(
         "origin_property": dados.get("origin_property") or "",
         "origin_city": dados.get("origin_city") or "",
         "notes": dados.get("notes") or "",
+        "operation_type": dados.get("operation_type") or "",
     }
     dados = aplicar_condicao(dados)
     season = _validar_compromisso(dados, usuario=usuario)
@@ -510,6 +514,22 @@ def encerrar_operacao(compromisso: Commitment, *, usuario, observacao: str = "")
             "Aprove o acerto antes de encerrar: sem ele a operação ainda não "
             "virou compra, custo e título."
         )
+    from apps.procurement.settlement import calcular_acerto
+
+    calculo = calcular_acerto(compromisso)
+    faltas = list(calculo.pendencias)
+    if not calculo.cabecas_recebidas:
+        faltas.append("registre a chegada e a conferência dos animais")
+    if (
+        selectors.viagens_ativas(compromisso)
+        .exclude(receivings__status=Status.CONFIRMADA)
+        .exists()
+    ):
+        faltas.append("conclua o recebimento e a conferência de todas as viagens")
+    if any(i.recebido and not i.peso_recebido_kg for i in calculo.itens):
+        faltas.append("informe os pesos recebidos de todos os itens conferidos")
+    if faltas:
+        raise BusinessError("Não é possível encerrar: " + "; ".join(faltas) + ".")
     antes = snapshot(compromisso)
     compromisso.closed_at = timezone.now()
     compromisso.closed_by = usuario

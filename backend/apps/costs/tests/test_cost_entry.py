@@ -238,6 +238,7 @@ class TestTelas:
         resposta = client.post(
             reverse("costs:novo"),
             {
+                "operation_type": "PROPRIO",
                 "date": "2025-09-18",
                 "farm": baixao.pk,
                 "cost_center": centro_funcionario.pk,
@@ -258,6 +259,7 @@ class TestTelas:
         resposta = client.post(
             reverse("costs:novo"),
             {
+                "operation_type": "PROPRIO",
                 "date": "2025-09-18",
                 "farm": baixao.pk,
                 "cost_class": custeio.pk,

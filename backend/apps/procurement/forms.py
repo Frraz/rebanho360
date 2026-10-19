@@ -18,6 +18,7 @@ from apps.commercial.models import (
     TaxType,
 )
 from apps.core import context as ctx
+from apps.core.operation_types import OperationType
 from apps.livestock.models import AnimalCategory, Lot
 from apps.partners.models import Partner, PartnerRoleChoice
 from apps.procurement.models import (
@@ -74,6 +75,9 @@ def _parceiros(papeis):
 
 
 class CommitmentForm(forms.Form):
+    operation_type = forms.ChoiceField(
+        label="Tipo de operação", choices=[("", "Selecione")] + OperationType.choices
+    )
     date = forms.DateField(
         label="Data do movimento", widget=ISO_DATE, input_formats=["%Y-%m-%d"]
     )
@@ -118,6 +122,8 @@ class CommitmentForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if "operation_type" in self.initial and not self.initial["operation_type"]:
+            self.fields["operation_type"].required = False
         self.fields["seller"].queryset = _parceiros(
             (PartnerRoleChoice.PRODUTOR, PartnerRoleChoice.FORNECEDOR)
         )

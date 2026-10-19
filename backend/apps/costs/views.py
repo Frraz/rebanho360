@@ -134,6 +134,8 @@ class CostCreateView(LancaCustoMixin, View):
                 payer=dados["payer"],
                 lot=dados["lot"],
                 notes=dados["notes"],
+                operation_type=dados["operation_type"],
+                reference=dados["reference"],
                 usuario=request.user,
             )
         except BusinessError as exc:
@@ -208,13 +210,19 @@ class CostUpdateView(LoginRequiredMixin, View):
                 "payer": custo.payer_id,
                 "lot": custo.lot_id,
                 "notes": custo.notes,
+                "operation_type": custo.operation_type,
+                "reference": custo.reference,
             },
         )
         return render(request, self.template_name, {"form": form, "custo": custo})
 
     def post(self, request, pk):
         custo = _get_custo(request, pk)
-        form = CostEntryEditForm(request.POST, user=request.user)
+        form = CostEntryEditForm(
+            request.POST,
+            user=request.user,
+            initial={"operation_type": custo.operation_type},
+        )
         if not form.is_valid():
             return render(request, self.template_name, {"form": form, "custo": custo})
 

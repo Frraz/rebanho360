@@ -13,7 +13,11 @@
   </header>
   <div class="fields">
     {% include "partials/_field.html" with field=form.date %}
+        {% include "partials/_field.html" with field=form.operation_type %}
     {% include "partials/_field.html" with field=form.seller %}
+        {% include "partials/_field.html" with field=form.buyer %}
+        {% include "partials/_field.html" with field=form.origin_property %}
+        {% include "partials/_field.html" with field=form.origin_city %}
     {% include "partials/_field.html" with field=form.destination_farm %}
     {% include "partials/_field.html" with field=form.category %}
     {% include "partials/_field.html" with field=form.lot %}

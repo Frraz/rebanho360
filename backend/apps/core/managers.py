@@ -31,3 +31,30 @@ class ScopedManager(models.Manager.from_queryset(ScopedQuerySet)):
 
     Listar sempre com `Model.objects.for_user(request.user)`.
     """
+
+
+class PurchaseManager(ScopedManager):
+    def get_queryset(self):
+        from django.db.models import DecimalField, OuterRef, Subquery, Sum, Value
+        from django.db.models.functions import Coalesce
+
+        from apps.procurement.models import FreightAllocation
+
+        totais = (
+            FreightAllocation.objects.filter(
+                purchase_id=OuterRef("pk"), supplement__status="CONFIRMADA"
+            )
+            .values("purchase_id")
+            .annotate(total=Sum("amount"))
+            .values("total")
+        )
+        campo = DecimalField(max_digits=14, decimal_places=2)
+        return (
+            super()
+            .get_queryset()
+            .annotate(
+                supplemental_freight=Coalesce(
+                    Subquery(totais, output_field=campo), Value(0), output_field=campo
+                )
+            )
+        )

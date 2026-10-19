@@ -7,7 +7,8 @@ de compra do frigorífico (Fase 5).
 from django.db import models
 from django.db.models import Q
 
-from apps.core.managers import ScopedManager
+from apps.core.managers import PurchaseManager
+from apps.core.operation_types import OperationType
 from apps.core.reversible import ReversibleModel, Status
 
 
@@ -98,11 +99,31 @@ class Purchase(ReversibleModel):
         null=True,
         blank=True,
     )
+    buyer = models.ForeignKey(
+        "partners.Partner",
+        verbose_name="Comprador",
+        null=True,
+        blank=True,
+        related_name="direct_purchases",
+        on_delete=models.PROTECT,
+    )
+    origin_property = models.CharField(
+        "Propriedade de origem", max_length=150, blank=True
+    )
+    origin_city = models.CharField("Cidade de origem", max_length=100, blank=True)
     # Texto livre, preservado e sem efeito em cálculo — pendência #3.
     partnership = models.CharField("Parceria", max_length=100, blank=True)
     notes = models.TextField("Observações", blank=True)
 
-    objects = ScopedManager()
+    operation_type = models.CharField(
+        "Tipo de operação",
+        max_length=16,
+        choices=OperationType.choices,
+        blank=True,
+        default="",
+    )
+
+    objects = PurchaseManager()
 
     class Meta:
         verbose_name = "Compra"
@@ -133,6 +154,12 @@ class Purchase(ReversibleModel):
         from apps.organizations.models import SeasonStatus
 
         bloqueios = []
+        if self.freight_allocations.exclude(
+            supplement__status=Status.EXCLUIDA
+        ).exists():
+            bloqueios.append(
+                "a compra tem complementos de frete. Exclua os complementos antes de corrigir ou excluir a compra."
+            )
         if self.season.status == SeasonStatus.ENCERRADA:
             bloqueios.append(
                 f"a safra {self.season.name} está encerrada. Peça a um "
@@ -190,7 +217,7 @@ class Purchase(ReversibleModel):
         )
         for campo, centro, rotulo in (
             ("animal_value", "DESPESA GADO", "animais"),
-            ("freight_value", "FRETE", "frete"),
+            ("freight_value", "FRETE DE COMPRA", "frete"),
             ("commission_value", "COMISSÃO", "comissão"),
             ("tax_value", "IMPOSTO E TAXAS", "impostos"),
         ):

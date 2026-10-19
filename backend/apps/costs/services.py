@@ -108,6 +108,9 @@ def registrar_custo(
     notes: str = "",
     season=None,
     source_purchase=None,
+    operation_type="",
+    source_freight=None,
+    reference="",
 ) -> CostEntry:
     season = _validar_lancamento(
         date=date,
@@ -120,6 +123,9 @@ def registrar_custo(
         usuario=usuario,
         season=season,
     )
+    from apps.core.operation_types import validar_tipo
+
+    validar_tipo(operation_type)
     custo = CostEntry(
         date=date,
         season=season,
@@ -131,6 +137,9 @@ def registrar_custo(
         payer=payer,
         lot=lot,
         source_purchase=source_purchase,
+        source_freight=source_freight,
+        operation_type=operation_type,
+        reference=reference,
         notes=notes,
         created_by=usuario,
     )
@@ -139,6 +148,10 @@ def registrar_custo(
 
 
 def _recusar_se_gerado_por_compra(custo: CostEntry, acao: str) -> None:
+    if custo.source_freight_id:
+        raise BusinessError(
+            "Este custo vem de um complemento de frete. Corrija ou exclua o complemento na operação de compra."
+        )
     if custo.source_purchase_id:
         raise BusinessError(
             f"Este custo foi gerado pela compra {custo.source_purchase.code} e "
@@ -163,11 +176,16 @@ def editar_custo(custo: CostEntry, dados: dict, *, usuario, motivo: str) -> Cost
         "lot": dados.get("lot", custo.lot),
     }
     season = _validar_lancamento(**novo, usuario=usuario, season=None)
+    from apps.core.operation_types import validar_tipo
+
+    validar_tipo(dados.get("operation_type", custo.operation_type))
     campos = {
         **novo,
         "season": season,
         "payer": dados.get("payer", custo.payer),
         "notes": dados.get("notes", custo.notes),
+        "operation_type": dados.get("operation_type", custo.operation_type),
+        "reference": dados.get("reference", custo.reference),
     }
     return reversible.editar(custo, campos, usuario=usuario, motivo=motivo)
 

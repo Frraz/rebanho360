@@ -31,6 +31,8 @@
 
 <section class="card" aria-label="Dados da compra">
   <dl class="facts">
+    {% if compra.supplemental_freight %}<div><dt>Fretes complementares</dt><dd>{{ compra.supplemental_freight|brl }}</dd></div>{% endif %}
+    <div><dt>Tipo de operação</dt><dd>{{ compra.get_operation_type_display|default:"Sem classificação" }}</dd></div>
     <div><dt>Data</dt><dd>{{ compra.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ compra.season.name }}</span></dd></div>
     <div><dt>Vendedor</dt><dd>{{ compra.seller.name|default:"—" }}</dd></div>
     <div><dt>Destino</dt><dd>{{ compra.destination_farm.name }} <span class="text-gray-500">· {{ compra.category.name }}</span></dd></div>

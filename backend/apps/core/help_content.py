@@ -526,8 +526,8 @@ AJUDA: dict[str, dict] = {
     "compromisso": {
         "titulo": "Compromissos",
         "resumo": [
-            "O compromisso é o contrato de compra feito com o produtor antes de o gado chegar: quem vende, para qual fazenda, o comprador (se houver), a programação (retirada, abate, caminhões) e os itens com o preço por faixa de arroba ou por cabeça.",
-            "O ciclo segue esta ordem: compromisso, aprovação, viagem, recebimento, romaneio e acerto. Só o acerto aprovado vira compra.",
+            "O compromisso é uma pré-compra que permanece aberta até a conferência e o encerramento manual: quem vende, para qual fazenda, o comprador (se houver), a programação (retirada, abate, caminhões) e os itens com o preço por faixa de arroba ou por cabeça.",
+            "O ciclo segue esta ordem: compromisso, aprovação, viagem, recebimento, romaneio e acerto. Só o acerto aprovado vira compra, entrada no rebanho, custos e títulos. A compra direta é uma alternativa: não é necessário cadastrar uma compra antes do compromisso. Programação e acerto começam dentro da operação, por isso suas listas não têm botão de inclusão independente. O frete recebido depois pode ser complementado na mesma operação, mesmo encerrada e com animais pagos, sem refazer o acerto.",
         ],
         "relacoes": [
             ("Parceiros", "Produtor, comprador, transportador e comissionado."),

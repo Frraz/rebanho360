@@ -25,7 +25,14 @@ def listar_compras_para(
     data_ate=None,
 ):
     qs = Purchase.objects.for_user(user).select_related(
-        "destination_farm", "category", "seller", "lot", "season"
+        "destination_farm",
+        "destination_farm__business_unit",
+        "category",
+        "seller",
+        "lot",
+        "season",
+        "buyer",
+        "commitment_item__commitment",
     )
     if season is not None:
         qs = qs.filter(season=season)
@@ -45,17 +52,30 @@ def listar_compras_para(
     return qs
 
 
-def compras_do_periodo(user, *, season=None, farm=None, start=None, end=None):
+def compras_do_periodo(
+    user, *, season=None, farm=None, start=None, end=None, **filtros
+):
     """Substitui `COMPRA DE GADO` + `DASH COMPRAS`: o que foi comprado, de
     quem, por quanto. Só compras confirmadas contam."""
     qs = listar_compras_para(
-        user, season=season, farm=farm, situacao=Status.CONFIRMADA
+        user,
+        season=season,
+        farm=farm,
+        situacao=filtros.get("situacao_operacao")
+        if filtros.get("situacao_operacao") in Status.values
+        else Status.CONFIRMADA,
     ).order_by("date", "id")
+    from apps.reports.filters import filtrar_compras
+
+    qs = filtrar_compras(qs, **filtros)
+    if season:
+        qs = qs.filter(season__company=season.company)
     if start is not None:
         qs = qs.filter(date__gte=start)
     if end is not None:
         qs = qs.filter(date__lte=end)
 
+    qs = qs.prefetch_related("commitment_item__commitment__commissions__payee")
     linhas = [{"compra": compra, "custo": custo_da_compra(compra)} for compra in qs]
     cabecas = sum(linha["compra"].head_count for linha in linhas)
     valor_animais = sum(
@@ -65,7 +85,13 @@ def compras_do_periodo(user, *, season=None, farm=None, start=None, end=None):
     totais = calcular_custo_da_compra(
         head_count=cabecas,
         animal_value=valor_animais,
-        freight_value=sum((x["compra"].freight_value for x in linhas), Decimal("0")),
+        freight_value=sum(
+            (
+                x["compra"].freight_value + x["compra"].supplemental_freight
+                for x in linhas
+            ),
+            Decimal("0"),
+        ),
         commission_value=sum(
             (x["compra"].commission_value for x in linhas), Decimal("0")
         ),
@@ -119,7 +145,10 @@ def custo_de_aquisicao_por_lote(user, *, season=None, farm=None):
         custo = calcular_custo_da_compra(
             head_count=cabecas,
             animal_value=animais,
-            freight_value=sum((c.freight_value for c in compras_do_lote), Decimal("0")),
+            freight_value=sum(
+                (c.freight_value + c.supplemental_freight for c in compras_do_lote),
+                Decimal("0"),
+            ),
             commission_value=sum(
                 (c.commission_value for c in compras_do_lote), Decimal("0")
             ),

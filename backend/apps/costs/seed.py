@@ -25,6 +25,8 @@ CENTROS = [
     # Centro próprio do frete (cliente, 2026-10-03): separa o custo dos animais,
     # o do frete e os demais custos da operação.
     "FRETE",
+    "FRETE DE COMPRA",
+    "FRETE DE TRANSFERÊNCIA",
 ]
 
 

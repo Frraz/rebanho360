@@ -150,7 +150,9 @@ def etapa_do_compromisso(commitment: Commitment) -> str:
     return etapas_dos_compromissos([commitment])[commitment.pk]
 
 
-def listar_compromissos_para(user, *, season=None, farm=None, situacao: str = ""):
+def listar_compromissos_para(
+    user, *, season=None, farm=None, situacao: str = "", start=None, end=None, **filtros
+):
     qs = Commitment.objects.for_user(user).select_related(
         "seller", "destination_farm", "commissioned", "season"
     )
@@ -160,4 +162,12 @@ def listar_compromissos_para(user, *, season=None, farm=None, situacao: str = ""
         qs = qs.filter(destination_farm=farm)
     if situacao:
         qs = qs.filter(status=situacao)
-    return qs
+    if season is not None:
+        qs = qs.filter(season__company=season.company_id)
+    if start:
+        qs = qs.filter(date__gte=start)
+    if end:
+        qs = qs.filter(date__lte=end)
+    from apps.reports.filters import filtrar_compromissos
+
+    return filtrar_compromissos(qs, **filtros)

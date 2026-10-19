@@ -750,6 +750,66 @@ def tabela_de_fazendas(e: Escopo) -> Tabela:
 
 
 def montar(e: Escopo) -> Painel:
+    from apps.core.formatting import numero_br
+    from apps.herd.consolidation import consolidar
+
+    dados = consolidar(
+        e.user,
+        company=e.season.company_id,
+        ate=e.fim,
+        farm=e.farm,
+        unidade=e.unidade,
+        categoria=e.categoria,
+    )
+    mapa = Secao(
+        "Mapa de Gado",
+        descricao="Posição consolidada das unidades e fazendas autorizadas.",
+        tabelas=[
+            Tabela(
+                ["Sexo", "Cabeças", "Participação (%)"],
+                [
+                    [
+                        linha["sexo"],
+                        numero_br(linha["cabecas"], 0),
+                        numero_br(linha["percentual"], 2)
+                        if linha["percentual"] is not None
+                        else "—",
+                    ]
+                    for linha in dados["sexos"]
+                ],
+                numericas=[1, 2],
+            ),
+            Tabela(
+                ["Categoria", "Cabeças"],
+                [[nome, numero_br(total, 0)] for nome, total in dados["ranking"]],
+                numericas=[1],
+                titulo="Ranking das categorias",
+            ),
+            Tabela(
+                ["Unidade", "Fazenda", "Categoria", "Cabeças"],
+                [
+                    [
+                        (
+                            f"{linha['farm__business_unit__code']} · {linha['farm__business_unit__name']}"
+                            if linha["farm__business_unit__code"]
+                            else "Sem unidade"
+                        ),
+                        linha["farm__name"],
+                        linha["category__name"],
+                        numero_br(linha["cabecas"], 0),
+                    ]
+                    for linha in dados["linhas"]
+                ],
+                numericas=[3],
+                titulo="Consolidação por unidade e fazenda",
+            ),
+        ],
+    )
+    if e.unidade or e.categoria:
+        return Painel(
+            kpis=[Kpi("Total de animais", numero_br(dados["total"], 0), "cabeças")],
+            secoes=[mapa],
+        )
     painel = Painel(kpis=kpis_do_rebanho(e), kpis_titulo="Posição do rebanho")
     if not saldo_por_fazenda(e) and not serie_mensal(e).entradas:
         painel.vazio = (
@@ -784,6 +844,7 @@ def montar(e: Escopo) -> Painel:
             tabelas=[tabela_de_fazendas(e)],
         ),
     ]
+    painel.secoes.insert(0, mapa)
     _, pesados, com_animais = peso_medio_do_rebanho(e)
     if com_animais and pesados < com_animais:
         painel.avisos.append(

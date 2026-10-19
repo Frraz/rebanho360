@@ -10,6 +10,13 @@
   {% endfor %}
 </nav>
 
+{% if filtros_mapa %}
+<form method="get" action="{% url 'dashboards:dashboard_aba' 'rebanho' %}" class="card mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+{% for field in filtros_mapa %}{% include "partials/_field.html" %}{% endfor %}
+<div class="flex items-end gap-2"><button class="btn-secondary" type="submit">Filtrar mapa</button><a class="btn-ghost" href="{% url 'dashboards:dashboard_aba' 'rebanho' %}">Limpar</a></div>
+<a class="link" href="{% url 'reports:relatorio' 'rebanho-consolidado' %}?{{ mapa_querystring }}">Relatório consolidado / exportar</a>
+</form>
+{% endif %}
 <div class="dash-body" id="dash-aba-{{ aba.slug }}">
   <div class="dash-intro">
     <h2 class="dash-intro-title">{{ aba.rotulo }}</h2>

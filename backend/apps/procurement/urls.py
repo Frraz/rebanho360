@@ -1,10 +1,36 @@
 from django.urls import path
 
-from apps.procurement import views
+from apps.procurement import freight_views, views
 
 app_name = "procurement"
 
 urlpatterns = [
+    path("fretes/<int:pk>/restaurar/", freight_views.FreightRestoreView.as_view(), name="frete_restaurar"),
+    path(
+        "<int:pk>/fretes/novo/",
+        freight_views.FreightFormView.as_view(),
+        name="frete_novo",
+    ),
+    path(
+        "<int:pk>/fretes/<int:freight_pk>/editar/",
+        freight_views.FreightFormView.as_view(),
+        name="frete_editar",
+    ),
+    path(
+        "fretes/<int:pk>/",
+        freight_views.FreightDetailView.as_view(),
+        name="frete_detalhe",
+    ),
+    path(
+        "fretes/<int:pk>/confirmar/",
+        freight_views.FreightConfirmView.as_view(),
+        name="frete_confirmar",
+    ),
+    path(
+        "fretes/<int:pk>/excluir/",
+        freight_views.FreightDeleteView.as_view(),
+        name="frete_excluir",
+    ),
     # Compromisso
     path("", views.CompromissoListView.as_view(), name="compromisso_lista"),
     path("novo/", views.CompromissoNovoView.as_view(), name="compromisso_novo"),

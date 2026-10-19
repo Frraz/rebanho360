@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Complemento de frete · Rebanho360{% endblock %}
+{% block content %}
+<header class="page-header"><div><a class="crumb" href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}">{{ compromisso.code }}</a><div class="page-title-row"><h1 class="page-title">Complemento de frete</h1>{% info "compromisso" %}</div></div></header>
+<form method="post" class="card max-w-4xl space-y-4">{% csrf_token %}
+{% if impacto %}<div class="alert-info"><div>{% for efeito in impacto.efeitos %}<p>{{ efeito }}</p>{% endfor %}{% for bloqueio in impacto.bloqueios %}<p>{{ bloqueio }}</p>{% endfor %}</div></div>{% endif %}
+{{ form.non_field_errors }}
+{% for field in form %}{% if field.name != "reason" or frete %}{% include "partials/_field.html" %}{% endif %}{% endfor %}
+{% if linhas %}<h2 class="card-title">Distribuição entre as compras</h2>{{ linhas.management_form }}{{ linhas.non_form_errors }}{% for linha in linhas %}{% for field in linha %}{% include "partials/_field.html" %}{% endfor %}{% endfor %}{% endif %}
+<div class="form-actions"><a class="btn-secondary" href="{% url 'procurement:compromisso_detalhe' compromisso.pk %}">Cancelar</a><button class="btn-primary" type="submit">{% if frete %}Salvar correção{% else %}Salvar rascunho{% endif %}</button></div>
+</form>{% endblock %}

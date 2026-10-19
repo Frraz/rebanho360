@@ -24,6 +24,7 @@
     {% endif %}
     {% if pode_editar %}<a href="{% url 'procurement:compromisso_editar' compromisso.pk %}" class="btn-secondary">{% icon "pencil" %} Editar</a>{% endif %}
     {% if pode_encerrar %}<a href="{% url 'procurement:operacao_encerrar' compromisso.pk %}" class="btn-secondary">{% icon "lock" %} Encerrar operação</a>{% endif %}
+    {% if acerto_aprovado and pode_lancar %}<a class="btn-secondary" href="{% url 'procurement:frete_novo' compromisso.pk %}">Complementar frete</a>{% endif %}
     {% if pode_reabrir_operacao %}<a href="{% url 'procurement:operacao_reabrir' compromisso.pk %}" class="btn-secondary">{% icon "rotate-ccw" %} Reabrir operação</a>{% endif %}
   </div>
 </header>
@@ -38,7 +39,7 @@
   <dl class="facts">
     <div><dt>Data do movimento</dt><dd>{{ compromisso.date|date:"d/m/Y" }} <span class="text-gray-500">· safra {{ compromisso.season.name }}</span></dd></div>
     <div><dt>Produtor</dt><dd>{{ compromisso.seller.name }}</dd></div>
-    <div><dt>Destino</dt><dd>{{ compromisso.destination_farm.name }}</dd></div>
+    <div><dt>Tipo de operação</dt><dd>{{ compromisso.get_operation_type_display|default:"Sem classificação" }}</dd></div><div><dt>Destino</dt><dd>{{ compromisso.destination_farm.name }}</dd></div>
     <div><dt>Compradores</dt><dd>{% for x in comissoes %}{% if x.comissao.payee %}{{ x.comissao.payee.name }}{% if not forloop.last %}, {% endif %}{% endif %}{% empty %}—{% endfor %}</dd></div>
     {% if compromisso.origin_property or compromisso.origin_city %}<div><dt>Origem</dt><dd>{{ compromisso.origin_property|default:"—" }}{% if compromisso.origin_city %} <span class="text-gray-500">· {{ compromisso.origin_city }}</span>{% endif %}</dd></div>{% endif %}
     <div><dt>Retirada</dt><dd>{% if compromisso.pickup_date %}{{ compromisso.pickup_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
@@ -183,4 +184,5 @@
   {% endif %}
 </div>
 {% endif %}
+<section class="card mt-6"><h2 class="card-title">Complementos de frete</h2>{% for frete in compromisso.freight_supplements.all %}<p class="mt-2"><a class="link" href="{% url 'procurement:frete_detalhe' frete.pk %}">{{ frete }}</a> · {{ frete.carrier }} · {{ frete.amount|brl }} · {{ frete.get_status_display }}</p>{% empty %}<p class="text-sm text-gray-500">Nenhum complemento de frete.</p>{% endfor %}</section>
 {% endblock %}

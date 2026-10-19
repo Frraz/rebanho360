@@ -47,6 +47,10 @@ def _initial_da_compra(compra: Purchase) -> dict:
         "payment_days": compra.payment_days,
         "payment_condition": compra.payment_condition_id,
         "partnership": compra.partnership,
+        "operation_type": compra.operation_type,
+        "buyer": compra.buyer_id,
+        "origin_property": compra.origin_property,
+        "origin_city": compra.origin_city,
         "notes": compra.notes,
     }
 
@@ -279,7 +283,11 @@ class PurchaseUpdateView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         compra = _get_compra(request, pk)
-        form = PurchaseEditForm(request.POST, user=request.user)
+        form = PurchaseEditForm(
+            request.POST,
+            user=request.user,
+            initial={"operation_type": compra.operation_type},
+        )
         contexto = lambda: _contexto_form(form, compra=compra)  # noqa: E731
         if not form.is_valid():
             return render(request, self.template_name, contexto())

@@ -33,11 +33,12 @@
 
 <div class="grid gap-6 lg:grid-cols-12">
   <!-- Pendências primeiro: "o que preciso fazer hoje?" -->
-  <section class="card-flush lg:col-span-8" aria-labelledby="titulo-pendencias">
-    <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
+  <details open class="card-flush lg:col-span-8" aria-labelledby="titulo-pendencias">
+    <summary class="flex min-h-touch cursor-pointer items-center justify-between border-b border-gray-200 px-5 py-3.5">
       <h2 id="titulo-pendencias" class="card-title">Pendências</h2>
       {% if pendencias %}<span class="badge-pendencia">{{ pendencias|length }} para revisar</span>{% endif %}
-    </div>
+      {% icon "chevron-down" %}
+    </summary>
     {% if pendencias %}
     <ul class="divide-y divide-gray-100">
       {% for p in pendencias %}
@@ -56,7 +57,7 @@
     {% else %}
     <p class="flex items-center gap-3 px-5 py-6 text-sm text-sage-800">{% icon "circle-check" "text-sage-600" %} Nada pendente hoje.</p>
     {% endif %}
-  </section>
+  </details>
 
   <section class="card lg:col-span-4" aria-labelledby="titulo-rebanho">
     <h2 id="titulo-rebanho" class="eyebrow">Rebanho</h2>

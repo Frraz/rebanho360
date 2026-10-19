@@ -63,6 +63,30 @@ def parametros_do_relatorio(user, slug, origem) -> dict:
         extras["preco_arroba"] = _decimal(origem.get("preco_arroba", ""))
     if "rendimento_entrada" in aceitos:
         extras["rendimento_entrada"] = _decimal(origem.get("rendimento_entrada", ""))
+    from django.http import Http404
+
+    from apps.reports.filters import OperationalFilterForm
+
+    operacionais = set(aceitos) & {
+        "unidade",
+        "produtor",
+        "categoria",
+        "operacao",
+        "centro_custo",
+        "situacao_operacao",
+        "tipo_operacao",
+    }
+    if operacionais:
+        escolhidos = operacionais | (
+            set(aceitos) & {"comprador", "fazenda", "de", "ate"}
+        )
+        form = OperationalFilterForm(origem, user=user, fields=escolhidos)
+        if not form.is_valid():
+            raise Http404("Filtros inválidos ou fora do seu acesso.")
+        for nome in escolhidos - {"de", "ate"}:
+            valor = form.cleaned_data.get(nome)
+            if valor is not None and valor != "":
+                extras[nome] = valor
     return extras
 
 
@@ -114,4 +138,30 @@ def campos_de_selecao(user, slug, origem) -> list[dict]:
                 "valor": origem.get("situacao", ""),
             }
         )
+    from apps.reports.filters import OperationalFilterForm
+
+    novos = set(aceitos) & {
+        "unidade",
+        "produtor",
+        "categoria",
+        "operacao",
+        "centro_custo",
+        "situacao_operacao",
+        "tipo_operacao",
+    }
+    if novos:
+        novos |= set(aceitos) & {"comprador", "fazenda"}
+        campos = [c for c in campos if c["nome"] not in novos]
+        form = OperationalFilterForm(origem, user=user, fields=novos)
+        for nome, campo in form.fields.items():
+            opcoes = list(campo.choices)
+            campos.append(
+                {
+                    "nome": nome,
+                    "rotulo": campo.label,
+                    "vazio": "Todos",
+                    "opcoes": [(v, t) for v, t in opcoes if str(v)],
+                    "valor": origem.get(nome, ""),
+                }
+            )
     return campos

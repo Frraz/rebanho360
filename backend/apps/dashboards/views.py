@@ -118,7 +118,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     def _html_da_aba(self, atual, user, season, farm, hoje) -> str:
         """O fragmento da aba, pronto. Tudo o que o muda está na chave: quem pede
         (a aba e o dinheiro dependem do papel), a safra, a fazenda e o dia."""
+        filtros_mapa = self._filtros_mapa(user) if atual.slug == "rebanho" else None
+        if filtros_mapa and filtros_mapa.cleaned_data.get("fazenda"):
+            farm = filtros_mapa.cleaned_data["fazenda"]
         partes = (
+            tuple(
+                (k, str(v.pk) if hasattr(v, "pk") else str(v))
+                for k, v in filtros_mapa.cleaned_data.items()
+            )
+            if filtros_mapa
+            else (),
             user.pk,
             atual.slug,
             season.pk if season else None,
@@ -134,7 +143,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def _montar_a_aba(self, atual, user, season, farm, hoje) -> str:
         escopo = Escopo.criar(user, season=season, farm=farm, hoje=hoje)
+        filtros_mapa = self._filtros_mapa(user) if atual.slug == "rebanho" else None
+        if filtros_mapa and escopo:
+            from dataclasses import replace
+
+            escopo = replace(
+                escopo,
+                unidade=filtros_mapa.cleaned_data.get("unidade"),
+                categoria=filtros_mapa.cleaned_data.get("categoria"),
+            )
         context = dict(
+            filtros_mapa=filtros_mapa,
+            mapa_querystring=self.request.GET.urlencode(),
             abas=registro.abas_visiveis(user),
             aba=atual,
             season=season,
@@ -156,6 +176,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 segundos=round(time.perf_counter() - inicio, 2),
             )
         return render_to_string(self.template_fragmento, context)
+
+    def _filtros_mapa(self, user):
+        from apps.reports.filters import OperationalFilterForm
+
+        if hasattr(self, "_mapa_filtros"):
+            return self._mapa_filtros
+        form = OperationalFilterForm(
+            self.request.GET, user=user, fields=("unidade", "fazenda", "categoria")
+        )
+        if not form.is_valid():
+            raise Http404("Filtros inválidos ou fora do seu acesso.")
+        self._mapa_filtros = form
+        return form
 
     def render_to_response(self, context, **kwargs):
         if self._e_fragmento():

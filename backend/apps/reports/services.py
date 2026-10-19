@@ -28,7 +28,7 @@ from apps.finance.permissions import pode_ver_titulos
 from apps.herd import selectors as rebanho
 from apps.herd.models import MovementType, Weighing
 from apps.herd.weight_gain import desempenho_dos_lotes as _desempenhos
-from apps.livestock.models import Lot, LotStatus
+from apps.livestock.models import Lot, LotStatus, Sex
 from apps.procurement.permissions import pode_ver_o_ciclo
 from apps.purchases import selectors as compras
 from apps.sales import carcass
@@ -332,7 +332,7 @@ def custos_por_fazenda(user, *, season, farm=None) -> Relatorio:
 
 
 def custos_por_fazenda_detalhado(
-    user, *, season, farm, start=None, end=None
+    user, *, season, farm, start=None, end=None, **filtros
 ) -> Relatorio:
     """Cada lançamento de custo da fazenda e do período, um a um — o relatório
     "custo por fazenda" da planilha, para conferir mês a mês. Inclui os custos
@@ -346,11 +346,32 @@ def custos_por_fazenda_detalhado(
         qs = qs.filter(date__gte=start)
     if end:
         qs = qs.filter(date__lte=end)
+    if season:
+        qs = qs.filter(season__company=season.company_id)
+    if filtros.get("unidade"):
+        qs = qs.filter(farm__business_unit=filtros["unidade"])
+    if filtros.get("centro_custo"):
+        qs = qs.filter(cost_center=filtros["centro_custo"])
+    if filtros.get("tipo_operacao"):
+        qs = qs.filter(
+            operation_type=""
+            if filtros["tipo_operacao"] == "SEM_TIPO"
+            else filtros["tipo_operacao"]
+        )
+    qs = qs.select_related(
+        "farm__business_unit", "source_purchase", "cost_center", "cost_class"
+    )
     lancamentos = list(qs)
     linhas = [
         {
             "data": f"{c.date:%d/%m/%Y}",
             "fazenda": c.farm.name,
+            "unidade": f"{c.farm.business_unit.code} · {c.farm.business_unit.name}"
+            if c.farm.business_unit_id
+            else None,
+            "referencia": c.reference or c.notes or None,
+            "tipo_operacao": c.get_operation_type_display() or "Sem classificação",
+            "compra": c.source_purchase.code if c.source_purchase_id else None,
             "centro": c.cost_center.name,
             "classe": c.cost_class.name,
             "descricao": c.description,
@@ -368,6 +389,10 @@ def custos_por_fazenda_detalhado(
         colunas=[
             Coluna("data", "Data"),
             Coluna("fazenda", "Fazenda"),
+            Coluna("unidade", "Unidade"),
+            Coluna("tipo_operacao", "Tipo de operação"),
+            Coluna("compra", "Compra relacionada"),
+            Coluna("referencia", "Referência da despesa"),
             Coluna("centro", "Centro de custo"),
             Coluna("classe", "Classe"),
             Coluna("descricao", "Descrição"),
@@ -404,14 +429,23 @@ def custeio_x_investimento(user, *, season, farm) -> Relatorio:
 # --------------------------------------------------------------------------
 
 
-def compras_do_periodo(user, *, season, farm, start=None, end=None) -> Relatorio:
+def compras_do_periodo(
+    user, *, season, farm, start=None, end=None, **filtros
+) -> Relatorio:
     """Substitui `COMPRA DE GADO` + `DASH COMPRAS`."""
     linhas_brutas, totais = compras.compras_do_periodo(
-        user, season=season, farm=farm, start=start, end=end
+        user, season=season, farm=farm, start=start, end=end, **filtros
     )
     linhas = [
         {
             "codigo": lin["compra"].code,
+            "produtor": lin["compra"].seller.name if lin["compra"].seller_id else None,
+            "comprador": _compradores_da_compra(lin["compra"]),
+            "origem": _origem_da_compra(lin["compra"]),
+            "unidade": _unidade_da_fazenda(lin["compra"].destination_farm),
+            "tipo_operacao": lin["compra"].get_operation_type_display()
+            or "Sem classificação",
+            "situacao": lin["compra"].get_status_display(),
             "data": f"{lin['compra'].date:%d/%m/%Y}",
             "fazenda": lin["compra"].destination_farm.name,
             "categoria": lin["compra"].category.name,
@@ -425,6 +459,12 @@ def compras_do_periodo(user, *, season, farm, start=None, end=None) -> Relatorio
     ]
     colunas = [
         Coluna("codigo", "Compra"),
+        Coluna("produtor", "Produtor/pecuarista"),
+        Coluna("comprador", "Comprador"),
+        Coluna("origem", "Origem dos animais"),
+        Coluna("unidade", "Unidade"),
+        Coluna("tipo_operacao", "Tipo de operação"),
+        Coluna("situacao", "Situação"),
         Coluna("data", "Data"),
         Coluna("fazenda", "Fazenda"),
         Coluna("categoria", "Categoria"),
@@ -434,15 +474,18 @@ def compras_do_periodo(user, *, season, farm, start=None, end=None) -> Relatorio
         Coluna("media_cabeca", "Média/cabeça", DINHEIRO),
         Coluna("custo_arroba", "Custo/@", DINHEIRO),
     ]
-    por_mes = [
-        {
-            "mes": f"{m['mes']:%m/%Y}",
-            "compras": m["compras"],
-            "cabecas": m["cabecas"],
-            "valor": m["valor"],
-        }
-        for m in compras.compras_por_mes(user, season=season, farm=farm)
-    ]
+    agrupados = {}
+    for linha in linhas_brutas:
+        compra = linha["compra"]
+        mes = compra.date.replace(day=1)
+        agregado = agrupados.setdefault(
+            mes,
+            {"mes": f"{mes:%m/%Y}", "compras": 0, "cabecas": 0, "valor": Decimal(0)},
+        )
+        agregado["compras"] += 1
+        agregado["cabecas"] += compra.head_count
+        agregado["valor"] += compra.animal_value
+    por_mes = [agrupados[m] for m in sorted(agrupados)]
     secao = Relatorio(
         titulo="Compras por mês",
         descricao="",
@@ -458,7 +501,7 @@ def compras_do_periodo(user, *, season, farm, start=None, end=None) -> Relatorio
     custo = totais["custo"]
     return Relatorio(
         titulo="Compras do período",
-        descricao="O que foi comprado, de quem, por quanto. Só compras confirmadas.",
+        descricao="Compras do período: de quem, por quanto e na situação selecionada. Sem filtro de situação, somente confirmadas.",
         colunas=colunas,
         linhas=linhas,
         totais={
@@ -1494,7 +1537,20 @@ def montar_relatorio(user, slug, *, season, farm, extras=None) -> Relatorio:
     extras = dict(extras or {})
     # "Fazenda" escolhida no próprio relatório vale mais que a do topo da tela.
     farm = extras.pop("fazenda", None) or farm
-    return RELATORIOS[slug](user, season=season, farm=farm, **extras)
+    relatorio = RELATORIOS[slug](user, season=season, farm=farm, **extras)
+    from apps.reports.filters import rotulos
+
+    relatorio.filtros.extend(rotulos(extras))
+    if extras.get("categoria") and slug in {
+        "programacao-de-embarque",
+        "fretes-e-quebra",
+        "historico-por-pecuarista",
+        "comissao-por-comprador",
+    }:
+        relatorio.notas.append(
+            "Categoria seleciona operações que contêm esses animais. Valores e totais logísticos/comerciais permanecem os da operação completa."
+        )
+    return relatorio
 
 
 def catalogo_para(user):
@@ -1692,3 +1748,238 @@ CATALOGO = [
         "Fertilidade, inseminadas, nascimentos e desmama de cada ciclo.",
     ),
 ]
+
+
+def _unidade_da_fazenda(fazenda):
+    u = fazenda.business_unit
+    return f"{u.code} · {u.name}" if u else None
+
+
+def _origem_da_compra(compra):
+    item = getattr(compra, "commitment_item", None)
+    origem = compra.origin_property or (item.commitment.origin_property if item else "")
+    cidade = compra.origin_city or (item.commitment.origin_city if item else "")
+    return " · ".join(filter(None, [origem, cidade])) or None
+
+
+def _compradores_da_compra(compra):
+    item = getattr(compra, "commitment_item", None)
+    if item:
+        nomes = [c.payee.name for c in item.commitment.commissions.all() if c.payee_id]
+        return ", ".join(dict.fromkeys(nomes)) or (
+            compra.buyer.name if compra.buyer_id else None
+        )
+    return compra.buyer.name if compra.buyer_id else None
+
+
+def compromissos_previsao(user, *, season, farm, start=None, end=None, **filtros):
+    from apps.procurement.selectors import (
+        etapas_dos_compromissos,
+        listar_compromissos_para,
+    )
+    from apps.procurement.settlement import calcular_acerto
+
+    qs = listar_compromissos_para(
+        user, season=season, farm=farm, start=start, end=end, **filtros
+    )
+    if not filtros.get("situacao_operacao"):
+        qs = qs.exclude(status=Status.EXCLUIDA).filter(closed_at__isnull=True)
+    qs = qs.select_related(
+        "destination_farm__business_unit", "payment_condition"
+    ).prefetch_related("items__category", "commissions__payee")
+    compromissos = list(qs)
+    etapas = etapas_dos_compromissos(compromissos)
+    from apps.procurement.selectors import Etapa
+
+    linhas = []
+    for c in compromissos:
+        calculo = calcular_acerto(c)
+        previstos = [i.valor_previsto for i in calculo.itens]
+        valor = (
+            sum(previstos, Decimal(0))
+            if previstos and all(v is not None for v in previstos)
+            else None
+        )
+        # A data real depende do recebimento. Não inventar vencimento a partir da negociação.
+        referencia = c.pickup_date
+        vencimento = (
+            (referencia + datetime.timedelta(days=c.payment_days))
+            if referencia and c.payment_days is not None
+            else None
+        )
+        linhas.append(
+            {
+                "operacao": c.code,
+                "data": f"{c.date:%d/%m/%Y}",
+                "retirada": f"{c.pickup_date:%d/%m/%Y}" if c.pickup_date else None,
+                "produtor": c.seller.name,
+                "compradores": ", ".join(
+                    dict.fromkeys(
+                        x.payee.name for x in c.commissions.all() if x.payee_id
+                    )
+                )
+                or (c.commissioned.name if c.commissioned_id else None),
+                "unidade": _unidade_da_fazenda(c.destination_farm),
+                "fazenda": c.destination_farm.name,
+                "categorias": ", ".join(
+                    dict.fromkeys(i.category.name for i in c.items.all())
+                ),
+                "cabecas": sum(i.head_count for i in c.items.all()),
+                "valor": valor,
+                "condicao": c.payment_condition.name
+                if c.payment_condition_id
+                else f"{c.payment_days} dias"
+                if c.payment_days is not None
+                else "A definir",
+                "vencimento": f"{vencimento:%d/%m/%Y}" if vencimento else None,
+                "situacao": "Encerrada" if c.encerrada else Etapa(etapas[c.pk]).label,
+                "tipo_operacao": c.get_operation_type_display() or "Sem classificação",
+            }
+        )
+    valores = [linha["valor"] for linha in linhas]
+    return Relatorio(
+        "Compromissos — previsão financeira",
+        "Pré-compras para planejamento financeiro.",
+        [
+            Coluna("operacao", "Operação"),
+            Coluna("data", "Data"),
+            Coluna("retirada", "Retirada prevista"),
+            Coluna("produtor", "Produtor/pecuarista"),
+            Coluna("compradores", "Compradores"),
+            Coluna("unidade", "Unidade"),
+            Coluna("fazenda", "Fazenda"),
+            Coluna("categorias", "Categorias"),
+            Coluna("cabecas", "Cabeças", INTEIRO),
+            Coluna("valor", "Valor previsto", DINHEIRO),
+            Coluna("condicao", "Condição"),
+            Coluna("vencimento", "Pagamento previsto"),
+            Coluna("situacao", "Situação"),
+            Coluna("tipo_operacao", "Tipo de operação"),
+        ],
+        linhas,
+        totais={
+            "operacao": "Total",
+            "cabecas": sum(linha["cabecas"] for linha in linhas),
+            "valor": sum(valores, Decimal(0))
+            if all(v is not None for v in valores)
+            else None,
+        },
+        filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
+        notas=[
+            "Previsão não gera obrigação financeira. Valores/datas indefinidos aparecem como —. Pagamento previsto usa retirada prevista e prazo; o vencimento efetivo depende da compra conferida."
+        ],
+    )
+
+
+FILTROS_COMPRA = (
+    "de",
+    "ate",
+    "unidade",
+    "fazenda",
+    "comprador",
+    "produtor",
+    "categoria",
+    "operacao",
+    "situacao_operacao",
+    "tipo_operacao",
+)
+PARAMETROS["compras-do-periodo"] = (*FILTROS_COMPRA, "centro_custo")
+PARAMETROS["compromissos"] = FILTROS_COMPRA
+PARAMETROS["custos-por-fazenda-detalhado"] = (
+    "de",
+    "ate",
+    "unidade",
+    "fazenda",
+    "centro_custo",
+    "tipo_operacao",
+)
+for _slug in RELATORIOS_DO_CICLO - {"conferencia-do-acerto", "contrato-de-compra"}:
+    PARAMETROS[_slug] = (*FILTROS_COMPRA, "centro_custo")
+RELATORIOS["compromissos"] = compromissos_previsao
+RELATORIOS_DO_CICLO = RELATORIOS_DO_CICLO | {"compromissos"}
+RELATORIOS_COM_DINHEIRO = RELATORIOS_COM_DINHEIRO | {"compromissos"}
+CATALOGO.append(
+    (
+        "compromissos",
+        "Compromissos — previsão financeira",
+        "Pré-compras em aberto, valores e previsão de pagamento.",
+    )
+)
+
+
+def rebanho_consolidado(user, *, season, farm, unidade=None, categoria=None):
+    from django.utils import timezone
+
+    from apps.dashboards.bi.escopo import Escopo
+    from apps.herd.consolidation import consolidar
+
+    if season is None:
+        return Relatorio("Rebanho consolidado", "Escolha uma safra.", [], [])
+    dados = consolidar(
+        user,
+        company=season.company_id,
+        ate=Escopo.fim_do_recorte(season, timezone.localdate()),
+        farm=farm,
+        unidade=unidade,
+        categoria=categoria,
+    )
+    linhas = [
+        {
+            "unidade": (
+                f"{linha['farm__business_unit__code']} · {linha['farm__business_unit__name']}"
+                if linha["farm__business_unit__code"]
+                else "Sem unidade"
+            ),
+            "fazenda": linha["farm__name"],
+            "categoria": linha["category__name"],
+            "sexo": Sex(linha["category__sex"]).label,
+            "cabecas": linha["cabecas"],
+        }
+        for linha in dados["linhas"]
+    ]
+    return Relatorio(
+        "Rebanho consolidado",
+        "Mapa de Gado de todas as unidades e fazendas autorizadas.",
+        [
+            Coluna("unidade", "Unidade"),
+            Coluna("fazenda", "Fazenda"),
+            Coluna("categoria", "Categoria"),
+            Coluna("sexo", "Sexo"),
+            Coluna("cabecas", "Cabeças", INTEIRO),
+        ],
+        linhas,
+        totais={"unidade": "Total", "cabecas": dados["total"]},
+        filtros=_contexto(season, farm),
+        secoes=[
+            Relatorio(
+                "Machos e fêmeas",
+                "",
+                [
+                    Coluna("sexo", "Sexo"),
+                    Coluna("cabecas", "Cabeças", INTEIRO),
+                    Coluna("percentual", "Participação (%)", PERCENTUAL),
+                ],
+                dados["sexos"],
+            ),
+            Relatorio(
+                "Ranking das categorias",
+                "",
+                [
+                    Coluna("categoria", "Categoria"),
+                    Coluna("cabecas", "Cabeças", INTEIRO),
+                ],
+                [{"categoria": n, "cabecas": t} for n, t in dados["ranking"]],
+            ),
+        ],
+    )
+
+
+RELATORIOS["rebanho-consolidado"] = rebanho_consolidado
+PARAMETROS["rebanho-consolidado"] = ("unidade", "fazenda", "categoria")
+CATALOGO.append(
+    (
+        "rebanho-consolidado",
+        "Rebanho consolidado",
+        "Mapa de Gado por unidade, fazenda, categoria e sexo.",
+    )
+)

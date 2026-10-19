@@ -55,6 +55,8 @@ class Escopo:
     hoje: datetime.date
     inicio: datetime.date
     fim: datetime.date
+    unidade: object | None = None
+    categoria: object | None = None
     ver_dinheiro: bool = True
     ver_titulos: bool = True
     ver_ciclo: bool = True
@@ -147,6 +149,8 @@ class Escopo:
     # ------------------------------------------------------------------
 
     def _fazenda(self, qs, campo: str):
+        if self.unidade:
+            qs = qs.filter(**{campo + "__business_unit": self.unidade})
         return qs.filter(**{campo: self.farm}) if self.farm is not None else qs
 
     def compras(self):
@@ -178,6 +182,20 @@ class Escopo:
         qs = HerdLedgerEntry.objects.for_user(self.user).filter(
             date__lte=ate or self.fim
         )
+        if self.season:
+            from django.db.models import Q
+
+            qs = qs.filter(
+                Q(farm__business_unit__company=self.season.company_id)
+                | Q(
+                    farm__business_unit__isnull=True,
+                    season__company=self.season.company_id,
+                )
+            )
+        if self.unidade:
+            qs = qs.filter(farm__business_unit=self.unidade)
+        if self.categoria:
+            qs = qs.filter(category=self.categoria)
         return self._fazenda(qs, "farm")
 
     def movimentos(self):
@@ -190,6 +208,18 @@ class Escopo:
             from django.db.models import Q
 
             qs = qs.filter(Q(origin_farm=self.farm) | Q(destination_farm=self.farm))
+        from django.db.models import Q
+
+        if self.unidade:
+            qs = qs.filter(
+                Q(origin_farm__business_unit=self.unidade)
+                | Q(destination_farm__business_unit=self.unidade)
+            )
+        if self.categoria:
+            qs = qs.filter(
+                Q(origin_category=self.categoria)
+                | Q(destination_category=self.categoria)
+            )
         return qs
 
     def pesagens(self):
@@ -255,7 +285,18 @@ class Escopo:
         # Várias abas e gráficos pedem a lista: uma consulta por requisição.
         # `Farm` já ordena por nome; a lista é a mesma que a barra do topo usa
         # (`ctx.available_farms` é uma consulta só por requisição).
-        return self.memo("fazendas", lambda: list(ctx.available_farms(self.user)))
+        return self.memo(
+            "fazendas",
+            lambda: [
+                farm
+                for farm in ctx.available_farms(self.user)
+                if (
+                    farm.business_unit_id is None
+                    or farm.business_unit.company_id == self.season.company_id
+                )
+                and (self.unidade is None or farm.business_unit_id == self.unidade.pk)
+            ],
+        )
 
 
 ZERO = Decimal("0")
