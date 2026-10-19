@@ -22,8 +22,8 @@ from apps.dashboards.bi.escopo import Escopo
 
 
 class InicioView(LoginRequiredMixin, TemplateView):
-    """Tela inicial: responde "o que preciso fazer hoje?". Pendências em
-    primeiro lugar; indicador sem dado aparece como "—".
+    """Tela inicial: visão do rebanho e da safra, com pendências recolhíveis.
+    Indicador sem dado aparece como "—".
     Ver docs/ux/01-navegacao-e-ui.md#tela-inicial."""
 
     template_name = "dashboards/inicio.html"

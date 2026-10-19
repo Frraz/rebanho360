@@ -954,13 +954,13 @@ AJUDA: dict[str, dict] = {
     "inicio": {
         "titulo": "Início",
         "resumo": [
-            "O painel responde à pergunta do dia: o que preciso fazer agora? As pendências vêm primeiro, depois o rebanho, os indicadores da safra e os últimos lançamentos.",
+            "O painel reúne o saldo do rebanho, os indicadores da safra e os últimos lançamentos. As pendências ficam em uma seção recolhível, abaixo dos indicadores.",
             "Segue a safra e a fazenda escolhidas no topo da tela.",
         ],
         "relacoes": [
             (
                 "Pendências",
-                "Cada uma é um link que leva direto ao que precisa de atenção.",
+                "Clique em Pendências para abrir ou recolher a lista. Cada item leva direto ao registro que precisa de atenção. A escolha de abrir ou recolher é lembrada para seu usuário neste navegador, quando o armazenamento local está disponível.",
             ),
             (
                 "Rebanho",

@@ -83,9 +83,9 @@ Responde "o que preciso fazer hoje?", não é enfeite.
 12/04  Abate VD-2025/26-0003  ·  81 cb · Coperfrigu      Maria
 ```
 
-Pendências em primeiro lugar. O gráfico bonito vem depois — e só se for usado.
+O esquema acima registra a proposta original. A revisão de 19/10/2026 coloca os indicadores primeiro e mantém as pendências sob demanda.
 
-**Layout atual:** pendências à esquerda (cada uma é uma linha-link com até 4 exemplos) e o bloco do rebanho à direita; abaixo, a faixa de indicadores da safra (comprado, vendido, custos, custo/cabeça, custo/@) e a tabela de últimos lançamentos. Um único bloco de números dividido em células, em vez de uma parede de cartões.
+**Layout atual (19/10/2026):** saldo do rebanho em destaque, com fazendas, lotes e movimentos do mês; abaixo, a faixa de indicadores da safra (comprado, vendido, custos, custo/cabeça, custo/@). As pendências ficam em uma faixa discreta, fechada por padrão, antes dos últimos lançamentos. Clique ou use Enter/Espaço para abrir e recolher. A escolha é lembrada por usuário neste navegador, quando o armazenamento local está disponível; sem JavaScript, o controle nativo continua funcionando. O contador mostra categorias de pendência, e cada item mantém seu link e até 4 exemplos. Um único bloco de números dividido em células, em vez de uma parede de cartões.
 
 Note o `Custo/@` como "—": não há peso de carcaça em todas as vendas ainda. Melhor que um número inventado.
 

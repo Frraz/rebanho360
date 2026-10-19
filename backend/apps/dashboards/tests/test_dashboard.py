@@ -1,4 +1,4 @@
-"""F3-09 — o painel: pendências em primeiro lugar, indicador sem dado é "—",
+"""O painel: indicadores primeiro e pendências recolhíveis; sem dado é "—",
 e o mesmo número que o resto do sistema mostra para o mesmo indicador."""
 
 import datetime
@@ -336,17 +336,36 @@ class TestMortalidade:
 
 
 class TestTela:
-    def test_pendencias_vem_antes_do_resto(self, client, gestor, lote_gordo):
+    def test_indicadores_antes_das_pendencias_recolhidas(
+        self, client, gestor, lote_gordo
+    ):
         client.force_login(gestor)
         html = client.get(reverse("dashboards:inicio")).content.decode()
 
         # Os `id` das seções: "Rebanho" também aparece no menu lateral.
         assert (
-            html.index('id="titulo-pendencias"')
-            < html.index('id="titulo-rebanho"')
+            html.index('id="titulo-rebanho"')
             < html.index('id="titulo-safra"')
+            < html.index('id="titulo-pendencias"')
             < html.index('id="titulo-ultimos"')
         )
+
+        from html.parser import HTMLParser
+
+        class PainelParser(HTMLParser):
+            painel = None
+
+            def handle_starttag(self, tag, attrs):
+                atributos = dict(attrs)
+                if tag == "details" and "data-pendencias-usuario" in atributos:
+                    self.painel = atributos
+
+        parser = PainelParser()
+        parser.feed(html)
+        assert parser.painel is not None
+        assert "open" not in parser.painel
+        assert parser.painel["data-pendencias-usuario"] == str(gestor.pk)
+        assert "js/inicio.js" in html
 
     def test_indicador_sem_dado_e_travessao_nunca_zero(self, client, gestor, season):
         client.force_login(gestor)

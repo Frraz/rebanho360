@@ -864,6 +864,90 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Início: saldo e indicadores primeiro; revisão sob demanda. */
+  .inicio-section-heading {
+    @apply mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1;
+  }
+  .inicio-rebanho {
+    @apply grid overflow-hidden rounded-lg border border-gray-200 bg-surface md:grid-cols-3;
+  }
+  .inicio-rebanho-total {
+    @apply min-w-0 border-b border-gray-200 bg-brand-50/40 p-5 sm:p-6 md:border-b-0 md:border-r;
+  }
+  .inicio-rebanho-value {
+    @apply mt-3 break-words text-4xl font-semibold leading-tight tracking-tight text-gray-900;
+    font-variant-numeric: tabular-nums;
+  }
+  .inicio-rebanho-value > span {
+    @apply text-sm font-normal tracking-normal text-gray-500;
+  }
+  .inicio-rebanho-dados {
+    @apply grid grid-cols-2 md:col-span-2;
+  }
+  .inicio-rebanho-dados > div {
+    @apply min-w-0 px-5 py-4 sm:px-6;
+  }
+  .inicio-rebanho-dados > div:nth-child(odd) {
+    @apply border-r border-gray-100;
+  }
+  .inicio-rebanho-dados > div:nth-child(-n+2) {
+    @apply border-b border-gray-100;
+  }
+  .inicio-rebanho-dados dt {
+    @apply text-xs text-gray-500;
+  }
+  .inicio-rebanho-dados dd {
+    @apply mt-1 text-xl font-semibold text-gray-900;
+    font-variant-numeric: tabular-nums;
+  }
+  .inicio-rebanho-dados dd.inicio-rebanho-note {
+    @apply mt-0.5 text-xs font-normal text-gray-500;
+  }
+  .inicio-safra {
+    @apply grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5;
+  }
+  .inicio-safra .stat {
+    @apply min-w-0;
+  }
+  .inicio-safra .stat:last-child {
+    @apply col-span-2 md:col-span-1;
+  }
+  .inicio-safra .stat-value {
+    @apply whitespace-normal break-words text-base sm:text-xl;
+    overflow-wrap: anywhere;
+  }
+  .inicio-pendencias-summary {
+    @apply flex min-h-touch cursor-pointer list-none items-center gap-3 px-4 py-4 transition-colors hover:bg-gray-50 sm:px-5;
+  }
+  .inicio-pendencias-summary::-webkit-details-marker {
+    display: none;
+  }
+  .inicio-pendencias :is(summary, a):focus-visible {
+    @apply ring-inset ring-offset-0;
+  }
+  .inicio-pendencias-count {
+    @apply shrink-0 rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600;
+    font-variant-numeric: tabular-nums;
+  }
+  .inicio-pendencias-action {
+    @apply hidden shrink-0 text-xs font-medium text-brand-700 sm:inline;
+  }
+  .inicio-pendencias-ocultar {
+    display: none;
+  }
+  .inicio-pendencias[open] .inicio-pendencias-ver {
+    display: none;
+  }
+  .inicio-pendencias[open] .inicio-pendencias-ocultar {
+    display: inline;
+  }
+  .inicio-pendencias-chevron {
+    transition: transform 150ms ease;
+  }
+  .inicio-pendencias[open] .inicio-pendencias-chevron {
+    transform: rotate(180deg);
+  }
+
   /* ---------- Controle segmentado (filtro por link) ---------- */
   .seg {
     @apply inline-flex flex-wrap gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5 text-sm;

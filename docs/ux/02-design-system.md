@@ -114,7 +114,7 @@ Todos em [`backend/static/css/input.css`](../../backend/static/css/input.css), c
 - **Detalhe:** voltar → código (mono) + selos → ações (primária, editar) → `.facts` → blocos em 2–3 colunas (`.dl`/`.rows`) → "o que este registro gerou" → zona de exclusão separada por linha, no fim.
 - **Lançamento:** `.form-section`s; prévia de indicadores atualizada por HTMX logo abaixo dos valores; salvar rascunho + confirmar.
 - **Exclusão:** análise de impacto antes ("Isto vai desfazer", dependentes, bloqueios com o caminho), motivo obrigatório, cascata só com confirmação explícita.
-- **Painel inicial:** pendências primeiro (cada uma é um link com exemplos), depois rebanho, faixa de indicadores da safra e últimos lançamentos. Sem gráfico: os gráficos moram no **Dashboard** ([seção 13](#13-dashboard-analítico)).
+- **Painel inicial:** saldo do rebanho e faixa de indicadores da safra em destaque, pendências em uma faixa recolhível antes dos últimos lançamentos. Fechada por padrão; lembra a escolha por usuário neste navegador, se o armazenamento local estiver disponível. Cada pendência mantém seu link e exemplos. Sem gráfico: os gráficos moram no **Dashboard** ([seção 13](#13-dashboard-analítico)).
 
 ---
 
