@@ -79,6 +79,7 @@
 
 {% for secao, tabela_da_secao in secoes %}
 <h2 class="section-title">{{ secao.titulo }}</h2>
+{% if relatorio.titulo == "Programação de compras e pagamentos" %}<p class="text-sm">{{ secao.descricao }}</p>{% for nota in secao.notas %}<p class="text-xs text-gray-500">{{ nota }}</p>{% endfor %}{% endif %}
 {% include "reports/_tabela.html" with tabela=tabela_da_secao %}
 {% endfor %}
 {% endblock %}

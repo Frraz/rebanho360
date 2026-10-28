@@ -5,6 +5,11 @@ from apps.documents import views
 app_name = "documents"
 
 urlpatterns = [
+    path(
+        "<uuid:document_id>/tentar-novamente/",
+        views.RegerarProgramacaoView.as_view(),
+        name="regerar_programacao",
+    ),
     path("", views.DocumentListView.as_view(), name="lista"),
     path("gerar/<slug:slug>/", views.GerarView.as_view(), name="gerar"),
     path("<uuid:document_id>/", views.DocumentDetailView.as_view(), name="detalhe"),

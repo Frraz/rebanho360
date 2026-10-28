@@ -10,5 +10,6 @@
   <a href="{% url 'documents:baixar' documento.document_id %}" class="btn-primary">{% icon "download" %} Baixar PDF</a>
   {% else %}
   <p class="flex items-start gap-2 text-sm text-red-800" role="alert">{% icon "circle-x" "mt-0.5 text-red-600" %} <span>{{ documento.error }}</span></p>
+  {% if documento.entity_id == "programacao-de-compras-e-pagamentos" %}<form method="post" action="{% url 'documents:regerar_programacao' documento.document_id %}">{% csrf_token %}<button class="btn-secondary" type="submit">Tentar novamente</button></form>{% endif %}
   {% endif %}
 </div>

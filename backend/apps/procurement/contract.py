@@ -34,7 +34,7 @@ from apps.procurement.permissions import pode_ver_o_ciclo
 logger = logging.getLogger(__name__)
 
 #: Muda quando o layout do contrato muda. Fica gravada em cada documento.
-TEMPLATE_VERSION = "contrato-v2"
+TEMPLATE_VERSION = "contrato-v3"
 
 
 def contratos_do_compromisso(compromisso: Commitment):
@@ -58,7 +58,12 @@ def renderizar_html(
         "documents/contrato.html",
         {
             "compromisso": compromisso,
-            "compradores": commitments.comissoes_do(compromisso),
+            "compradores": commitments.comissoes_do(compromisso)
+            or (
+                [{"payee": compromisso.commissioned}]
+                if compromisso.commissioned_id
+                else []
+            ),
             "conta": conta_do_produtor(compromisso) if com_dado_bancario else None,
             "com_dado_bancario": com_dado_bancario,
             "condicao": (

@@ -1,0 +1,11 @@
+<table{% if tabela.densidade %} class="{{ tabela.densidade }}"{% endif %}>
+  {% if tabela.larguras %}<colgroup>{% for l in tabela.larguras %}<col style="width: {{ l|stringformat:'.2f' }}%">{% endfor %}</colgroup>{% endif %}
+  <thead><tr>{% for rotulo in tabela.cabecalho %}<th{% if forloop.counter0 in tabela.indices_numericos %} class="num"{% endif %}>{{ rotulo }}</th>{% endfor %}</tr></thead>
+  <tbody>
+    {% for linha in tabela.celulas %}
+    <tr{% if forloop.last and tabela.tem_totais %} class="total"{% endif %}>{% for valor, numerica in linha %}<td{% if numerica %} class="num"{% endif %}>{{ valor }}</td>{% endfor %}</tr>
+    {% empty %}
+    <tr><td class="vazio" colspan="{{ tabela.cabecalho|length }}">Sem dados neste filtro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

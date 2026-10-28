@@ -102,6 +102,12 @@ class CommitmentForm(forms.Form):
         "Prazo de pagamento (dias)",
         ajuda="Só se não escolher uma condição acima.",
     )
+    expected_payment_date = forms.DateField(
+        label="Data prevista de pagamento",
+        required=False,
+        widget=ISO_DATE,
+        input_formats=["%Y-%m-%d"],
+    )
     pickup_date = forms.DateField(
         label="Data da retirada",
         required=False,

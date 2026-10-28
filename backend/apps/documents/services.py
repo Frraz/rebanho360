@@ -149,7 +149,11 @@ def solicitar_documento(*, slug: str, user, season, farm, origem) -> GeneratedDo
             entity_type="Relatorio",
             entity_id=slug,
             title=relatorio.titulo,
-            template_version=TEMPLATE_VERSION,
+            template_version=(
+                "programacao-v1"
+                if slug == "programacao-de-compras-e-pagamentos"
+                else TEMPLATE_VERSION
+            ),
             params=_parametros_para_gravar(extras, season=season, farm=farm),
             filters=list(relatorio.filtros),
             generated_by=user,
@@ -174,6 +178,22 @@ def solicitar_documento(*, slug: str, user, season, farm, origem) -> GeneratedDo
 def renderizar_html(relatorio, *, emitido_por: str, emitido_em, versao: str) -> str:
     """O HTML do documento: cabeçalho com sistema, relatório, emissão e
     **filtros aplicados**, repetido em toda página (CSS `running`)."""
+    if relatorio.titulo == "Programação de compras e pagamentos":
+        return render_to_string(
+            "documents/programacao.html",
+            {
+                "relatorio": relatorio,
+                "empresa": ctx.current_company(),
+                "resumo": layout.preparar_tabela(relatorios.para_tela(relatorio)),
+                "blocos": [
+                    (sec, layout.preparar_tabela(relatorios.para_tela(sec)))
+                    for sec in relatorio.secoes
+                ],
+                "emitido_por": emitido_por,
+                "emitido_em": emitido_em,
+                "versao": versao,
+            },
+        )
     tabelas = [("", layout.preparar_tabela(relatorios.para_tela(relatorio)))] + [
         (s.titulo, layout.preparar_tabela(relatorios.para_tela(s)))
         for s in relatorio.secoes

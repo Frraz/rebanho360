@@ -607,7 +607,7 @@ class TestFiltroDeComprador:
         )
         from apps.documents.models import GeneratedDocument
 
-        doc = GeneratedDocument.objects.get()
+        doc = GeneratedDocument.objects.get(entity_id="comissao-por-comprador")
         assert f"Comprador: {comissionado.name}" in doc.filters
         assert doc.params["comprador_id"] == comissionado.pk
 

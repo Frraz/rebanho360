@@ -918,3 +918,100 @@ def programado_x_realizado(
             "de carcaça ou por cabeça). O período filtra a data do compromisso.",
         ],
     )
+
+
+def programacao_de_compras_e_pagamentos(
+    user, *, season, farm, start=None, end=None, fazenda=None
+):
+    qs = _compromissos(user, season=season, farm=farm).filter(status=Status.CONFIRMADA)
+    if fazenda:
+        qs = qs.filter(destination_farm=fazenda)
+    if start:
+        qs = qs.filter(date__gte=start)
+    if end:
+        qs = qs.filter(date__lte=end)
+    linhas, secoes = [], []
+    for c in (
+        qs.select_related("payment_condition")
+        .prefetch_related("commissions__payee")
+        .order_by("date", "pk")
+    ):
+        itens = []
+        for d in calcular_acerto(c).itens:
+            itens.append(
+                {
+                    "item": d.item.number,
+                    "produto": f"{d.item.product_code} {d.item.category.name}".strip(),
+                    "cabecas": d.item.head_count,
+                    "media": (
+                        d.item.expected_arrobas
+                        if d.item.price_basis == PriceBasis.ARROBA
+                        else None
+                    ),
+                    "base": d.item.get_price_basis_display(),
+                    "preco": d.preco_previsto,
+                    "valor": d.valor_previsto,
+                }
+            )
+        incompleto = any(i["valor"] is None for i in itens)
+        conhecidos = [i["valor"] for i in itens if i["valor"] is not None]
+        total = sum(conhecidos, ZERO) if conhecidos else None
+        linhas.append(
+            {
+                "compromisso": c.code,
+                "cabecas": sum(i["cabecas"] for i in itens),
+                "valor": total,
+                "situacao": ("Previsão incompleta" if incompleto else "Completa"),
+            }
+        )
+        secoes.append(
+            Relatorio(
+                c.code,
+                f"Produtor: {c.seller.name} · Propriedade: {c.origin_property or '—'} · Cidade: {c.origin_city or '—'} · Compradores: {_compradores_em_texto(c) or (c.commissioned.name if c.commissioned_id else '—')}",
+                [
+                    Coluna("item", "Item", INTEIRO),
+                    Coluna("produto", "Produto"),
+                    Coluna("cabecas", "Cabeças", INTEIRO),
+                    Coluna("media", "Média @", NUMERO),
+                    Coluna("base", "Base"),
+                    Coluna("preco", "Preço", DINHEIRO),
+                    Coluna("valor", "Previsão de valor", DINHEIRO),
+                ],
+                itens,
+                notas=[
+                    f"Movimento: {_data(c.date)} · Retirada: {_data(c.pickup_date) or '—'} · Abate: {_data(c.slaughter_date) or '—'}",
+                    f"Pagamento previsto: {_data(c.expected_payment_date) or 'Não informada'} · Condição: {_condicao_em_texto(c)}",
+                    f"Distância: {c.distance_km if c.distance_km is not None else '—'} km · Caminhões: {c.trucks if c.trucks is not None else '—'}",
+                ],
+            )
+        )
+    return Relatorio(
+        "Programação de compras e pagamentos",
+        "Pré-compras aprovadas; valores previstos dos animais.",
+        [
+            Coluna("compromisso", "Compromisso"),
+            Coluna("cabecas", "Cabeças", INTEIRO),
+            Coluna("valor", "Previsão de valor", DINHEIRO),
+            Coluna("situacao", "Previsão"),
+        ],
+        linhas,
+        totais={
+            "compromisso": f"{len(linhas)} lotes comprados",
+            "cabecas": sum(i["cabecas"] for i in linhas),
+            "valor": (
+                sum((i["valor"] for i in linhas if i["valor"] is not None), ZERO)
+                if any(i["valor"] is not None for i in linhas) or not linhas
+                else None
+            ),
+            "situacao": (
+                "Total parcial"
+                if any(i["situacao"] != "Completa" for i in linhas)
+                else "Total"
+            ),
+        },
+        filtros=[*_contexto(season, farm or fazenda), *_filtro_de_periodo(start, end)],
+        notas=[
+            "Período pela data do movimento. Lotes comprados = compromissos distintos. Valores ausentes não são zero."
+        ],
+        secoes=secoes,
+    )

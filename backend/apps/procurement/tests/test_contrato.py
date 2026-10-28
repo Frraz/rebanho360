@@ -23,7 +23,7 @@ class TestGerar:
 
         assert documento.status == DocumentStatus.PRONTO
         assert documento.doc_type == DocumentType.CONTRATO
-        assert documento.template_version == contract.TEMPLATE_VERSION == "contrato-v2"
+        assert documento.template_version == contract.TEMPLATE_VERSION == "contrato-v3"
         assert documento.entity_type == "Commitment"
         assert documento.entity_id == str(compromisso.pk)
         conteudo = documento.file.read()
@@ -50,7 +50,9 @@ class TestGerar:
     def test_so_depois_de_aprovar(self, rascunho, escritorio):
         with pytest.raises(BusinessError, match="depois da aprovação"):
             contract.gerar_contrato(rascunho, usuario=escritorio)
-        assert not GeneratedDocument.objects.exists()
+        assert not GeneratedDocument.objects.filter(
+            doc_type=DocumentType.CONTRATO
+        ).exists()
 
     def test_campo_nao_gera(self, compromisso, campo_baixao):
         with pytest.raises(BusinessError, match="permissão"):
@@ -187,7 +189,7 @@ class TestTela:
         resposta = client.post(
             reverse("procurement:contrato_gerar", args=[compromisso.pk])
         )
-        documento = GeneratedDocument.objects.get()
+        documento = GeneratedDocument.objects.get(doc_type=DocumentType.CONTRATO)
         assert resposta.status_code == 302
         assert str(documento.document_id) in resposta["Location"]
 
@@ -197,7 +199,9 @@ class TestTela:
             reverse("procurement:contrato_gerar", args=[compromisso.pk])
         )
         assert resposta.status_code == 405
-        assert not GeneratedDocument.objects.exists()
+        assert not GeneratedDocument.objects.filter(
+            doc_type=DocumentType.CONTRATO
+        ).exists()
 
     def test_fora_do_escopo_devolve_404(self, client, baixao, compromisso):
         outro = User.objects.create_user(
@@ -240,4 +244,4 @@ class TestTela:
         html = client.get(
             reverse("procurement:compromisso_detalhe", args=[compromisso.pk])
         ).content.decode()
-        assert "Contrato gerado em" in html and "contrato-v2" in html
+        assert "Contrato gerado em" in html and "contrato-v3" in html

@@ -45,6 +45,7 @@
     <div><dt>Retirada</dt><dd>{% if compromisso.pickup_date %}{{ compromisso.pickup_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
     <div><dt>Abate previsto</dt><dd>{% if compromisso.slaughter_date %}{{ compromisso.slaughter_date|date:"d/m/Y" }}{% else %}—{% endif %}</dd></div>
     <div><dt>Caminhões · distância</dt><dd>{{ compromisso.trucks|default_if_none:"—" }} · {% if compromisso.distance_km %}{{ compromisso.distance_km }} km{% else %}—{% endif %}</dd></div>
+    <div><dt>Data prevista de pagamento</dt><dd>{{ compromisso.expected_payment_date|date:"d/m/Y"|default:"Não informada" }}</dd></div>
     <div><dt>Condição de pagamento</dt><dd>{% if compromisso.payment_condition %}{{ compromisso.payment_condition.name }}{% elif compromisso.payment_days is not None %}{{ compromisso.payment_days }} dias{% else %}na data{% endif %}</dd></div>
     {% if compromisso.encerrada %}<div><dt>Encerrada</dt><dd>{{ compromisso.closed_at|date:"d/m/Y H:i" }} <span class="text-gray-500">· {{ compromisso.closed_by }}{% if compromisso.closure_note %} · {{ compromisso.closure_note }}{% endif %}</span></dd></div>{% endif %}
     {% if compromisso.approved_at %}<div><dt>Aprovado</dt><dd>{{ compromisso.approved_at|date:"d/m/Y H:i" }} <span class="text-gray-500">· {{ compromisso.approved_by }}</span></dd></div>{% endif %}
@@ -161,6 +162,9 @@
     <form method="post" action="{% url 'procurement:contrato_gerar' compromisso.pk %}">{% csrf_token %}<button type="submit" class="btn-secondary btn-sm">{% icon "file-down" "icon-sm" %} Gerar contrato (PDF)</button></form>
     {% endif %}
   </div>
+  <h3>Programação de compras e pagamentos</h3>
+  {% for d in programacoes %}<p><a class="link" href="{% url 'documents:detalhe' d.document_id %}">{{ d.get_status_display }} · {{ d.generated_at|date:"d/m/Y H:i" }}</a></p>{% endfor %}
+  <a class="btn-secondary" href="{% url 'reports:relatorio' 'programacao-de-compras-e-pagamentos' %}">Consultar e emitir com filtros</a>
   {% if contratos %}
   <ul class="divide-y divide-gray-100 text-sm">
     {% for d in contratos %}

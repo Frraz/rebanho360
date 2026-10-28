@@ -88,3 +88,24 @@ class DocumentListView(LoginRequiredMixin, View):
         return render(
             request, "documents/document_list.html", {"documentos": documentos[:100]}
         )
+
+
+class RegerarProgramacaoView(LoginRequiredMixin, View):
+    http_method_names = ["post"]
+
+    def post(self, request, document_id):
+        documento = _documento(request, document_id)
+        if documento.entity_id != "programacao-de-compras-e-pagamentos":
+            raise Http404
+        from django.db import transaction
+
+        with transaction.atomic():
+            documento = GeneratedDocument.objects.select_for_update().get(
+                pk=documento.pk
+            )
+            if documento.status == DocumentStatus.ERRO:
+                documento.status = DocumentStatus.PENDENTE
+                documento.error = ""
+                documento.save(update_fields=["status", "error"])
+        services.gerar_documento(documento.pk)
+        return redirect("documents:detalhe", document_id=documento.document_id)

@@ -14,6 +14,7 @@ class Partner(models.Model):
     city = models.CharField("Cidade", max_length=100, blank=True)
     state = models.CharField("UF", max_length=2, blank=True)
     phone = models.CharField("Telefone", max_length=20, blank=True)
+    fax = models.CharField("Fax", max_length=20, blank=True)
     email = models.EmailField("E-mail", blank=True)
     notes = models.TextField("Observações", blank=True)
     is_active = models.BooleanField("Ativo", default=True)

@@ -25,6 +25,7 @@ class PartnerForm(forms.ModelForm):
             "city",
             "state",
             "phone",
+            "fax",
             "email",
             "notes",
             "is_active",

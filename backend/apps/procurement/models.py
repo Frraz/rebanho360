@@ -122,6 +122,9 @@ class Commitment(ReversibleModel):
         related_name="+",
         on_delete=models.PROTECT,
     )
+    expected_payment_date = models.DateField(
+        "Data prevista de pagamento", null=True, blank=True
+    )
     # Programação
     pickup_date = models.DateField("Data da retirada", null=True, blank=True)
     slaughter_date = models.DateField("Data prevista do abate", null=True, blank=True)

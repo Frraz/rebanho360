@@ -41,15 +41,18 @@
   {% if empresa %}<div class="emitente">{% if empresa.tax_id %}CNPJ {{ empresa.tax_id }}{% endif %}{% if empresa.address %} · {{ empresa.address }}{% endif %}{% if empresa.city %} · {{ empresa.city }}{% if empresa.state %}-{{ empresa.state }}{% endif %}{% endif %}{% if empresa.phone %} · {{ empresa.phone }}{% endif %}</div>{% endif %}
 </header>
 
+<h2>Compromisso de compra</h2>
 <div class="codigo">Documento {{ compromisso.code }}</div>
 
 <h2>Produtor</h2>
 <dl>
-  <dt>Produtor</dt><dd>{{ compromisso.seller.name }}</dd>
+  <dt>Produtor</dt><dd>{{ compromisso.seller.pk }} · {{ compromisso.seller.name }}</dd>
+  {% if compromisso.seller.trade_name %}<dt>Fantasia</dt><dd>{{ compromisso.seller.trade_name }}</dd>{% endif %}
   {% if compromisso.seller.document %}<dt>CPF/CNPJ</dt><dd>{{ compromisso.seller.document }}</dd>{% endif %}
   {% if compromisso.origin_property %}<dt>Propriedade</dt><dd>{{ compromisso.origin_property }}</dd>{% endif %}
   {% if compromisso.seller.address %}<dt>Endereço</dt><dd>{{ compromisso.seller.address }}</dd>{% endif %}
   {% if compromisso.origin_city or compromisso.seller.city %}<dt>Cidade</dt><dd>{{ compromisso.origin_city|default:compromisso.seller.city }}{% if compromisso.seller.state %}-{{ compromisso.seller.state }}{% endif %}</dd>{% endif %}
+  {% if compromisso.seller.fax %}<dt>Fax</dt><dd>{{ compromisso.seller.fax }}</dd>{% endif %}
   {% if compromisso.seller.phone %}<dt>Telefone</dt><dd>{{ compromisso.seller.phone }}</dd>{% endif %}
 </dl>
 

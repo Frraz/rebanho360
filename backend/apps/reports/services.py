@@ -354,9 +354,11 @@ def custos_por_fazenda_detalhado(
         qs = qs.filter(cost_center=filtros["centro_custo"])
     if filtros.get("tipo_operacao"):
         qs = qs.filter(
-            operation_type=""
-            if filtros["tipo_operacao"] == "SEM_TIPO"
-            else filtros["tipo_operacao"]
+            operation_type=(
+                ""
+                if filtros["tipo_operacao"] == "SEM_TIPO"
+                else filtros["tipo_operacao"]
+            )
         )
     qs = qs.select_related(
         "farm__business_unit", "source_purchase", "cost_center", "cost_class"
@@ -366,9 +368,11 @@ def custos_por_fazenda_detalhado(
         {
             "data": f"{c.date:%d/%m/%Y}",
             "fazenda": c.farm.name,
-            "unidade": f"{c.farm.business_unit.code} · {c.farm.business_unit.name}"
-            if c.farm.business_unit_id
-            else None,
+            "unidade": (
+                f"{c.farm.business_unit.code} · {c.farm.business_unit.name}"
+                if c.farm.business_unit_id
+                else None
+            ),
             "referencia": c.reference or c.notes or None,
             "tipo_operacao": c.get_operation_type_display() or "Sem classificação",
             "compra": c.source_purchase.code if c.source_purchase_id else None,
@@ -1451,6 +1455,9 @@ def _do_ciclo(funcao: str):
 
 RELATORIOS.update(
     {
+        "programacao-de-compras-e-pagamentos": _do_ciclo(
+            "programacao_de_compras_e_pagamentos"
+        ),
         "programacao-de-embarque": _do_ciclo("programacao_de_embarque"),
         "programacao-de-abate": _do_ciclo("programacao_de_abate"),
         "conferencia-do-acerto": _do_ciclo("conferencia_do_acerto"),
@@ -1500,6 +1507,7 @@ RELATORIOS_COM_DINHEIRO = frozenset(
 RELATORIOS_DO_CICLO = frozenset(
     {
         "contrato-de-compra",
+        "programacao-de-compras-e-pagamentos",
         "programacao-de-embarque",
         "programacao-de-abate",
         "conferencia-do-acerto",
@@ -1800,13 +1808,7 @@ def compromissos_previsao(user, *, season, farm, start=None, end=None, **filtros
             if previstos and all(v is not None for v in previstos)
             else None
         )
-        # A data real depende do recebimento. Não inventar vencimento a partir da negociação.
-        referencia = c.pickup_date
-        vencimento = (
-            (referencia + datetime.timedelta(days=c.payment_days))
-            if referencia and c.payment_days is not None
-            else None
-        )
+        vencimento = c.expected_payment_date
         linhas.append(
             {
                 "operacao": c.code,
@@ -1826,11 +1828,15 @@ def compromissos_previsao(user, *, season, farm, start=None, end=None, **filtros
                 ),
                 "cabecas": sum(i.head_count for i in c.items.all()),
                 "valor": valor,
-                "condicao": c.payment_condition.name
-                if c.payment_condition_id
-                else f"{c.payment_days} dias"
-                if c.payment_days is not None
-                else "A definir",
+                "condicao": (
+                    c.payment_condition.name
+                    if c.payment_condition_id
+                    else (
+                        f"{c.payment_days} dias"
+                        if c.payment_days is not None
+                        else "A definir"
+                    )
+                ),
                 "vencimento": f"{vencimento:%d/%m/%Y}" if vencimento else None,
                 "situacao": "Encerrada" if c.encerrada else Etapa(etapas[c.pk]).label,
                 "tipo_operacao": c.get_operation_type_display() or "Sem classificação",
@@ -1860,13 +1866,15 @@ def compromissos_previsao(user, *, season, farm, start=None, end=None, **filtros
         totais={
             "operacao": "Total",
             "cabecas": sum(linha["cabecas"] for linha in linhas),
-            "valor": sum(valores, Decimal(0))
-            if all(v is not None for v in valores)
-            else None,
+            "valor": (
+                sum(valores, Decimal(0))
+                if all(v is not None for v in valores)
+                else None
+            ),
         },
         filtros=[*_contexto(season, farm), *_filtro_de_periodo(start, end)],
         notas=[
-            "Previsão não gera obrigação financeira. Valores/datas indefinidos aparecem como —. Pagamento previsto usa retirada prevista e prazo; o vencimento efetivo depende da compra conferida."
+            "Previsão não gera obrigação financeira. Valores/datas indefinidos aparecem como —. Pagamento previsto é informado no compromisso; o vencimento efetivo depende da compra conferida."
         ],
     )
 
@@ -1981,5 +1989,14 @@ CATALOGO.append(
         "rebanho-consolidado",
         "Rebanho consolidado",
         "Mapa de Gado por unidade, fazenda, categoria e sexo.",
+    )
+)
+
+PARAMETROS["programacao-de-compras-e-pagamentos"] = ("de", "ate", "fazenda")
+CATALOGO.append(
+    (
+        "programacao-de-compras-e-pagamentos",
+        "Programação de compras e pagamentos",
+        "Compromissos aprovados, animais e pagamento previsto.",
     )
 )

@@ -22,6 +22,7 @@ from apps.core.exceptions import BlockingDependencyError, BusinessError
 from apps.core.permissions import pode_editar_confirmado, pode_excluir_confirmado
 from apps.core.reversible import Status
 from apps.core.views import ExclusaoComImpactoView
+from apps.documents.models import GeneratedDocument
 from apps.documents.permissions import pode_ver_documento
 from apps.livestock.models import Lot
 from apps.procurement import (
@@ -318,6 +319,7 @@ class CompromissoListView(VeOCicloMixin, TemplateView):
                 "fazenda",
                 "comprador",
                 "produtor",
+                "operacao",
                 "de",
                 "ate",
                 "situacao_operacao",
@@ -585,6 +587,14 @@ class CompromissoDetalheView(VeOCicloMixin, TemplateView):
                 "acerto_aprovado": acerto is not None
                 and acerto.status == Status.CONFIRMADA,
                 "bases": PriceBasis,
+                "programacoes": [
+                    d
+                    for d in GeneratedDocument.objects.filter(
+                        entity_id="programacao-de-compras-e-pagamentos",
+                        params__commitment_id=c.pk,
+                    )
+                    if pode_ver_documento(user, d)
+                ],
                 "contratos": [
                     d
                     for d in contract.contratos_do_compromisso(c)

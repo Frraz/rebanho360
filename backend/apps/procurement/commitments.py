@@ -61,6 +61,7 @@ CAMPOS_EDITAVEIS = (
     "commissioned",
     "origin_property",
     "origin_city",
+    "expected_payment_date",
     "payment_days",
     "payment_condition",
     "pickup_date",
@@ -399,7 +400,11 @@ def aprovar_compromisso(compromisso: Commitment, *, usuario) -> Commitment:
     compromisso.season = _validar_compromisso(
         _completar(compromisso, {}), usuario=usuario
     )
-    return reversible.confirmar(compromisso, usuario=usuario)
+    confirmado = reversible.confirmar(compromisso, usuario=usuario)
+    from apps.procurement.scheduling import gerar_programacao
+
+    gerar_programacao(confirmado, usuario=usuario)
+    return confirmado
 
 
 @transaction.atomic
