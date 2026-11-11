@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Compromisso** (`Commitment`) | O contrato, com o **número da operação** (`OP-000123`): produtor, fazenda de destino, **compradores**, programação (retirada, abate, caminhões, distância), **condição de pagamento** e **itens** — uma categoria cada, com preço por faixa de @ (1 a 5, digitado) ou por cabeça, e rendimento estimado de entrada |
+| **Compromisso** (`Commitment`) | O contrato, com o **número da operação** (`OP-000123`): produtor, fazenda de destino, **compradores**, programação (retirada, abate, caminhões, distância), **condição de pagamento**, **data prevista de pagamento informada** (`expected_payment_date`, opcional) e **itens** — uma categoria cada, com preço por faixa de @ (1 a 5, digitado) ou por cabeça, e rendimento estimado de entrada |
 | **Comissão** (`Commission`) | **Uma linha por comprador** (sem limite): tipo (percentual sobre o **valor bruto dos animais**, por cabeça ou valor direto), valor, extra e vencimento próprios. Sem valor informado, recebe o **snapshot** da regra vigente na aprovação |
 | **Viagem** (`Trip`, `TripLoad`) | Um caminhão: transportador, motorista, veículo, placa, **número do ADF**, carga programada × embarcada, frete e **vencimento do frete** |
 | **Recebimento** (`Receiving`, `ReceivingLine`) | A chegada de uma viagem: cabeças, peso, categoria, ocorrência e a **quebra de viagem digitada** |
@@ -21,6 +21,7 @@ O núcleo (`Purchase`, `Lot`, `CostEntry`, `HerdMovement`) só ganhou campos de 
 ```mermaid
 flowchart LR
     A[Compromisso<br/>em negociação] -->|aprovar<br/>grava a comissão| B[Aprovado]
+    B --> P[PDF de programação<br/>de compras e pagamentos]
     B --> C[Viagem]
     C --> D[Recebimento]
     D --> E[Romaneio]
@@ -35,6 +36,16 @@ flowchart LR
 **Depois do acerto aprovado** a situação também é derivada — dos títulos (`selectors.situacao_financeira`): *Aguardando financeiro* → *Pagamento programado* → *Pago*. O único passo **manual** é **Encerrada**: `ADMIN` e `GESTOR` encerram a operação (e a reabrem, com motivo); ficam status, data, responsável e observação, e a operação encerrada não recebe lançamento. O sistema nunca decide que a operação acabou só porque as contas foram pagas.
 
 **Numeração.** O compromisso nasce com `OP-000123` (sequência global) e o número acompanha tudo: viagem `OP-000123/V1`, recebimento `/R1`, acerto `/AC1`, compra do item `/I1`; o financeiro e o centro de custo o carregam pela compra de origem. Operações anteriores mantêm o código antigo (`CM-…`).
+
+## Aprovação da pré-compra e programação (28/10/2026)
+
+Nesta solicitação, “finalizar o compromisso” significa **aprovar a pré-compra**, não encerrar manualmente a operação. A aprovação gera automaticamente um PDF dos compromissos aprovados da mesma safra e fazenda de destino, sem restrição adicional de período. Rascunhos e excluídos não entram; operações encerradas continuam no consolidado se aprovadas. O documento fica vinculado ao compromisso que disparou a emissão, respeitando a permissão de acesso ao PDF.
+
+A **data prevista de pagamento** é digitada e opcional. Não se calcula pela retirada, pelo abate nem pelo prazo da condição de pagamento. Sem data, a programação mostra “Não informada”; o relatório de previsão financeira existente mostra `—`. Registros anteriores permanecem sem data. A previsão não cria título, não altera vencimento efetivo e não entra no fluxo de caixa.
+
+Aprovar novamente o mesmo compromisso é recusado antes de gerar outro documento. Falha de geração deixa o PDF com erro e preserva a aprovação; o documento oferece **Tentar novamente**. Emissões novas e filtradas ficam no catálogo de relatórios. O PDF pronto permanece guardado; mudanças posteriores exigem nova emissão.
+
+Na lista de compromissos, o filtro **Operação** permite localizar o código que acompanha viagens, recebimentos, compras, custos e acertos. Os campos cadastrais do produtor são reaproveitados no contrato, incluindo nome fantasia e fax opcional.
 
 ## Preço, romaneio e valor dos animais
 
@@ -88,7 +99,8 @@ Excluir e restaurar o acerto seguem a mesma mecânica; restaurar um acerto que n
 
 ## Contrato e relatórios
 
-- **Contrato** (PDF) pelo `GeneratedDocument`, com `template_version` (`contrato-v2`), hash e quem gerou, todos os compradores e a condição de pagamento. **Banco, agência e conta do produtor** vão no contrato **só para quem já vê dado bancário** (`ADMIN`, `GESTOR`, `FINANCEIRO`) — e a geração com dado bancário fica na auditoria ([#27](99-pendencias-resolvidas.md)). A chave Pix nunca vai. Só por view autenticada.
+- **Contrato** (PDF) pelo `GeneratedDocument`, com `template_version` (`contrato-v3`), hash e quem gerou, todos os compradores e a condição de pagamento. **Banco, agência e conta do produtor** vão no contrato **só para quem já vê dado bancário** (`ADMIN`, `GESTOR`, `FINANCEIRO`) — e a geração com dado bancário fica na auditoria ([#27](99-pendencias-resolvidas.md)). A chave Pix nunca vai. Só por view autenticada.
+- **Programação de compras e pagamentos** (`programacao-v1` no PDF): resumo de compromissos distintos, cabeças e valores previstos, seguido dos dados e itens de cada operação. Usa a média prevista em @ e o preço da faixa esperada, ou o preço por cabeça. Sem previsão completa, identifica subtotal/total parcial; sem nenhum valor conhecido, apresenta `—`. Não inclui dados bancários. [Detalhes e filtros](../relatorios/01-catalogo.md#programação-de-compras-e-pagamentos-28102026).
 - **Relatórios** (tela, CSV, XLSX e PDF; escopo de fazenda; negados ao `CAMPO`): programação de embarque e de abate, conferência do acerto (com banco, agência e conta para quem vê dado bancário), comissão por comprador (uma linha por comprador, a regra **gravada**), fretes e quebra, histórico por pecuarista e programado × realizado (com "Por que há —").
 
 ## Quebra de viagem

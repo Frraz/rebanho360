@@ -45,7 +45,8 @@ Vale para toda tarefa de todas as fases. Tela que aparece não é funcionalidade
 
 ### Não regride
 - [ ] Não quebra o que já existe
-- [ ] Documentação atualizada quando a decisão mudou
+- [ ] Documentação alinhada ao comportamento implementado: regras, modelo, relatórios, fluxos e ajuda da tela afetados; índice atualizado e referências antigas corrigidas ou marcadas como históricas
+- [ ] Migrações e evidências registradas, distinguindo teste local, homologação e publicação no VPS
 
 ---
 

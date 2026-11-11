@@ -526,6 +526,7 @@ AJUDA: dict[str, dict] = {
     "compromisso": {
         "titulo": "Compromissos",
         "resumo": [
+            "Ao aprovar a pré-compra, o sistema gera a Programação de compras e pagamentos dos compromissos aprovados da mesma safra e fazenda. Informe a data prevista de pagamento; ela não é calculada pelo prazo e não cria uma conta a pagar. No catálogo de relatórios você pode ajustar o período e emitir outra cópia.",
             "O compromisso é uma pré-compra que permanece aberta até a conferência e o encerramento manual: quem vende, para qual fazenda, o comprador (se houver), a programação (retirada, abate, caminhões) e os itens com o preço por faixa de arroba ou por cabeça.",
             "O ciclo segue esta ordem: compromisso, aprovação, viagem, recebimento, romaneio e acerto. Só o acerto aprovado vira compra, entrada no rebanho, custos e títulos. A compra direta é uma alternativa: não é necessário cadastrar uma compra antes do compromisso. Programação e acerto começam dentro da operação, por isso suas listas não têm botão de inclusão independente. O frete recebido depois pode ser complementado na mesma operação, mesmo encerrada e com animais pagos, sem refazer o acerto.",
         ],
@@ -545,6 +546,10 @@ AJUDA: dict[str, dict] = {
             ),
         ],
         "perguntas": [
+            (
+                "Onde encontro a programação gerada?",
+                "No detalhe do compromisso, na seção Programação de compras e pagamentos, conforme sua permissão para abrir o documento. Se a geração falhar, abra o documento e use Tentar novamente. Também é possível consultar e emitir com filtros pelo catálogo de relatórios.",
+            ),
             (
                 "Aprovar o compromisso mexe no rebanho?",
                 "Não. Aprovar libera viagem, recebimento e acerto. Nada vira compra, custo ou título até o acerto ser aprovado.",

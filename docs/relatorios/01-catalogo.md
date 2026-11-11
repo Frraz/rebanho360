@@ -23,7 +23,7 @@ Se dois lugares mostram o mesmo indicador com números diferentes, o usuário pa
 
 Relatório pesado roda em Celery e avisa quando fica pronto. Navegador não espera.
 
-Todos filtráveis por: período, safra, fazenda, lote, categoria, parceiro, centro de custo. Filtro preservado ao voltar da lista.
+Os filtros disponíveis dependem do relatório: período, safra, fazenda, lote, categoria, parceiro ou centro de custo, conforme declarado em `PARAMETROS`. Filtro preservado ao voltar da lista.
 
 **Implementado na Fase 3:** safra e fazenda vêm do contexto fixo no topo; cada relatório declara os demais parâmetros que aceita (`apps/reports/services.py::PARAMETROS`: período, lote, rendimento de entrada estimado). O que o usuário filtrou vira `Relatorio.filtros` — e vai **dentro** do CSV, do XLSX e do PDF.
 
@@ -70,16 +70,18 @@ Os quatro chamam os serviços de cálculo (`CarcassService`, `SaleResultService`
 
 Mapa financeiro · Contas a pagar (e a receber) · Pagamentos realizados · Fluxo de caixa projetado — substituem a `DASH CAIXA`, hoje vazia.
 
-**Como ficou:** os cinco estão no catálogo (`contas-a-pagar`, `contas-a-receber`, `pagamentos-realizados`, `fluxo-de-caixa`, `mapa-financeiro`), com tela, CSV, XLSX e PDF. Só abre quem vê títulos (`403` para os demais, inclusive no PDF); o índice esconde o que o papel não abre. Contas e mapa não dependem da safra do topo (dívida de uma safra se paga em outra); o fluxo percorre os meses da safra escolhida. Dado bancário não vai em relatório — com uma exceção, a **Programação de pagamentos** (abaixo), que mostra banco, agência e conta **só para quem vê dado bancário** ([#27](../regras-negocio/99-pendencias-resolvidas.md)).
+**Como ficou:** os cinco estão no catálogo (`contas-a-pagar`, `contas-a-receber`, `pagamentos-realizados`, `fluxo-de-caixa`, `mapa-financeiro`), com tela, CSV, XLSX e PDF. Só abre quem vê títulos (`403` para os demais, inclusive no PDF); o índice esconde o que o papel não abre. Contas e mapa não dependem da safra do topo (dívida de uma safra se paga em outra); o fluxo percorre os meses da safra escolhida. A **Programação de pagamentos** não exibe dados bancários. Banco, agência e conta ficam no contrato e na conferência do acerto, somente para quem tem permissão ([#27](../regras-negocio/99-pendencias-resolvidas.md)).
 
-**Programação de pagamentos** (`programacao-de-pagamentos`, 2026-10-02, seções 4.3 e 10 do documento funcional): tudo o que há a pagar, com compra, favorecido, documento, vencimento, "pagar em", valor, saldo, banco, agência, conta, situação e **atenção** (sem favorecido, sem conta bancária). Ordem: o que já tem data de pagamento primeiro, depois pelo vencimento. Mesmo recorte de Contas a pagar (em aberto, todas as safras; período filtra o vencimento). Não cria título previsto antes do acerto ([#31](../regras-negocio/99-pendencias-resolvidas.md)).
+**Programação de pagamentos** (`programacao-de-pagamentos`, 2026-10-02, seções 4.3 e 10 do documento funcional): tudo o que há a pagar, com compra, favorecido, documento, vencimento, "pagar em", valor, saldo, situação e **atenção** (sem favorecido, sem conta bancária). Ordem: o que já tem data de pagamento primeiro, depois pelo vencimento. Mesmo recorte de Contas a pagar (em aberto, todas as safras; período filtra o vencimento). Não cria título previsto antes do acerto ([#31](../regras-negocio/99-pendencias-resolvidas.md)).
 
 ### Fase 5 — Ciclo de compra
 
-Sete relatórios, com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calcular_acerto`, viagem, recebimento). Escopo por fazenda; **negados ao `CAMPO`** (preço, comissão e frete são dado comercial). Não levam dado bancário. O oitavo item, o **contrato de compra**, não é tabela: é a lista dos compromissos aprovados com o botão que gera o PDF (dado bancário só para quem pode vê-lo, como no detalhe do compromisso).
+Relatórios com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calcular_acerto`, viagem, recebimento). Escopo por fazenda; **negados ao `CAMPO`** (preço, comissão e frete são dado comercial). Dados bancários só na conferência do acerto para quem tem permissão. O **contrato de compra** não é tabela: é a lista dos compromissos aprovados com o botão que gera o PDF (dado bancário só para quem pode vê-lo, como no detalhe do compromisso).
 
 | Relatório | Legado de referência |
 |---|---|
+| **Programação de compras e pagamentos** — pré-compras aprovadas, PDF automático na aprovação | Modelo recebido em 28/10/2026 |
+| **Compromissos — previsão financeira** — compromissos em aberto; data prevista informada | Solicitações de 18 e 28/10/2026 |
 | Programação de embarque | `03` |
 | Programação de abate | `03` |
 | Conferência do acerto (abre pelo acerto: `?acerto=`) | `04` |
@@ -89,7 +91,19 @@ Sete relatórios, com tela, CSV, XLSX e PDF, do mesmo serviço que a tela (`calc
 | **Programado × realizado** (o que a Fase 3 deixou de fora), com "Por que há —" | — |
 | **Contrato de compra** — lista os compromissos aprovados e gera o PDF de cada um (o mesmo do detalhe do compromisso). Não é tabela: fica fora da exportação de dados | `Contrato de Compra de Animais` |
 
-Os cinco legados abaixo foram a especificação.
+### Programação de compras e pagamentos (28/10/2026)
+
+Slug: `programacao-de-compras-e-pagamentos`. A aprovação de uma pré-compra emite automaticamente o consolidado da **safra e fazenda do compromisso**, sem limite de período. No catálogo, safra e fazenda vêm do contexto, com filtros adicionais de fazenda e período pela **data do movimento**; prevalece sempre o escopo do usuário.
+
+O resumo conta compromissos distintos (“lotes comprados”), soma cabeças e valores previstos dos animais. Cada bloco traz código, produtor, propriedade, cidade, compradores, datas de movimento/retirada/abate, condição e data prevista de pagamento, distância, caminhões e itens com produto, cabeças, média @, base, preço e valor. O total não é o custo final de aquisição com fretes, comissões e tributos.
+
+A previsão por @ usa cabeças × média @ prevista × preço da faixa esperada; por cabeça, cabeças × preço unitário. Itens sem dados suficientes mostram `—`. Somam-se apenas valores conhecidos, identificando previsão incompleta e total parcial; se nenhum valor for conhecido, o valor total também fica `—`.
+
+A data prevista é informada no compromisso. O relatório existente `compromissos` também lê essa data; deixou de inferi-la pela retirada mais prazo. A programação operacional não cria títulos nem substitui `programacao-de-pagamentos`, que lista obrigações financeiras já existentes.
+
+PDF específico em A4, versão `programacao-v1`, com resumo e blocos por compromisso. Falha pode ser repetida pelo botão **Tentar novamente** no documento. Quem gerou e usuários com acesso amplo podem abrir o PDF; outros usuários autorizados ao relatório podem emitir sua própria cópia no catálogo. Emissões prontas não são sobrescritas por edições posteriores da compra.
+
+Os cinco legados abaixo foram a especificação original; o modelo de 28/10 complementa o catálogo.
 
 ---
 
@@ -156,4 +170,4 @@ Todo PDF que vira documento registra: `document_id`, tipo, entidade, `template_v
 
 Assim se responde "qual documento foi gerado quando esta compra foi confirmada?" — e o documento é reproduzível exatamente como era, mesmo que o template tenha mudado depois.
 
-**Implementado (`apps/documents`):** `GeneratedDocument` com `document_id` (UUID), tipo, entidade, `template_version` (hoje `relatorio-v1`), quem gerou, quando, hash SHA-256, filtros impressos, parâmetros (para gerar de novo) e o **arquivo guardado** — o arquivo é a reprodução exata. Só é servido por view autenticada, ao dono e a quem enxerga tudo; para os demais, 404. Relatório pesado (resultado, desempenho, pesagens) vai para o Celery e a tela do documento atualiza sozinha por HTMX; a tarefa é idempotente. Falha mostra o motivo e o código do documento, nunca traceback.
+**Implementado (`apps/documents`):** `GeneratedDocument` com `document_id` (UUID), tipo, entidade, `template_version` (`relatorio-v2` no layout geral, `contrato-v3` no contrato e `programacao-v1` na programação de compras e pagamentos), quem gerou, quando, hash SHA-256, filtros impressos, parâmetros (para gerar de novo) e o **arquivo guardado** — o arquivo é a reprodução exata. Só é servido por view autenticada, ao dono e a quem enxerga tudo; para os demais, 404. Relatório pesado (resultado, desempenho, pesagens) vai para o Celery e a tela do documento atualiza sozinha por HTMX; a tarefa é idempotente. Falha mostra o motivo e o código do documento, nunca traceback.

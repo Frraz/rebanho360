@@ -83,7 +83,7 @@ Papéis: `ADMIN`, `GESTOR`, `ESCRITORIO`, `CAMPO`, `FINANCEIRO`, `CONSULTA`.
 O papel define **o quê**; esta tabela define **onde**. Usuário sem nenhuma linha aqui não enxerga fazenda alguma — exceto `ADMIN` e `GESTOR`, que têm acesso amplo por definição do papel. Ver [ADR 0003](../arquitetura/adr/0003-escopo-por-fazenda-desde-a-fase-0.md).
 
 ### `Partner` — Parceiro
-`name`, `legal_name`, `trade_name`, `document` (CPF/CNPJ), `address`, `city`, `state`, `phone`, `email`, `notes`, `is_active`
+`name`, `legal_name`, `trade_name`, `document` (CPF/CNPJ), `address`, `city`, `state`, `phone`, `fax` (opcional), `email`, `notes`, `is_active`
 
 ### `PartnerRole` — Papel do parceiro
 `partner`, `role`
@@ -189,7 +189,7 @@ Navegador que o usuário marcou como confiável ao confirmar o código (ADR 0009
 
 ## Ciclo de compra (Fase 5)
 
-Nenhuma coluna nova em `Purchase`, `Lot`, `CostEntry`, `HerdMovement` ou `Invoice`. Regra em [08](../regras-negocio/08-ciclo-de-compra.md).
+O ciclo se liga às compras por `CommitmentItem.purchase`; os registros do núcleo também possuem campos de integração e classificação adicionados nas evoluções posteriores. Regra em [08](../regras-negocio/08-ciclo-de-compra.md).
 
 **`commercial` — cadastros:** `CarcassClass` (código, nome, ordem, `default_band` opcional) · `TaxType` (nome, natureza `TRIBUTO`/`TAXA`/`DESCONTO`/`ADIANTAMENTO`/`CREDITO`; **sem alíquota**) · `CommissionRule` (comissionado, categoria, tipo `PERCENTUAL`/`POR_CABECA`, base `BRUTO`/`LIQUIDO`, valor, vigência).
 
@@ -197,15 +197,15 @@ Nenhuma coluna nova em `Purchase`, `Lot`, `CostEntry`, `HerdMovement` ou `Invoic
 
 | Entidade | Resumo |
 |---|---|
-| `Commitment` | `code` (`CM-`), data, safra, produtor, fazenda de destino, comprador, programação (retirada, abate, caminhões, distância), `payment_days`, aprovação. `ReversibleModel` |
+| `Commitment` | `code` único (`OP-…`; códigos antigos preservados), data, safra, produtor, fazenda de destino, comprador principal e comissões por comprador; programação (retirada, abate, caminhões, distância), `payment_condition`, `payment_days`, `expected_payment_date` (data prevista informada, opcional), aprovação e encerramento manual. `ReversibleModel` |
 | `CommitmentItem` | Categoria, cabeças, peso médio, base do preço (`ARROBA`/`CABECA`), faixas 1–5 ou preço por cabeça, `purchase` (**a única ligação com o núcleo**) |
-| `Commission` | **Snapshot** da regra aplicada (tipo, base, valor, favorecido, comissão extra). 1:1 com o compromisso |
-| `Trip`, `TripLoad` | Viagem (`VG-`): transportador, motorista, placa, critério/tarifa/realizado do frete; carga programada × embarcada |
-| `Receiving`, `ReceivingLine` | Recebimento (`RB-`), um por viagem: cabeças, peso, categoria recebida, ocorrência |
+| `Commission` | **Snapshot** da regra aplicada (tipo, base, valor, favorecido, comissão extra). Várias por compromisso, uma por comprador |
+| `Trip`, `TripLoad` | Viagem (`OP-…/V1`; códigos antigos preservados): transportador, motorista, placa, critério/tarifa/realizado do frete; carga programada × embarcada |
+| `Receiving`, `ReceivingLine` | Recebimento (`OP-…/R1`; códigos antigos preservados), um por viagem: cabeças, peso, categoria recebida, ocorrência |
 | `GradingLine` | Linha do romaneio: classificação, faixa 1–5, cabeças, peso de carcaça, preço da @, desconto % |
-| `Settlement`, `SettlementLine`, `FiscalNote` | Acerto (`AC-`), um ativo por compromisso; linhas digitadas por `TaxType`; notas fiscais **registradas** |
+| `Settlement`, `SettlementLine`, `FiscalNote` | Acerto (`OP-…/AC1`; códigos antigos preservados), um ativo por compromisso; linhas digitadas por `TaxType`; notas fiscais **registradas** |
 
-As **linhas** (`LineModel`) nunca saem do banco: `removed_at` as tira da operação. Média @, valores, totais, frete previsto, quebra, comissão em reais e a **etapa** do compromisso são **derivados**, nunca campos.
+As **linhas** (`LineModel`) nunca saem do banco: `removed_at` as tira da operação. Média @ **realizada**, valores, totais, frete calculado, comissão em reais e a **etapa** do compromisso são derivados. A média @ **prevista** (`expected_arrobas`) e a faixa esperada são informadas no item; a quebra de viagem é informada no recebimento.
 
 ## Auditoria
 
@@ -230,7 +230,7 @@ As **linhas** (`LineModel`) nunca saem do banco: `removed_at` as tira da operaç
 ### `GeneratedDocument` (`documents`)
 `document_id` (UUID), `doc_type`, `entity_type`, `entity_id`, `title`, `template_version`, `status` (`PENDENTE` · `PRONTO` · `ERRO`), `params`, `filters`, `file`, `file_hash` (SHA-256), `size_bytes`, `error`, `generated_by`, `generated_at`, `finished_at`
 
-O PDF que vira papel, guardado com o que é preciso para saber o que foi impresso, por quem e quando.
+O PDF que vira papel, guardado com o que é preciso para saber o que foi impresso, por quem e quando. A programação automática usa `entity_type="Relatorio"`, `entity_id="programacao-de-compras-e-pagamentos"` e `template_version="programacao-v1"`; seus `params` guardam `season_id`, `farm_id`, `commitment_id` e `commitment_version`. A consulta no compromisso usa esse vínculo; o arquivo pronto fica preservado.
 
 ### `OperationEvent`
 `timestamp`, `actor`, `entity_type`, `entity_id`, `title`, `description`, `previous_status`, `new_status`, `document`

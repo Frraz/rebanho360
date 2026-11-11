@@ -36,7 +36,7 @@ Custos do complemento carregam a compra, o lote e o próprio complemento como or
 
 Os centros novos `FRETE DE COMPRA` e `FRETE DE TRANSFERÊNCIA` são criados sem renomear nem reclassificar lançamentos antigos no centro `FRETE`. O centro existente `DESPESA GADO` continua identificando a compra dos animais, separado de comissão e frete.
 
-O relatório de compromissos abre por padrão nos compromissos não excluídos e ainda não encerrados. Valor previsto incompleto aparece como `—`, inclusive no total; previsão de pagamento depende de retirada prevista e prazo e não equivale ao vencimento definitivo. Condições parceladas permanecem identificadas pela condição de pagamento.
+O relatório de compromissos abre por padrão nos compromissos não excluídos e ainda não encerrados. Valor previsto incompleto aparece como `—`, inclusive no total; na entrega de 18/10 a previsão de pagamento dependia de retirada prevista e prazo. **Substituído em 28/10/2026:** agora lê a data prevista informada no compromisso, sem inferência e sem equivaler ao vencimento definitivo (ver [atualização](../validacao/2026-10-28-jefeson.md)). Condições parceladas permanecem identificadas pela condição de pagamento.
 
 Relatórios por item aplicam categoria às linhas. Relatórios cujo objeto é a operação, comissão ou viagem selecionam operações que contêm a categoria e mantêm os valores completos da operação, com nota explicativa. Não se inventa rateio financeiro por categoria. O custo detalhado permite selecionar a natureza da despesa pelo centro de custo.
 

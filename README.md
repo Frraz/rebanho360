@@ -89,6 +89,8 @@ Toda operação do ciclo de compra carrega **um número só** (`OP-000123`, e `/
 
 ## Estado do projeto
 
+**Atualização de 28/10/2026:** o responsável informou que o sistema está em testes no VPS. Os últimos ajustes do compromisso foram implementados e validados localmente; sua atualização e homologação no VPS ainda não foram verificadas. A aprovação da pré-compra gera um PDF de **Programação de compras e pagamentos**, consolidado por safra e fazenda, com data prevista de pagamento informada. Veja o [registro da atualização](docs/validacao/2026-10-28-jefeson.md) para migrações, testes e roteiro de homologação. As pendências de deploy das fases abaixo são registros de validação, não confirmação de que o VPS esteja fora do ar.
+
 **Código das Fases 0 a 5 pronto, mais parte da Fase 6** (exportação de dados, dashboard analítico, gestão a pasto resumida e indicadores de consultoria). **Faltam as tarefas de deploy**, que dependem de um servidor real; os scripts e o `docker-compose.prod.yml` já existem.
 
 | Fase | Entrega | Estado |

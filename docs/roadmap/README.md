@@ -6,6 +6,10 @@ Não construir 80 telas antes de qualquer uma servir.
 
 ---
 
+## Atualização mais recente
+
+**28/10/2026 — compromissos e programação:** implementados e validados localmente o PDF automático na aprovação, data prevista de pagamento informada, campos complementares do contrato e consulta por operação. O responsável informou que o sistema está em testes no VPS; a aplicação desta atualização e sua homologação lá permanecem sem verificação. Migrações e evidências no [registro de validação](../validacao/2026-10-28-jefeson.md). As marcações de deploy nas fases abaixo registram pendências de homologação, não o estado ao vivo do servidor.
+
 ## As fases
 
 | | Etapa | Esforço | Tarefas | Entrega |

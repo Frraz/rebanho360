@@ -6,6 +6,8 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 
 ## Índice
 
+[Atualização do compromisso de compra em 28/10/2026](validacao/2026-10-28-jefeson.md): programação automática, data prevista de pagamento, campos do contrato, migrações e evidências locais. Regras vigentes em [ciclo de compra](regras-negocio/08-ciclo-de-compra.md) e [catálogo de relatórios](relatorios/01-catalogo.md).
+
 [Atualização solicitada pelo cliente em 18/10/2026](atualizacoes/2026-10-18-pedidos-cliente.md): rastreabilidade, regras confirmadas, avaliação da importação e roteiro de homologação.
 
 [Validação para publicação em 19/10/2026](atualizacoes/2026-10-19-validacao-producao.md): revisão de integridade, ensaio de migração e restauração, imagem de produção e conferência das telas.
@@ -98,6 +100,6 @@ Sistema de gestão pecuária para uma operação real de fazenda a pasto: 5 faze
 - Documento longo não é lido. Alvo: 1 a 3 páginas.
 - Decisão importante vira ADR, **com a alternativa descartada e o porquê**.
 - Dúvida de negócio vai para `99-pendencias.md`. **Nunca inventar regra em silêncio.**
-- Decisão que muda: atualizar o documento no mesmo commit do código.
+- Toda mudança funcional deve atualizar, no mesmo conjunto de alterações, as regras, o catálogo/modelo/fluxo afetado e a ajuda da tela quando aplicável. Registrar a validação e as migrações; distinguir implementação local, homologação e atualização do VPS. Documentos históricos permanecem datados, com indicação da regra que os substituiu.
 - Mudou algo visual? O [design system](ux/02-design-system.md) é a fonte de verdade: atualize-o junto, e recompile o CSS.
 - Pendência resolvida: registrar a resposta, com data e quem respondeu. A pergunta fica — apagá-la é perder o motivo da regra.

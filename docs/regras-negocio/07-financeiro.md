@@ -121,3 +121,7 @@ Toda transição grava `AuditEvent` (`UPDATE`, `APPROVE`, `CONFIRM` da baixa, `D
 ## Testes que travam esta regra
 
 `apps/finance/tests/`: geração idempotente (inclusive concorrente) · aprovação com permissão própria · quem aprova não paga · pagar sem aprovar recusado · baixa parcial até o total, nunca acima · clique duplo (serviço, tela e threads) · desfazer baixa com motivo · baixa bloqueia a compra, a venda e o lote com link · escopo (404) e papel (403) · CSRF · dado bancário mascarado e consulta auditada · fluxo, mapa e resumo de vencimentos.
+
+## Previsão operacional da pré-compra (28/10/2026)
+
+A data prevista de pagamento informada no compromisso alimenta **Programação de compras e pagamentos** e **Compromissos — previsão financeira**. É informação operacional: não gera título, não altera vencimentos ou parcelas e não participa do fluxo de caixa projetado. A **Programação de pagamentos** do financeiro continua baseada nos títulos existentes. Ver [ciclo de compra](08-ciclo-de-compra.md#aprovação-da-pré-compra-e-programação-28102026).
