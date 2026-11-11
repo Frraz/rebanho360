@@ -467,10 +467,16 @@ sudo grep -rn "rebanho360-demo" /etc/nginx/sites-enabled/ || echo "domínio livr
 O vhost definitivo ([nginx.conf.example](nginx.conf.example)) referencia o certificado, que ainda não existe — então o `nginx -t` falharia. Primeiro suba um vhost mínimo só na porta 80, para o Certbot poder validar o domínio:
 
 ```bash
+sudo mkdir -p /var/www/certbot
 sudo tee /etc/nginx/sites-available/rebanho360-demo.ferzion.com.br > /dev/null <<'EOF'
 server {
     listen 80;
     server_name rebanho360-demo.ferzion.com.br;
+
+    # Rota da validação do Let's Encrypt (método webroot, ver 7.2)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
     location / { return 404; }
 }
 EOF
@@ -482,11 +488,13 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx     # se ainda não houver certbot
-sudo certbot certonly --nginx -d rebanho360-demo.ferzion.com.br \
+sudo certbot certonly --webroot -w /var/www/certbot -d rebanho360-demo.ferzion.com.br \
      -m seu-email@dominio.com --agree-tos --no-eff-email
 ```
 
-O DNS (etapa 2.6) precisa estar apontando para o VPS, e as portas 80/443 abertas. Ao terminar, o certificado fica em `/etc/letsencrypt/live/rebanho360-demo.ferzion.com.br/`.
+Usamos `--webroot`, não `--nginx`: o plugin `--nginx` não consegue abrir exceção no `location / { return 404; }` do vhost provisório e a validação falha com 404. O vhost definitivo ([nginx.conf.example](nginx.conf.example)) mantém a mesma rota `acme-challenge` na porta 80, que é o que deixa a **renovação** funcionar.
+
+O DNS (etapa 2.6) precisa estar apontando **para o IP deste servidor** (confira com `ip -4 -br addr`; se estiver no Cloudflare, deixe "DNS only") e as portas 80/443 abertas. O Let's Encrypt limita 5 falhas por hora por domínio: se falhar, diagnostique antes de repetir. Ao terminar, o certificado fica em `/etc/letsencrypt/live/rebanho360-demo.ferzion.com.br/`.
 
 Confira a renovação automática:
 
