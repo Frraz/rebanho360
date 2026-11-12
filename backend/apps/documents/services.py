@@ -166,13 +166,31 @@ def solicitar_documento(*, slug: str, user, season, farm, origem) -> GeneratedDo
             actor=user,
         )
         if slug in RELATORIOS_PESADOS:
-            from apps.documents.tasks import gerar_pdf
-
-            transaction.on_commit(lambda: gerar_pdf.delay(documento.pk))
+            transaction.on_commit(lambda: _enfileirar(documento.pk))
     if slug not in RELATORIOS_PESADOS:
         gerar_documento(documento.pk)
         documento.refresh_from_db()
     return documento
+
+
+def _enfileirar(documento_pk: int) -> None:
+    """Coloca a geração na fila. Broker fora do ar: o documento vira erro claro,
+    em vez de ficar "Gerando" para sempre."""
+    from apps.documents.tasks import gerar_pdf
+
+    try:
+        gerar_pdf.delay(documento_pk)
+    except Exception:
+        logger.exception("Não foi possível enfileirar o documento %s", documento_pk)
+        GeneratedDocument.objects.filter(
+            pk=documento_pk, status=DocumentStatus.PENDENTE
+        ).update(
+            status=DocumentStatus.ERRO,
+            error=(
+                "Não foi possível colocar o relatório na fila. Gere de novo; "
+                "se persistir, avise o suporte."
+            ),
+        )
 
 
 def renderizar_html(relatorio, *, emitido_por: str, emitido_em, versao: str) -> str:

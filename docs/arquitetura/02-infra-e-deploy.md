@@ -91,7 +91,7 @@ Em ordem, com `set -euo pipefail` (qualquer passo que falhe interrompe o deploy)
 3. **Build** — antes, a imagem em produção é etiquetada `rebanho360_web:previous` (o destino do rollback). O estágio `prod` do Dockerfile compila o Tailwind e roda o `collectstatic`.
 4. **Migrações e estáticos** — `migrate` e `collectstatic`; depois, **publica os estáticos** em `STATIC_HOST_DIR`.
 5. **Sobe** `web worker beat`.
-6. **Health check** (`healthcheck.sh`); se falhar, `rollback.sh` e o deploy sai com erro.
+6. **Health check** do web (`healthcheck.sh`) **e do worker** (`celery inspect ping`, 5 tentativas); se qualquer um falhar, `rollback.sh` e o deploy sai com erro. O web saudável não prova que a fila funciona: um worker em loop de reinícios passou despercebido assim.
 
 Antes de migração destrutiva: backup, migração reversível quando possível, e janela combinada. O rollback reverte o **código**, não as migrações já aplicadas.
 
@@ -118,7 +118,7 @@ O Compose prefixa o nome do projeto (`rebanho360_rebanho360_media`). Por isso os
 
 Ambas sem autenticação, sem dado sensível, e **fora** do log de acesso — senão poluem o log com uma linha por segundo.
 
-**Chamar de fora do Nginx exige se apresentar como ele.** Em produção o Django redireciona http→https (`SECURE_SSL_REDIRECT`) e só aceita o domínio de `DJANGO_ALLOWED_HOSTS`: um `curl 127.0.0.1:8010/ready/` cru recebe 400 (Host inválido), e com o Host certo mas sem o cabeçalho de proto recebe 301. O `healthcheck.sh` envia `Host: <1º domínio de DJANGO_ALLOWED_HOSTS>` e `X-Forwarded-Proto: https` e só aceita `"status": "ok"` no corpo. (O `healthcheck` do container no `docker-compose.prod.yml` ainda chama `localhost` sem esses cabeçalhos — ver pendência abaixo.)
+**Chamar de fora do Nginx exige se apresentar como ele.** Em produção o Django redireciona http→https (`SECURE_SSL_REDIRECT`) e só aceita o domínio de `DJANGO_ALLOWED_HOSTS`: um `curl 127.0.0.1:8010/ready/` cru recebe 400 (Host inválido), e com o Host certo mas sem o cabeçalho de proto recebe 301. O `healthcheck.sh` envia `Host: <1º domínio de DJANGO_ALLOWED_HOSTS>` e `X-Forwarded-Proto: https` e só aceita `"status": "ok"` no corpo. O `healthcheck` do contêiner `web`, no `docker-compose.prod.yml`, faz o mesmo (Host = 1º domínio de `DJANGO_ALLOWED_HOSTS`, lido do `.env` dentro do contêiner, e `X-Forwarded-Proto: https`). Sem isso o contêiner ficava *unhealthy* com o sistema no ar.
 
 ## Backup
 
@@ -188,13 +188,14 @@ Alteração de firewall vai documentada em `deploy/firewall.md`, com data e moti
 - [ ] Backup diário rodando **e** com cópia fora do VPS
 - [ ] Restauração testada ao menos uma vez, anotada
 - [ ] Health check respondendo
+- [ ] `docker ps`: nenhum contêiner `unhealthy` ou `Restarting`; contadores de reinício do `worker` e do `beat` parados (`docker inspect -f '{{.Name}} {{.RestartCount}}' rebanho360_worker rebanho360_beat`)
+- [ ] Dependências do Celery fixadas e `pip check` limpo (o Dockerfile já roda no build)
 - [ ] Logs com rotação
 - [ ] Firewall conferido
 - [ ] `restart: unless-stopped` em todos os containers
 
 ## Pendências conhecidas
 
-- `docker-compose.prod.yml`: o `healthcheck` do `web` usa `curl -f http://localhost:8000/health/`. Com `ALLOWED_HOSTS` só com o domínio e `SECURE_SSL_REDIRECT` ligado, isso responde 400 e o container aparece como *unhealthy*. Precisa dos mesmos cabeçalhos do `healthcheck.sh` (ou de uma isenção do redirect para `/health/`).
 - Primeiro deploy real continua pendente (F0-17): `nginx.conf.example` e `restore-check.sql` foram escritos e o SQL validado contra o banco de desenvolvimento, mas o vhost nunca foi aplicado num servidor.
 
 

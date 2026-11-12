@@ -63,10 +63,23 @@ echo "==> 5/6 Subindo"
 $COMPOSE up -d web worker beat
 
 echo "==> 6/6 Healthcheck"
-if ./deploy/healthcheck.sh; then
-  echo "Deploy OK."
+# O web pode estar saudável com o worker em loop de reinícios (foi o que passou
+# despercebido): confere também que o Celery responde ao broker.
+worker_responde() {
+  local i
+  for i in 1 2 3 4 5; do
+    if $COMPOSE exec -T worker celery -A config inspect ping --timeout 10 > /dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+
+if ./deploy/healthcheck.sh && worker_responde; then
+  echo "Deploy OK (web e worker respondendo)."
 else
-  echo "Healthcheck falhou — rollback."
+  echo "Healthcheck falhou (web ou worker) — rollback."
   ./deploy/rollback.sh
   exit 1
 fi

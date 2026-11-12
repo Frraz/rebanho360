@@ -172,6 +172,22 @@ class TestFila:
         assert doc.status == DocumentStatus.PENDENTE and not doc.file
         assert enviados == [doc.pk]
 
+    def test_fila_fora_do_ar_vira_erro_claro_em_vez_de_gerando_para_sempre(
+        self, client, gestor, season, monkeypatch, django_capture_on_commit_callbacks
+    ):
+        def quebra(pk):
+            raise ConnectionError("redis fora do ar")
+
+        monkeypatch.setattr(tasks.gerar_pdf, "delay", quebra)
+        client.force_login(gestor)
+
+        with django_capture_on_commit_callbacks(execute=True):
+            pedir(client, "resultado-do-lote")
+
+        doc = GeneratedDocument.objects.get()
+        assert doc.status == DocumentStatus.ERRO
+        assert "colocar o relatório na fila" in doc.error
+
     def test_a_tarefa_gera_o_documento(self, gestor, season):
         doc = GeneratedDocument.objects.create(
             entity_type="Relatorio",

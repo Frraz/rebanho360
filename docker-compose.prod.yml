@@ -18,11 +18,15 @@ services:
       - rebanho360_static:/app/staticfiles
     ports:
       - "127.0.0.1:${WEB_HOST_PORT:-8010}:8000"
+    # Se apresenta como o nginx faz (Host do domínio + X-Forwarded-Proto): sem isso o
+    # Django responde 400 (ALLOWED_HOSTS) ou 301 (SECURE_SSL_REDIRECT) e o contêiner
+    # fica "unhealthy" mesmo com o sistema no ar. O `$$` evita que o compose expanda.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -H \"Host: $${DJANGO_ALLOWED_HOSTS%%,*}\" -H 'X-Forwarded-Proto: https' http://127.0.0.1:8000/health/"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:

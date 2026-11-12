@@ -20,7 +20,7 @@ COPY requirements/ requirements/
 # --- estágio dev: inclui ferramentas de desenvolvimento, sem build de CSS/collectstatic ---
 FROM base AS dev
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev \
-    && pip install -r requirements/dev.txt \
+    && pip install -r requirements/dev.txt && pip check \
     && apt-get purge -y build-essential libpq-dev && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
@@ -30,7 +30,7 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 # --- estágio prod: build do Tailwind, collectstatic, Gunicorn ---
 FROM base AS prod
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev \
-    && pip install -r requirements/prod.txt \
+    && pip install -r requirements/prod.txt && pip check \
     && apt-get purge -y build-essential libpq-dev && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 COPY . .
